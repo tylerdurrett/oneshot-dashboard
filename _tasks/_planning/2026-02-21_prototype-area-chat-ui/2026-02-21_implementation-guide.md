@@ -79,14 +79,16 @@ apps/web/src/app/
 
 ### 2.2 Export AI Elements from @repo/ui
 
-- [ ] Add exports for Conversation, Message, and PromptInput components to `packages/ui/src/index.ts`
-- [ ] Add export tests to `packages/ui/src/__tests__/components.test.tsx` following the existing pattern (verify each component is defined)
-- [ ] Run `pnpm test --filter @repo/ui` to confirm tests pass
+- [x] Add exports for Conversation, Message, and PromptInput components to `packages/ui/src/index.ts`
+- [x] Add export tests to `packages/ui/src/__tests__/components.test.tsx` following the existing pattern (verify each component is defined)
+- [x] Run `pnpm test --filter @repo/ui` to confirm tests pass
 
 **Acceptance Criteria:**
 - AI Elements components are importable via `import { ... } from '@repo/ui'`
 - Export tests pass
 - `pnpm build` and `pnpm test` pass
+
+> **Notes (2026-02-21):** Used wildcard re-exports (`export * from`) instead of explicit named exports since prompt-input.tsx alone has 50+ exports. This keeps index.ts clean and avoids manual maintenance as components evolve. Added 3 test cases covering the primary component from each module plus representative sub-components (Conversation/ConversationContent, Message/MessageContent/MessageResponse, PromptInput/PromptInputTextarea/PromptInputSubmit). All 14 tests pass, `pnpm build` clean.
 
 ## Phase 3: Prototype Route Area
 

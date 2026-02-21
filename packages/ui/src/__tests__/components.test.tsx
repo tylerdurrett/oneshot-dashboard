@@ -11,7 +11,15 @@ import {
   CardHeader,
   CardTitle,
   cn,
+  Conversation,
+  ConversationContent,
   Input,
+  Message,
+  MessageContent,
+  MessageResponse,
+  PromptInput,
+  PromptInputSubmit,
+  PromptInputTextarea,
 } from '../index';
 
 describe('component exports', () => {
@@ -36,5 +44,22 @@ describe('component exports', () => {
 
   it('exports cn utility', () => {
     expect(cn).toBeDefined();
+  });
+
+  it('exports Conversation and its sub-components', () => {
+    expect(Conversation).toBeDefined();
+    expect(ConversationContent).toBeDefined();
+  });
+
+  it('exports Message and its sub-components', () => {
+    expect(Message).toBeDefined();
+    expect(MessageContent).toBeDefined();
+    expect(MessageResponse).toBeDefined();
+  });
+
+  it('exports PromptInput and its sub-components', () => {
+    expect(PromptInput).toBeDefined();
+    expect(PromptInputTextarea).toBeDefined();
+    expect(PromptInputSubmit).toBeDefined();
   });
 });

@@ -12,3 +12,8 @@ export {
   CardHeader,
   CardTitle,
 } from './components/card';
+
+// AI Elements
+export * from './components/ai-elements/conversation';
+export * from './components/ai-elements/message';
+export * from './components/ai-elements/prompt-input';
