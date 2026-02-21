@@ -112,12 +112,14 @@ apps/web/src/app/
 
 ### 3.2 Visual Verification — Prototype Index
 
-- [ ] Use chrome-devtools to navigate to `http://localhost:3200/prototype`
-- [ ] Take a screenshot and verify: dark mode applied, heading visible, link to chat prototype present, no unwanted app chrome leaking in
-- [ ] Fix any visual issues discovered
+- [x] Use chrome-devtools to navigate to `http://localhost:3200/prototype`
+- [x] Take a screenshot and verify: dark mode applied, heading visible, link to chat prototype present, no unwanted app chrome leaking in
+- [x] Fix any visual issues discovered
 
 **Acceptance Criteria:**
 - Screenshot confirms the prototype index renders correctly in dark mode with a clean, minimal appearance
+
+> **Notes (2026-02-21):** Screenshot captured at `_screenshots/2026-02-21/2026-02-21_prototype-index.jpg`. All acceptance criteria confirmed: dark background with light text, "Prototypes" heading visible, "Fullscreen Chat" card with border and description present, no app chrome leaking in. Initial screenshot attempt showed unstyled page due to a dev server CSS compilation timing issue (versioned asset URLs returning 404) — resolved by restarting the dev server. This is a known behavior with Next.js dev mode + Puppeteer; production builds are unaffected.
 
 ## Phase 4: Fullscreen Chat Prototype
 
