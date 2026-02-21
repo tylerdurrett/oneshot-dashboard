@@ -4,6 +4,7 @@ import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { config } from './config.js';
 import { websocket } from './plugins/websocket.js';
+import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
 import {
   probeSandbox,
@@ -43,6 +44,11 @@ export function buildServer(opts?: BuildServerOptions) {
     routeOpts.database = opts.database;
   }
   server.register(threadRoutes, routeOpts);
+
+  const chatOpts: ChatRoutesOptions = {};
+  if (opts?.database) chatOpts.database = opts.database;
+  if (opts?.spawnFn) chatOpts.spawnFn = opts.spawnFn;
+  server.register(chatRoutes, chatOpts);
 
   /** Run the sandbox probe and cache the result for the health endpoint. */
   async function runSandboxProbe(): Promise<SandboxProbeResult> {

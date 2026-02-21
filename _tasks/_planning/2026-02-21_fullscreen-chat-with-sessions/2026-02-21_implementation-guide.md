@@ -301,9 +301,9 @@ scripts/
 
 ### 4.2 Chat WebSocket endpoint
 
-- [ ] Create `src/routes/chat.ts` with a WebSocket route at `/chat`
-- [ ] Handle incoming messages matching the protocol: `{ "type": "message", "threadId": "...", "content": "..." }`
-- [ ] On receiving a message:
+- [x] Create `src/routes/chat.ts` with a WebSocket route at `/chat`
+- [x] Handle incoming messages matching the protocol: `{ "type": "message", "threadId": "...", "content": "..." }`
+- [x] On receiving a message:
   1. Validate `threadId` exists (send error if not)
   2. Persist the user message to the database via thread service
   3. Look up the thread's `claudeSessionId`
@@ -311,9 +311,9 @@ scripts/
   5. Forward each `content_block_delta` text token to the client as `{ "type": "token", "text": "..." }`
   6. On `result` event: persist the full assistant message, update thread's `claudeSessionId`, send `{ "type": "done", "messageId": "..." }`
   7. On error: send `{ "type": "error", "message": "..." }`
-- [ ] If this is the first message in a new thread, auto-generate the title from the user's message (first 60 chars, trimmed to word boundary) and update the thread
-- [ ] Disable sending while a response is streaming (ignore incoming messages for that connection until `done`)
-- [ ] Handle resume failures: if `--resume` fails, retry without `--resume` and update the thread's session ID
+- [x] If this is the first message in a new thread, auto-generate the title from the user's message (first 60 chars, trimmed to word boundary) and update the thread
+- [x] Disable sending while a response is streaming (ignore incoming messages for that connection until `done`)
+- [x] Handle resume failures: if `--resume` fails, retry without `--resume` and update the thread's session ID
 
 **Acceptance Criteria:**
 - Client can send a message and receive streamed tokens back
@@ -322,6 +322,17 @@ scripts/
 - Thread title is auto-generated from first message
 - Errors are forwarded to the client as error events
 - Resume failures fall back gracefully
+
+> **Implementation Notes (4.2):**
+> - `chatRoutes` plugin follows the same DI pattern as `threadRoutes` — `ChatRoutesOptions` accepts optional `database` and `spawnFn`. The `spawnFn` is needed here (unlike thread routes) because the chat route invokes Claude via the sandbox service.
+> - `handleChatMessage()` is a standalone async function (not exported) that encapsulates the full message flow. The streaming lock is passed in via a `setStreaming` callback, keeping the function testable without closure coupling.
+> - `generateTitle()` is exported for unit testing. It trims to word boundary with `...` suffix for truncated titles. Content ≤ 60 chars is returned as-is.
+> - Resume failure handling is delegated entirely to `invokeClaude()` — the chat route just listens for events. When `invokeClaude` retries without `--resume`, it emits a new `result` event with the new `sessionId`, which is persisted via `updateThreadSessionId`.
+> - A `resultReceived` flag in the event handler prevents the `close` safety net from prematurely releasing the streaming lock before the async `result` handler finishes persisting.
+> - The `socket.on('message')` handler is wrapped in try/catch to prevent unhandled promise rejections from crashing the server. Errors are forwarded to the client as `{ type: 'error' }` messages.
+> - `sendJSON()` checks `socket.readyState === OPEN` before sending to handle client disconnects during streaming gracefully.
+> - First-message detection uses `getThreadMessages().length === 1` (after persisting the user message) rather than checking the title string, as the message count is the authoritative signal.
+> - All 67 existing tests pass, TypeScript compiles cleanly.
 
 ### 4.3 Write WebSocket integration tests
 
