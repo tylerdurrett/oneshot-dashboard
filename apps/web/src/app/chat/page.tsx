@@ -180,16 +180,17 @@ export default function ChatPage() {
                 />
               ) : (
                 messages.map((msg) => (
-                  <Message key={msg.id} from={msg.role}>
-                    <MessageContent>
-                      {msg.role === 'assistant' && !msg.content ? (
-                        <Spinner className="my-1" />
-                      ) : (
+                    <Message key={msg.id} from={msg.role}>
+                      <MessageContent>
                         <MessageResponse>{msg.content}</MessageResponse>
-                      )}
-                    </MessageContent>
-                  </Message>
-                ))
+                        {msg.role === 'assistant' && isStreaming && (
+                          <div className={msg.content ? 'hidden' : ''}>
+                            <Spinner className="size-4" />
+                          </div>
+                        )}
+                      </MessageContent>
+                    </Message>
+                  ))
               )}
               {error && (
                 <div

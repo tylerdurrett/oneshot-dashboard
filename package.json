@@ -19,6 +19,12 @@
     "new-video": "node scripts/new-video.mjs",
     "sandbox": "node scripts/sandbox-auth.mjs"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  },
   "devDependencies": {
     "eslint": "^9.39.2",
     "prettier": "^3.8.1",

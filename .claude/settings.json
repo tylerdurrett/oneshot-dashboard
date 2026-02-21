@@ -32,7 +32,10 @@
       "Bash(grep:*)",
       "Bash(pnpm --filter @repo/ui build:*)",
       "Bash(git stash:*)",
-      "Bash(pnpm --filter @repo/web build:*)"
+      "Bash(pnpm --filter @repo/web build:*)",
+      "Bash(pnpm --filter @repo/web tsc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pnpm test:*)"
     ],
     "deny": [
       "Read(.env)",
