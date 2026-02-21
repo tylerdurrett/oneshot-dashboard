@@ -39,8 +39,8 @@ export const config = {
   webOrigin: `http://localhost:${projectConfig.port}`,
 
   /** Docker sandbox name. */
-  sandboxName: process.env.SANDBOX_NAME ?? 'my-sandbox',
+  sandboxName: process.env.SANDBOX_NAME ?? 'oneshot-sandbox',
 
-  /** Workspace path inside the Docker sandbox. */
-  sandboxWorkspace: process.env.SANDBOX_WORKSPACE ?? '/workspace',
+  /** Workspace path inside the Docker sandbox. Defaults to the monorepo root. */
+  sandboxWorkspace: process.env.SANDBOX_WORKSPACE ?? root,
 } as const;

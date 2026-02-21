@@ -16,7 +16,8 @@
     "go": "turbo run dev studio",
     "stop": "node scripts/stop-dev-processes.mjs",
     "prego": "node scripts/check-setup.mjs && pnpm --filter @repo/db db:migrate",
-    "new-video": "node scripts/new-video.mjs"
+    "new-video": "node scripts/new-video.mjs",
+    "sandbox": "node scripts/sandbox-auth.mjs"
   },
   "devDependencies": {
     "eslint": "^9.39.2",

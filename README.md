@@ -22,6 +22,19 @@ When you want to stop both long-running local processes (`dev` + `studio`), run:
 pnpm stop
 ```
 
+## Agent Sandbox Setup
+
+The chat feature (`/chat`) connects to a Claude agent running inside a Docker sandbox. One-time setup:
+
+1. Install the [Docker sandbox plugin](https://docs.docker.com/sandbox/) if you don't have it
+2. Run:
+
+```bash
+pnpm sandbox
+```
+
+It will create the sandbox, open a browser for login, and verify everything is working. The sandbox stays authenticated across restarts — you only need to do this once.
+
 ## How to build with Claude Code
 
 ### Small tasks

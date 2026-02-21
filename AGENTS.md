@@ -29,6 +29,7 @@ This repo is meant to be used by NON-DEVELOPERS who are using coding agents to v
 | `pnpm studio` | Launch Remotion Studio for video preview (auto-runs setup if needed) |
 | `pnpm go` | Start Next.js + agent server + Remotion Studio concurrently (auto-runs setup if needed) |
 | `pnpm new-video <Name>` | Scaffold a new video composition |
+| `pnpm sandbox` | Check Docker sandbox auth status (guides through setup if needed) |
 | `pnpm --filter @repo/server dev` | Start agent server only |
 | `pnpm dlx shadcn@latest add <component> --cwd packages/ui` | Add a Shadcn component |
 
