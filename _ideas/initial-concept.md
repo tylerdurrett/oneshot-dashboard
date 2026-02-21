@@ -126,3 +126,5 @@ v2 we get
 I can define an entity like a "brand" that has certain requirements and assign agents to regularly create/nourish it.
 We get projects
 We get tasks, schedules, timelines, gantt charts
+Perhaps this is when we get artifact creation (remotion videos, images, etc)
+Somewhere in this mix the agent schedules can do work directly on repos. That might be earlier than later.
