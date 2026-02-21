@@ -521,9 +521,9 @@ scripts/
 
 ### 6.2 New thread button
 
-- [ ] Add a "+" button in the top-right corner of the chat
-- [ ] Clicking it: creates a new thread (via `useCreateThread` mutation), switches to it, clears the message display
-- [ ] The new thread starts empty and ready for input
+- [x] Add a "+" button in the top-right corner of the chat
+- [x] Clicking it: creates a new thread (via `useCreateThread` mutation), switches to it, clears the message display
+- [x] The new thread starts empty and ready for input
 
 **Acceptance Criteria:**
 - "+" button is visible and accessible
@@ -531,6 +531,12 @@ scripts/
 - Chat switches to the new thread immediately
 - Previous thread is still available in the dropdown
 - **Visual test (chrome-devtools):** Screenshot showing the "+" button placement and the resulting empty thread state
+
+> **Implementation Notes (6.2):**
+> - The "+" button is a `Button` (variant `ghost`, size `icon`) with `Plus` icon from `lucide-react`, placed inside the title bar div after `ThreadSelector` with `ml-auto` to push it to the right edge. `shrink-0` prevents it from collapsing.
+> - Wired to the existing `handleNewThread` callback — no new logic needed. The button is a second entry point to the same function already used by `ThreadSelector`'s dropdown "New thread" menu item.
+> - `aria-label="New thread"` for accessibility. `data-testid="new-thread-btn"` for testing.
+> - 2 new tests added to `page.test.tsx`: button renders in title bar with correct aria-label, clicking it creates a new thread and clears messages. A `Button` mock was added to the `@repo/ui` mock. 97 total web tests, 210 total across all packages. Build and lint clean.
 
 ### 6.3 Thread resumption flow
 

@@ -79,6 +79,9 @@ vi.mock('../thread-selector', () => ({
 
 // Mock @repo/ui to avoid Streamdown/StickToBottom complexity in unit tests
 vi.mock('@repo/ui', () => ({
+  Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) => (
+    <button {...props}>{children}</button>
+  ),
   Conversation: ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div data-testid="conversation" className={className}>
       {children}
@@ -219,6 +222,35 @@ describe('ChatPage', () => {
 
     mockOnNewThread();
     expect(callCount).toBe(2); // new thread
+    expect(setMessages).toHaveBeenCalledWith([]);
+  });
+
+  it('renders the standalone new thread button in the title bar', () => {
+    render(<ChatPage />);
+    const btn = screen.getByTestId('new-thread-btn');
+    expect(btn).toBeDefined();
+    expect(btn.getAttribute('aria-label')).toBe('New thread');
+    // Verify it's inside the title bar
+    const titleBar = screen.getByTestId('title-bar');
+    expect(titleBar.contains(btn)).toBe(true);
+  });
+
+  it('creates a new thread when clicking the standalone "+" button', () => {
+    const setMessages = vi.fn();
+    hookReturn = { ...defaultReturn, setMessages };
+
+    let callCount = 0;
+    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void; onSettled: () => void }) => {
+      callCount++;
+      opts.onSuccess({ id: `thread-${callCount}` });
+      opts.onSettled();
+    });
+
+    render(<ChatPage />);
+    expect(callCount).toBe(1); // auto-create on mount
+
+    fireEvent.click(screen.getByTestId('new-thread-btn'));
+    expect(callCount).toBe(2); // new thread from "+" button
     expect(setMessages).toHaveBeenCalledWith([]);
   });
 

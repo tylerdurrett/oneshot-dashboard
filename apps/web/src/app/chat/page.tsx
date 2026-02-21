@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import {
+  Button,
   Conversation,
   ConversationContent,
   ConversationEmptyState,
@@ -140,6 +142,16 @@ export default function ChatPage() {
               onSelectThread={handleSelectThread}
               onNewThread={handleNewThread}
             />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto size-8 shrink-0"
+              onClick={handleNewThread}
+              aria-label="New thread"
+              data-testid="new-thread-btn"
+            >
+              <Plus className="size-4" />
+            </Button>
           </div>
 
           <Conversation className="flex-1">
