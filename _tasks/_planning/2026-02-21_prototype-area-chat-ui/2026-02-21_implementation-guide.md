@@ -162,18 +162,20 @@ apps/web/src/app/
 
 ### 4.3 Visual Verification — Chat UI
 
-- [ ] Use chrome-devtools to navigate to `http://localhost:3200/prototype/chat`
-- [ ] Take a screenshot and verify: fullscreen dark chat, mock messages visible with correct user/assistant styling, input anchored at bottom
-- [ ] Take a screenshot at a narrower viewport width (e.g., 1024px) to check nothing breaks
-- [ ] Verify markdown renders correctly in messages (bold, lists, paragraphs)
-- [ ] Verify visual distinction between user and assistant messages is clear
-- [ ] Fix any visual issues discovered
+- [x] Use chrome-devtools to navigate to `http://localhost:3200/prototype/chat`
+- [x] Take a screenshot and verify: fullscreen dark chat, mock messages visible with correct user/assistant styling, input anchored at bottom
+- [x] Take a screenshot at a narrower viewport width (e.g., 1024px) to check nothing breaks
+- [x] Verify markdown renders correctly in messages (bold, lists, paragraphs)
+- [x] Verify visual distinction between user and assistant messages is clear
+- [x] Fix any visual issues discovered
 
 **Acceptance Criteria:**
 - Screenshots confirm the chat looks clean and intentional at default and narrower viewport sizes
 - Messages render markdown correctly
 - User and assistant messages are visually distinct
 - Input is properly anchored, no overlap with message content
+
+> **Notes (2026-02-21):** Initial screenshots revealed Tailwind's preflight CSS reset was stripping list markers (`list-style: none`) from `<ul>` and `<ol>` elements rendered by Streamdown inside message content. Fixed by adding scoped CSS rules in `apps/web/src/app/globals.css` to restore `list-style-type: disc` for unordered lists and `list-style-type: decimal` for ordered lists inside `.is-assistant` and `.is-user` message containers. Also encountered the same dev server CSS compilation timing issue as Phase 3.2 — Puppeteer screenshots showed unstyled pages until the dev server was restarted. Screenshots saved to `_screenshots/2026-02-21/`: `2026-02-21_chat-default-viewport.png` (1920x1080) and `2026-02-21_chat-narrow-viewport.png` (1024x768). All acceptance criteria confirmed: dark mode, markdown (bold, bullet lists, numbered lists, paragraphs), user/assistant visual distinction (user messages in rounded dark cards right-aligned, assistant left-aligned), and input anchored at bottom with no overlap.
 
 ### 4.4 Final Build and Lint Check
 
