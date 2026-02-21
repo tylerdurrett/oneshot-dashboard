@@ -321,6 +321,7 @@ scripts/
 - Streaming tokens appear in real-time
 - Auto-scroll works when new content arrives
 - Content width scales with container, not uncomfortably wide on large screens
+- **Visual test (chrome-devtools):** Screenshot `/chat` at desktop and narrow widths, verify dark theme, layout, and container-query scaling
 
 ### 5.3 Chat input with streaming state
 
@@ -334,6 +335,7 @@ scripts/
 - Input is disabled while Claude is streaming
 - Submit button shows appropriate state (send vs stop)
 - Enter key submits, Shift+Enter adds newline
+- **Visual test (chrome-devtools):** Screenshot the input area in ready and streaming states, verify disabled styling and button state
 
 ### 5.4 Thread data fetching with TanStack Query
 
@@ -363,6 +365,7 @@ scripts/
 - Partial responses are preserved on error
 - Connection status is visible when disconnected
 - Page never crashes on any error scenario
+- **Visual test (chrome-devtools):** Screenshot error states — inline error message, connection status indicator, partial response with error
 
 ---
 
@@ -386,6 +389,7 @@ scripts/
 - Dropdown lists all threads with titles and timestamps
 - Selecting a thread loads its messages and resumes context
 - Current thread is highlighted in the dropdown
+- **Visual test (chrome-devtools):** Screenshot the title bar and open dropdown with multiple threads
 
 ### 6.2 New thread button
 
@@ -398,6 +402,7 @@ scripts/
 - Clicking creates a new empty thread
 - Chat switches to the new thread immediately
 - Previous thread is still available in the dropdown
+- **Visual test (chrome-devtools):** Screenshot showing the "+" button placement and the resulting empty thread state
 
 ### 6.3 Thread resumption flow
 
@@ -447,19 +452,24 @@ scripts/
 
 ### 7.3 End-to-end verification
 
-- [ ] Manual test: start `pnpm dev`, open `/chat`, send a message, see streamed response
-- [ ] Manual test: start a new thread, send messages, switch back to first thread, verify history loads
-- [ ] Manual test: kill the Docker sandbox, send a message, verify inline error appears
-- [ ] Manual test: verify dark theme, scrollbar styling, container-query scaling at various widths
 - [ ] Verify `pnpm test` passes across all packages
 - [ ] Verify `pnpm build` succeeds
 - [ ] Verify `pnpm lint` passes
+- [ ] **Visual test (chrome-devtools):** Start `pnpm dev`, navigate to `/chat`, and screenshot the following scenarios:
+  - Empty chat state (fresh thread, ready to type)
+  - After sending a message with streamed response visible
+  - Multi-turn conversation with several messages
+  - Thread dropdown open with multiple threads listed
+  - After switching to a previous thread (history loaded)
+  - Error state (sandbox unavailable)
+  - Dark theme, scrollbar styling, and container-query scaling at 1440px and 768px widths
 
 **Acceptance Criteria:**
 - All success criteria from the feature description are met
 - All automated tests pass
 - Build and lint succeed
 - Chat works end-to-end with real Docker sandbox
+- All visual test screenshots confirm correct layout, theming, and responsive behavior
 
 ---
 

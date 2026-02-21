@@ -82,7 +82,7 @@ Small changes are one-offs. Larger features use `_tasks/` with status folders: `
 
 - Never edit files ending in .human.md. Those were created by a person and should stay that way.
 - Always create tests for your code
-- When possible, visually test your code
+- When doing UI work, visually test your code using the chrome devtools skill
 - Do as much as possible to verify your work yourself without asking the user
 - Use best-practice software architecture patterns
 - Strive to create minimal code, and be pragmatic with your choices. We do not want to overengineer. Our focus is on creating exactly the functionality we need, and keeping the code footprint manageable.
