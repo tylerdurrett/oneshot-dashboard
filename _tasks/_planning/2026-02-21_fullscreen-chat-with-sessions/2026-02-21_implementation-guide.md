@@ -247,14 +247,14 @@ scripts/
 
 ### 3.2 Claude invocation with NDJSON stream parsing
 
-- [ ] Add `invokeClaude(prompt, sessionId?)` function to `src/services/sandbox.ts` that spawns `docker sandbox exec` with `--output-format stream-json` and `--permission-mode bypassPermissions`
-- [ ] If `sessionId` is provided, add `--resume <sessionId>` flag
-- [ ] Return a Node.js readable stream that emits parsed NDJSON events line-by-line
-- [ ] Implement `extractTextFromStreamLine()` following the reference doc pattern — handles `content_block_delta`, `assistant`, and `result` event types
-- [ ] Implement inactivity timeout (configurable, default 10 minutes) that kills the process if no output arrives
-- [ ] Handle non-zero exit codes gracefully — try to parse stdout before throwing
-- [ ] Handle resume failures by detecting error patterns and starting a new session
-- [ ] Write tests with mocked spawn for: successful streaming, resume success, resume failure fallback, timeout, and non-zero exit with valid output
+- [x] Add `invokeClaude(prompt, sessionId?)` function to `src/services/sandbox.ts` that spawns `docker sandbox exec` with `--output-format stream-json` and `--permission-mode bypassPermissions`
+- [x] If `sessionId` is provided, add `--resume <sessionId>` flag
+- [x] Return a Node.js readable stream that emits parsed NDJSON events line-by-line
+- [x] Implement `extractTextFromStreamLine()` following the reference doc pattern — handles `content_block_delta`, `assistant`, and `result` event types
+- [x] Implement inactivity timeout (configurable, default 10 minutes) that kills the process if no output arrives
+- [x] Handle non-zero exit codes gracefully — try to parse stdout before throwing
+- [x] Handle resume failures by detecting error patterns and starting a new session
+- [x] Write tests with mocked spawn for: successful streaming, resume success, resume failure fallback, timeout, and non-zero exit with valid output
 
 **Acceptance Criteria:**
 - `invokeClaude()` streams text tokens as they arrive
@@ -263,6 +263,17 @@ scripts/
 - Inactivity timeout kills hung processes
 - Non-zero exits with valid output are handled correctly
 - All error classification patterns from the reference doc are covered
+
+> **Implementation Notes (3.2):**
+> - `invokeClaude()` returns an `EventEmitter` (not a `Readable` stream) since the consumer (Phase 4 WebSocket) needs to react to typed events (`text`, `result`, `error`, `close`, `resume_failed`) rather than read a generic stream. This is more idiomatic for the event-driven pattern.
+> - Uses the same spawn DI pattern as `probeSandbox()` — `spawnFn` defaults to `child_process.spawn`, tests pass a fake.
+> - Inactivity timeout uses `setInterval` with a configurable check interval (5 seconds or the timeout value, whichever is smaller). Tests use 50ms timeout for speed.
+> - Line buffering handles NDJSON lines split across multiple `stdout` chunks — data is buffered and only complete lines (terminated by `\n`) are processed. A dedicated test verifies this with a line split mid-JSON.
+> - `processStreamLine()` emits `text` events for `content_block_delta` and `assistant` types, and `result` events for the `result` type. The `result` event carries both the full text and session ID.
+> - Error classification priority follows the reference doc: auth → unavailability → resume → unknown. Specifically, resume failure auto-retry is suppressed when auth failure patterns are also present (auth takes priority).
+> - `runInvocation()` calls itself recursively on resume failure with `sessionId = undefined`, reusing the same `EventEmitter`. The `resume_failed` event is emitted before the retry so consumers can track this.
+> - Non-zero exit with valid NDJSON: the `result` event is already emitted during line-by-line streaming, so `parseResultFromOutput()` just confirms a result existed and the close is clean (no error emitted).
+> - 23 new tests added (10 `extractTextFromStreamLine` + 13 `invokeClaude`) for a total of 38 sandbox tests and 65 across all server test files. Covers: all NDJSON event types, edge cases (empty, non-JSON, unknown type), successful streaming, correct docker args with/without resume, resume failure fallback, auth-over-resume priority, inactivity timeout, non-zero exit with/without valid output, auth/unavailability classification, spawn error, and line buffering across chunks.
 
 ---
 
