@@ -72,7 +72,7 @@ Follows the Next.js convention, applied consistently across all apps:
 - ESLint uses flat config (`eslint.config.js`), not legacy `.eslintrc`
 - Vitest configs are per-package (for Turbo cache compatibility)
 - SQLite database files (`*.db`) are gitignored; `DATABASE_URL` env var defaults to `file:local.db`
-- Dev server port is set via `pnpm hello` and stored in `project.config.json` (agent-readable). Read port from `project.config.json`.
+- Ports are set via `pnpm hello` and stored in `project.config.json` (agent-readable). Convention: Web = N, Remotion Studio = N+1, Agent Server = N+2. Read ports from `project.config.json`, never hardcode them.
 
 ## Development Workflow
 

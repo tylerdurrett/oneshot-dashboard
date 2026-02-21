@@ -24,9 +24,10 @@ apps/
     package.json
     tsconfig.json
     vitest.config.ts
+    .env                           ← Committed: safe defaults (sandbox name, workspace path)
     src/
       index.ts                     ← Server entry, registers plugins
-      config.ts                    ← Environment/config (sandbox name, ports, etc.)
+      config.ts                    ← Reads port from project.config.json, env for sandbox config
       plugins/
         websocket.ts               ← WebSocket plugin registration
       routes/
@@ -50,6 +51,9 @@ apps/web/
 packages/db/
   src/
     schema.ts                      ← MODIFIED: Add threads + messages tables
+
+scripts/
+  get-server-port.mjs             ← NEW: Reads serverPort from project.config.json
 ```
 
 ---
@@ -104,15 +108,21 @@ packages/db/
 ### 2.1 Scaffold the Fastify app
 
 - [ ] Create `apps/server/` directory with `package.json` (`@repo/server`), `tsconfig.json` (extending `@repo/typescript-config`), and `vitest.config.ts`
-- [ ] Add dependencies: `fastify`, `@fastify/websocket`, `@repo/db`, `nanoid` (for ID generation if preferred over crypto.randomUUID)
+- [ ] Add dependencies: `fastify`, `@fastify/websocket`, `@fastify/cors`, `@repo/db`, `dotenv` (for loading `.env` files)
 - [ ] Add dev dependencies: `tsx` (for dev runner), `vitest`, `@repo/typescript-config`, `@repo/eslint-config`
 - [ ] Add scripts: `"dev": "tsx watch src/index.ts"`, `"build": "tsc"`, `"test": "vitest run"`, `"lint": "eslint ."`
-- [ ] Create `src/index.ts` with basic Fastify server startup on a configurable port (default 3201, read from env `SERVER_PORT`)
-- [ ] Create `src/config.ts` exporting server configuration (port, sandbox name, workspace path) from environment variables with sensible defaults
+- [ ] Create `src/config.ts` that reads `serverPort` from `project.config.json` (following the same pattern as `scripts/get-port.mjs`), and reads sandbox config (`SANDBOX_NAME`, `SANDBOX_WORKSPACE`) from environment variables via `dotenv`
+- [ ] Create `src/index.ts` with basic Fastify server startup using the port from config
+- [ ] Create `apps/server/.env` (committed) with safe defaults and comments for all env vars:
+  ```
+  # Docker sandbox configuration
+  SANDBOX_NAME=my-sandbox
+  SANDBOX_WORKSPACE=/workspace
+  ```
 - [ ] Add `apps/server` to pnpm workspace (already covered by `apps/*` glob in `pnpm-workspace.yaml`)
 
 **Acceptance Criteria:**
-- `pnpm --filter @repo/server dev` starts a Fastify server
+- `pnpm --filter @repo/server dev` starts a Fastify server on the port from `project.config.json`
 - Server responds to `GET /health` with `{ status: "ok" }`
 - TypeScript compiles without errors
 
@@ -136,7 +146,7 @@ packages/db/
   - `POST /threads` — accepts `{ title?: string }` body, creates thread with title (or "New conversation"), returns `{ thread: { id, title, ... } }`
 - [ ] Register routes in `src/index.ts`
 - [ ] Write integration tests in `src/__tests__/threads-routes.test.ts` using `fastify.inject()`
-- [ ] Enable CORS for the frontend origin (configurable, default `http://localhost:3200`)
+- [ ] Enable CORS for the frontend origin (derived from `project.config.json` web port)
 
 **Acceptance Criteria:**
 - All three endpoints return correct responses
@@ -145,16 +155,34 @@ packages/db/
 - Integration tests pass
 - CORS headers are present in responses
 
-### 2.4 Integrate with Turborepo
+### 2.4 Integrate with Turborepo and monorepo tooling
 
-- [ ] Verify `turbo.json` `dev` task picks up `apps/server` automatically (it should — `dev` task has no filter)
-- [ ] Test that `pnpm dev` starts both the Next.js app and the Fastify server concurrently
-- [ ] Update root `package.json` if needed to ensure both apps start
+**Port convention:** Web = N, Remotion Studio = N+1, Agent Server = N+2 (where N is the port from `pnpm hello`).
+
+- [ ] Update `scripts/setup.mjs` (`pnpm hello`):
+  - Add `serverPort` (webPort + 2) to `project.config.json` output
+  - Update the console output to show: "Dev server on port N, Remotion Studio on N+1, Agent server on N+2"
+- [ ] Create `scripts/get-server-port.mjs` (mirrors `get-port.mjs` but reads `serverPort`, defaults to 3002)
+- [ ] Update `apps/server/package.json` dev script to read port: `"dev": "tsx watch src/index.ts"` (port read in `src/config.ts` from `project.config.json`)
+- [ ] Verify `turbo.json` `dev` task picks up `apps/server` automatically (it should — `dev` task has no filter and `apps/*` is in the workspace)
+- [ ] Test that `pnpm dev` starts Next.js, and the Fastify server concurrently
+- [ ] Update `pnpm go` if needed — currently `turbo run dev studio`, which should pick up the server's `dev` task via turbo
+- [ ] Update `scripts/stop-dev-processes.mjs`:
+  - Change `getTargetPorts(devPort)` to return `[devPort, devPort + 1, devPort + 2]` (adds server port)
+  - Update console messages to mention all three services
+- [ ] Update `AGENTS.md`:
+  - Add `apps/server` (`@repo/server`) to the Monorepo Structure section
+  - Add `pnpm --filter @repo/server dev` to the Key Commands table
+  - Update `pnpm dev` description to mention it starts the agent server too
+  - Update `pnpm go` description if changed
+- [ ] Run `pnpm hello` to regenerate `project.config.json` with the new `serverPort` field
 
 **Acceptance Criteria:**
-- `pnpm dev` starts both `apps/web` (port from `project.config.json`) and `apps/server` (port 3201)
-- Both servers are accessible simultaneously
-- Stopping `pnpm dev` stops both processes
+- `pnpm hello` writes both `port` and `serverPort` to `project.config.json`
+- `pnpm dev` starts both `apps/web` and `apps/server` concurrently on their respective ports
+- `pnpm go` starts all three services (web, studio, server)
+- `pnpm stop` kills processes on all three ports (web, studio, server)
+- `AGENTS.md` reflects the new app and commands
 
 ---
 
@@ -262,7 +290,7 @@ packages/db/
 ### 5.1 WebSocket hook
 
 - [ ] Create `apps/web/src/app/chat/use-chat-socket.ts` — a custom React hook that manages the WebSocket connection
-- [ ] Hook API: `useChatSocket({ serverUrl })` returns `{ sendMessage(threadId, content), messages, isStreaming, error, connectionStatus }`
+- [ ] Hook API: `useChatSocket({ serverUrl })` returns `{ sendMessage(threadId, content), messages, isStreaming, error, connectionStatus }`. The `serverUrl` is derived from `NEXT_PUBLIC_SERVER_URL` env var (set in `next.config.ts` from `project.config.json`'s `serverPort`)
 - [ ] Handle incoming event types: `token` (append to current assistant message), `done` (finalize message), `error` (set error state)
 - [ ] Implement auto-reconnect with exponential backoff on disconnect
 - [ ] Track connection status: `connecting`, `connected`, `disconnected`
@@ -477,3 +505,5 @@ Note: Phases 2 and 3 can be worked on in parallel since they're independent (ser
 | Prototype as reference, not base | The prototype at `apps/web/src/app/prototype/chat/` proves the component composition works, but the real page will have significant additional logic (WebSocket, thread management, error states). Build fresh rather than adapt the prototype. |
 | Mocked sandbox in tests | All server tests mock `child_process.spawn` to avoid Docker dependency. End-to-end Docker testing is manual (Phase 7). |
 | Auto-create thread on page load | User lands on `/chat` ready to type — no "create thread" step. A thread is created automatically if none is active. |
+| Port convention: N, N+1, N+2 | Web, Remotion, Server ports derived from a single base port in `project.config.json`. Set once via `pnpm hello`, readable by all apps. No env var duplication. |
+| Server URL from project.config.json | Frontend derives `NEXT_PUBLIC_SERVER_URL` from `serverPort` in `next.config.ts` rather than a separate `.env` entry. Ports stay centralized in one file. |
