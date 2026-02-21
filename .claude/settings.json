@@ -23,7 +23,9 @@
       "Bash(pnpm --version:*)",
       "Bash(pnpm run:*)",
       "Bash(node scripts/check-setup.mjs:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "WebFetch(domain:ai-sdk.dev)",
+      "WebFetch(domain:elements.ai-sdk.dev)"
     ],
     "deny": [
       "Read(.env)",
