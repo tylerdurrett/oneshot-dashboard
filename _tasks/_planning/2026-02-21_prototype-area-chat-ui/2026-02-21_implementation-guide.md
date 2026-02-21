@@ -129,15 +129,17 @@ apps/web/src/app/
 
 ### 4.1 Mock Data
 
-- [ ] Create `apps/web/src/app/prototype/chat/mock-data.ts` with a static array of mock messages
-- [ ] Messages should simulate the "birth the bot" onboarding conversation: agent greeting, asking the user's name, user responding, agent asking about goals, etc.
-- [ ] Each message has a `role` ("user" or "assistant"), `content` (markdown string), and an `id`
-- [ ] Include 6-10 messages that demonstrate: plain text, a longer paragraph, a markdown list, and a question from the agent
+- [x] Create `apps/web/src/app/prototype/chat/mock-data.ts` with a static array of mock messages
+- [x] Messages should simulate the "birth the bot" onboarding conversation: agent greeting, asking the user's name, user responding, agent asking about goals, etc.
+- [x] Each message has a `role` ("user" or "assistant"), `content` (markdown string), and an `id`
+- [x] Include 6-10 messages that demonstrate: plain text, a longer paragraph, a markdown list, and a question from the agent
 
 **Acceptance Criteria:**
 - Mock data file exports a typed array of messages
 - Messages cover a range of content types (short, long, markdown formatting)
 - Content simulates a realistic onboarding exchange
+
+> **Notes (2026-02-21):** Created `MockMessage` interface with `id`, `role`, and `content` fields. 9 messages simulate a realistic onboarding exchange covering: plain text greetings, short user replies, longer assistant paragraphs, **bold** markdown, unordered bullet lists, ordered numbered lists, and agent questions. The `role` type is `'user' | 'assistant'` which matches `UIMessage["role"]` from the `ai` package used by the Message component. `pnpm build` and `pnpm test` pass.
 
 ### 4.2 Fullscreen Chat Page
 
