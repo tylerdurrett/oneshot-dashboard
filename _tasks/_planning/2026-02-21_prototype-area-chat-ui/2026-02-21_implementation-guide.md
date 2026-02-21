@@ -45,15 +45,17 @@ apps/web/src/app/
 
 ### 1.1 Test Chrome DevTools Skill
 
-- [ ] Start the dev server (`pnpm dev`)
-- [ ] Use the chrome-devtools skill to navigate to the existing home page (http://localhost:3200)
-- [ ] Take a screenshot of the home page and verify it renders correctly
-- [ ] Confirm the screenshot workflow works end-to-end (navigate, capture, review)
+- [x] Start the dev server (`pnpm dev`)
+- [x] Use the chrome-devtools skill to navigate to the existing home page (http://localhost:3200)
+- [x] Take a screenshot of the home page and verify it renders correctly
+- [x] Confirm the screenshot workflow works end-to-end (navigate, capture, review)
 
 **Acceptance Criteria:**
 - Chrome DevTools skill successfully launches a browser and navigates to the dev server
 - Screenshot is captured and can be reviewed
 - The workflow is reliable enough to use for visual testing in later phases
+
+> **Notes (2026-02-21):** The chrome-devtools skill was missing its `lib/` directory (`browser.js` and `selector.js`). Created both files to restore functionality. All scripts (navigate.js, screenshot.js) now work correctly. Screenshot of homepage captured and verified at `_screenshots/2026-02-21/2026-02-21_015447_homepage.jpg`.
 
 ## Phase 2: AI Elements in packages/ui
 
