@@ -22,6 +22,8 @@ export {
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
 
+export { Spinner } from './components/spinner';
+
 // AI Elements
 export * from './components/ai-elements/conversation';
 export * from './components/ai-elements/message';

@@ -9,6 +9,7 @@ import {
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
+  useStickToBottomContext,
   Message,
   MessageContent,
   MessageResponse,
@@ -17,11 +18,26 @@ import {
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
+  Spinner,
 } from '@repo/ui';
 import { useChatSocket } from './use-chat-socket';
 import { useCreateThread, useThreadMessages, useThreads, threadKeys } from './use-threads';
 import { ThreadSelector } from './thread-selector';
 import type { ChatMessage } from './use-chat-socket';
+
+function ScrollOnStream({ isStreaming }: { isStreaming: boolean }) {
+  const { scrollToBottom } = useStickToBottomContext();
+  const prevRef = useRef(false);
+
+  useEffect(() => {
+    if (isStreaming && !prevRef.current) {
+      scrollToBottom();
+    }
+    prevRef.current = isStreaming;
+  }, [isStreaming, scrollToBottom]);
+
+  return null;
+}
 
 export default function ChatPage() {
   const { messages, sendMessage, setMessages, isStreaming, error, connectionStatus } =
@@ -155,6 +171,7 @@ export default function ChatPage() {
           </div>
 
           <Conversation className="flex-1">
+            <ScrollOnStream isStreaming={isStreaming} />
             <ConversationContent>
               {messages.length === 0 ? (
                 <ConversationEmptyState
@@ -165,7 +182,11 @@ export default function ChatPage() {
                 messages.map((msg) => (
                   <Message key={msg.id} from={msg.role}>
                     <MessageContent>
-                      <MessageResponse>{msg.content}</MessageResponse>
+                      {msg.role === 'assistant' && !msg.content ? (
+                        <Spinner className="my-1" />
+                      ) : (
+                        <MessageResponse>{msg.content}</MessageResponse>
+                      )}
                     </MessageContent>
                   </Message>
                 ))
