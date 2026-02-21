@@ -65,15 +65,17 @@ apps/web/src/app/
 
 ### 2.1 Install AI Elements Components
 
-- [ ] Run the AI Elements CLI to install Conversation, Message, and PromptInput components into `packages/ui`. The CLI may need `--cwd` pointed to `packages/ui`, similar to how Shadcn components are added: `pnpm dlx shadcn@latest add <component> --cwd packages/ui`
-- [ ] If the AI Elements CLI doesn't support `--cwd`, manually copy the component source files into `packages/ui/src/components/ai-elements/`
-- [ ] Verify the installed component files exist and have no import path issues (they should reference local utils via the aliases in `components.json`)
-- [ ] Add any missing peer dependencies to `packages/ui/package.json` (AI Elements may require `react-markdown`, `remark-gfm`, or similar — check the component source for imports)
+- [x] Run the AI Elements CLI to install Conversation, Message, and PromptInput components into `packages/ui`. The CLI may need `--cwd` pointed to `packages/ui`, similar to how Shadcn components are added: `pnpm dlx shadcn@latest add <component> --cwd packages/ui`
+- [x] If the AI Elements CLI doesn't support `--cwd`, manually copy the component source files into `packages/ui/src/components/ai-elements/`
+- [x] Verify the installed component files exist and have no import path issues (they should reference local utils via the aliases in `components.json`)
+- [x] Add any missing peer dependencies to `packages/ui/package.json` (AI Elements may require `react-markdown`, `remark-gfm`, or similar — check the component source for imports)
 
 **Acceptance Criteria:**
 - AI Elements component source files exist in `packages/ui/src/components/ai-elements/`
 - All imports within the component files resolve correctly
 - `pnpm build` passes with no TypeScript errors in `packages/ui`
+
+> **Notes (2026-02-21):** Used `pnpm dlx ai-elements@latest add <component>` from within `packages/ui/` directory (CLI doesn't support `--cwd`). The CLI automatically installed all dependencies (`use-stick-to-bottom`, `streamdown`, `@streamdown/*`, `ai`, `nanoid`, `cmdk`) and companion Shadcn components (`separator`, `tooltip`, `button-group`, `dialog`, `dropdown-menu`, `hover-card`, `textarea`, `select`, `spinner`, `command`, `input-group`). Components use `@streamdown` plugins instead of `react-markdown`/`remark-gfm` as the plan predicted. `pnpm build` passes cleanly.
 
 ### 2.2 Export AI Elements from @repo/ui
 
