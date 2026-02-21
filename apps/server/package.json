@@ -1,0 +1,28 @@
+{
+  "name": "@repo/server",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/websocket": "^11.0.0",
+    "@repo/db": "workspace:*",
+    "dotenv": "^17.0.0",
+    "fastify": "^5.7.0"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "^25.3.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

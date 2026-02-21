@@ -107,24 +107,31 @@ scripts/
 
 ### 2.1 Scaffold the Fastify app
 
-- [ ] Create `apps/server/` directory with `package.json` (`@repo/server`), `tsconfig.json` (extending `@repo/typescript-config`), and `vitest.config.ts`
-- [ ] Add dependencies: `fastify`, `@fastify/websocket`, `@fastify/cors`, `@repo/db`, `dotenv` (for loading `.env` files)
-- [ ] Add dev dependencies: `tsx` (for dev runner), `vitest`, `@repo/typescript-config`, `@repo/eslint-config`
-- [ ] Add scripts: `"dev": "tsx watch src/index.ts"`, `"build": "tsc"`, `"test": "vitest run"`, `"lint": "eslint ."`
-- [ ] Create `src/config.ts` that reads `serverPort` from `project.config.json` (following the same pattern as `scripts/get-port.mjs`), and reads sandbox config (`SANDBOX_NAME`, `SANDBOX_WORKSPACE`) from environment variables via `dotenv`
-- [ ] Create `src/index.ts` with basic Fastify server startup using the port from config
-- [ ] Create `apps/server/.env` (committed) with safe defaults and comments for all env vars:
+- [x] Create `apps/server/` directory with `package.json` (`@repo/server`), `tsconfig.json` (extending `@repo/typescript-config`), and `vitest.config.ts`
+- [x] Add dependencies: `fastify`, `@fastify/websocket`, `@fastify/cors`, `@repo/db`, `dotenv` (for loading `.env` files)
+- [x] Add dev dependencies: `tsx` (for dev runner), `vitest`, `@repo/typescript-config`, `@repo/eslint-config`
+- [x] Add scripts: `"dev": "tsx watch src/index.ts"`, `"build": "tsc"`, `"test": "vitest run"`, `"lint": "eslint ."`
+- [x] Create `src/config.ts` that reads `serverPort` from `project.config.json` (following the same pattern as `scripts/get-port.mjs`), and reads sandbox config (`SANDBOX_NAME`, `SANDBOX_WORKSPACE`) from environment variables via `dotenv`
+- [x] Create `src/index.ts` with basic Fastify server startup using the port from config
+- [x] Create `apps/server/.env` (committed) with safe defaults and comments for all env vars:
   ```
   # Docker sandbox configuration
   SANDBOX_NAME=my-sandbox
   SANDBOX_WORKSPACE=/workspace
   ```
-- [ ] Add `apps/server` to pnpm workspace (already covered by `apps/*` glob in `pnpm-workspace.yaml`)
+- [x] Add `apps/server` to pnpm workspace (already covered by `apps/*` glob in `pnpm-workspace.yaml`)
 
 **Acceptance Criteria:**
 - `pnpm --filter @repo/server dev` starts a Fastify server on the port from `project.config.json`
 - Server responds to `GET /health` with `{ status: "ok" }`
 - TypeScript compiles without errors
+
+> **Implementation Notes (2.1):**
+> - `src/index.ts` exports a `buildServer()` factory function (Fastify best practice) to enable `fastify.inject()` testing without starting a real server. The server only starts when not in Vitest (`!process.env.VITEST` guard).
+> - `buildServer()` accepts an optional `{ logger?: boolean }` param so tests can suppress Pino output.
+> - `tsconfig.json` extends `base.json` (not `library.json`) — `noEmit: true` from base means `tsc` only type-checks, which is correct since `tsx` runs source directly.
+> - `config.ts` supports both `serverPort` (for Phase 2.4) and fallback `port + 2` from `project.config.json`.
+> - Added a health endpoint test in `src/__tests__/health.test.ts` to validate the scaffold works.
 
 ### 2.2 Thread service layer
 
