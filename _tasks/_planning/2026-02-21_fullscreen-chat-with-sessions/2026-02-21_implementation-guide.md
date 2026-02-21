@@ -66,10 +66,10 @@ scripts/
 
 ### 1.1 Add threads and messages tables
 
-- [ ] Add `threads` table to `packages/db/src/schema.ts` with columns: `id` (text, primary key), `title` (text, not null), `claudeSessionId` (text, nullable), `createdAt` (integer, timestamp, default now), `updatedAt` (integer, timestamp, default now)
-- [ ] Add `messages` table with columns: `id` (text, primary key), `threadId` (text, foreign key to threads), `role` (text, enum: user/assistant), `content` (text), `createdAt` (integer, timestamp, default now)
-- [ ] Use `crypto.randomUUID()` for ID generation at the application layer (not auto-increment — these are text PKs)
-- [ ] Export both tables from `packages/db/src/index.ts` (already covered by `export * from './schema'`)
+- [x] Add `threads` table to `packages/db/src/schema.ts` with columns: `id` (text, primary key), `title` (text, not null), `claudeSessionId` (text, nullable), `createdAt` (integer, timestamp, default now), `updatedAt` (integer, timestamp, default now)
+- [x] Add `messages` table with columns: `id` (text, primary key), `threadId` (text, foreign key to threads), `role` (text, enum: user/assistant), `content` (text), `createdAt` (integer, timestamp, default now)
+- [x] Use `crypto.randomUUID()` for ID generation at the application layer (not auto-increment — these are text PKs)
+- [x] Export both tables from `packages/db/src/index.ts` (already covered by `export * from './schema'`)
 
 **Acceptance Criteria:**
 - `threads` and `messages` tables exist in schema with correct column types
@@ -78,10 +78,10 @@ scripts/
 
 ### 1.2 Generate and apply migration
 
-- [ ] Run `pnpm --filter @repo/db db:generate` to create the migration file
-- [ ] Review the generated `.sql` file in `packages/db/drizzle/` to verify it creates the expected tables and columns
-- [ ] Run `pnpm --filter @repo/db db:migrate` to apply the migration to the local database
-- [ ] Commit the schema change and migration file together
+- [x] Run `pnpm --filter @repo/db db:generate` to create the migration file
+- [x] Review the generated `.sql` file in `packages/db/drizzle/` to verify it creates the expected tables and columns
+- [x] Run `pnpm --filter @repo/db db:migrate` to apply the migration to the local database
+- [x] Commit the schema change and migration file together
 
 **Acceptance Criteria:**
 - Migration file is generated in `packages/db/drizzle/`
@@ -90,8 +90,8 @@ scripts/
 
 ### 1.3 Write schema tests
 
-- [ ] Add tests in `packages/db/src/__tests__/schema.test.ts` verifying: threads table exports correctly, messages table exports correctly, column types match expectations
-- [ ] Run `pnpm --filter @repo/db test` — all tests pass
+- [x] Add tests in `packages/db/src/__tests__/schema.test.ts` verifying: threads table exports correctly, messages table exports correctly, column types match expectations
+- [x] Run `pnpm --filter @repo/db test` — all tests pass
 
 **Acceptance Criteria:**
 - Schema tests pass
