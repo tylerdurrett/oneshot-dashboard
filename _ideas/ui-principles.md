@@ -37,6 +37,13 @@ The chat panel is a central piece of the UI and needs to be well crafted.
 - Use semantic tokens. Example: `warning` (semantic) → `amber-500` (palette) → `#f59e0b` (literal).
 - This creates a layer of meaning between intent and color, making theming and consistency manageable.
 
+## Performance
+
+Sluggish UI is not acceptable. Buttery smooth at all times.
+
+- **Instant, optimistic updates** with background actions. TanStack Query for good performance characteristics.
+- **GPU-optimized animations** — dragging, transitions, and animations must use performant properties (transforms, opacity) that don't trigger reflow.
+
 ## Feature Design Workflow
 
 When designing features that have UI:

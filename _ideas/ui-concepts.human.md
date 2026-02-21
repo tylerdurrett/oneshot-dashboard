@@ -34,3 +34,9 @@ Sometimes the center view does not contain what we would think of as an "artifac
 The chat panel itself, being a key central part of the UI, will need to be well crafted.
 We will need a way to choose previous chats.
 We will need a way to choose which agent we're chatting with.
+---
+A note on UI performance.
+Slugish UI is not acceptable.
+We need to use methods that ensure buttery smooth UI in a couple of ways:
+1. Instant, optimistic updates with background actions. Tanstack Query tends to have good performance characteristics.
+2. For things involving dragging elements or animation, we need to be sure the animation is built in a performant way, using GPU-optimized properties that don't reflow content.
