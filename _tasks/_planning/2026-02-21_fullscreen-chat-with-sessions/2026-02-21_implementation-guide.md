@@ -135,15 +135,22 @@ scripts/
 
 ### 2.2 Thread service layer
 
-- [ ] Create `src/services/thread.ts` with functions: `createThread(title)`, `getThread(id)`, `listThreads()`, `getThreadMessages(threadId)`, `addMessage(threadId, role, content)`, `updateThreadSessionId(threadId, sessionId)`, `updateThreadTitle(threadId, title)`
-- [ ] All functions use Drizzle ORM queries against `@repo/db`
-- [ ] `listThreads()` returns threads ordered by `updatedAt` descending
-- [ ] Write unit tests in `src/__tests__/thread.test.ts` using an in-memory SQLite database
+- [x] Create `src/services/thread.ts` with functions: `createThread(title)`, `getThread(id)`, `listThreads()`, `getThreadMessages(threadId)`, `addMessage(threadId, role, content)`, `updateThreadSessionId(threadId, sessionId)`, `updateThreadTitle(threadId, title)`
+- [x] All functions use Drizzle ORM queries against `@repo/db`
+- [x] `listThreads()` returns threads ordered by `updatedAt` descending
+- [x] Write unit tests in `src/__tests__/thread.test.ts` using an in-memory SQLite database
 
 **Acceptance Criteria:**
 - All thread service functions work correctly
 - Tests pass with in-memory database
 - Thread listing is ordered most-recent-first
+
+> **Implementation Notes (2.2):**
+> - All service functions use dependency injection for the database parameter (`database: Database = db`) — defaults to the shared `@repo/db` client for production, but tests pass an in-memory libsql instance.
+> - `Database` type is inferred as `typeof defaultDb` from the shared drizzle client, avoiding manual type construction.
+> - Test database uses `@libsql/client` with `url: ':memory:'` and raw SQL DDL to create tables. Both `@libsql/client` and `drizzle-orm` added as dev dependencies to `@repo/server` since pnpm strict mode doesn't hoist transitive deps.
+> - `addMessage()` also updates the parent thread's `updatedAt` timestamp to keep `listThreads()` ordering accurate.
+> - 14 unit tests cover all 7 service functions including edge cases (nonexistent IDs, empty results, timestamp updates).
 
 ### 2.3 Thread HTTP routes
 
