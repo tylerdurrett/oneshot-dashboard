@@ -143,12 +143,12 @@ apps/web/src/app/
 
 ### 4.2 Fullscreen Chat Page
 
-- [ ] Create `apps/web/src/app/prototype/chat/page.tsx` as a client component
-- [ ] Layout: full viewport height (`h-dvh`), flex column, centered horizontally with a max-width for readability (e.g., `max-w-3xl`)
-- [ ] Message area: use the Conversation component (or a scrollable container) displaying mock messages using the Message component. Auto-scroll to bottom
-- [ ] Input area: use the PromptInput component fixed at the bottom of the chat. On submit, append the new message to local state and clear the input
-- [ ] No simulated agent responses — user messages simply appear in the list. This is about the UI feel, not interaction logic
-- [ ] Ensure smooth scrolling behavior when new messages are added
+- [x] Create `apps/web/src/app/prototype/chat/page.tsx` as a client component
+- [x] Layout: full viewport height (`h-dvh`), flex column, centered horizontally with a max-width for readability (e.g., `max-w-3xl`)
+- [x] Message area: use the Conversation component (or a scrollable container) displaying mock messages using the Message component. Auto-scroll to bottom
+- [x] Input area: use the PromptInput component fixed at the bottom of the chat. On submit, append the new message to local state and clear the input
+- [x] No simulated agent responses — user messages simply appear in the list. This is about the UI feel, not interaction logic
+- [x] Ensure smooth scrolling behavior when new messages are added
 
 **Acceptance Criteria:**
 - `/prototype/chat` renders a fullscreen chat filling the viewport
@@ -157,6 +157,8 @@ apps/web/src/app/
 - User can type a message, submit it, and see it appear in the message list
 - Input clears after submission
 - Chat scrolls smoothly, latest messages visible
+
+> **Notes (2026-02-21):** Used `Conversation` > `ConversationContent` for the message area with built-in auto-scroll via `use-stick-to-bottom`. Each message rendered with `Message` (`from={role}`) > `MessageContent` > `MessageResponse` for markdown support via Streamdown plugins. Input uses `PromptInputProvider` > `PromptInput` > `PromptInputTextarea` + `PromptInputSubmit` composition. The provider handles auto-clearing the input on submit. Added a `ConversationScrollButton` for scroll-to-bottom affordance when user scrolls up. Layout uses `h-dvh` with the message area flexing to fill space and input pinned at the bottom with a subtle `border-t border-border` separator. `pnpm build` and `pnpm test` pass (all 22 tests across 4 packages).
 
 ### 4.3 Visual Verification — Chat UI
 
