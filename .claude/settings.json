@@ -28,7 +28,8 @@
       "WebFetch(domain:elements.ai-sdk.dev)",
       "Bash(pnpm --filter @repo/db test:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(grep:*)"
     ],
     "deny": [
       "Read(.env)",
