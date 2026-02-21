@@ -29,7 +29,10 @@
       "Bash(pnpm --filter @repo/db test:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(pnpm --filter @repo/ui build:*)",
+      "Bash(git stash:*)",
+      "Bash(pnpm --filter @repo/web build:*)"
     ],
     "deny": [
       "Read(.env)",

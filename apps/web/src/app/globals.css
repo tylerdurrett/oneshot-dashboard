@@ -89,6 +89,27 @@
   --chart-5: 340 75% 55%;
 }
 
+/* Global scrollbar — subtle, dark-theme matched, visible on hover.
+   Webkit-only: both Safari and Chrome ignore these when standard
+   scrollbar-color/scrollbar-width are set, so we avoid those entirely. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(240 4% 22%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(240 4% 35%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
