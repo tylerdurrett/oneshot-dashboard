@@ -57,6 +57,14 @@ Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (
 - `db:migrate` runs automatically on `pnpm dev` / `pnpm go` / `pnpm studio`, so pending migrations are always applied.
 - `db:push` exists for throwaway prototyping only. It skips migration files and can drop data.
 
+## Environment Variables
+
+Follows the Next.js convention, applied consistently across all apps:
+- **`.env`** — Committed to git. Contains non-sensitive defaults with comments explaining each variable. This is the documentation for what env vars exist.
+- **`.env.local`** — NOT committed (gitignored). Contains secrets and local overrides.
+- **`.env.development`**, **`.env.production`** — Committed. Environment-specific defaults.
+- When adding a new env var, always update the app's `.env` with a safe default or placeholder.
+
 ## Conventions
 
 - Package names use `@repo/*` scope

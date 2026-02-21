@@ -40,11 +40,9 @@ yarn-error.log*
 .next/
 out/
 
-# Environment variables
-.env
+# Environment variables — .env is committed (safe defaults), .env.local is not (secrets)
 .env.local
 .env.*.local
-*.env
 project.config.json
 
 # IDE
