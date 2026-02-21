@@ -285,12 +285,19 @@ scripts/
 
 ### 4.1 WebSocket plugin setup
 
-- [ ] Create `src/plugins/websocket.ts` that registers `@fastify/websocket`
-- [ ] Register the plugin in `src/index.ts`
+- [x] Create `src/plugins/websocket.ts` that registers `@fastify/websocket`
+- [x] Register the plugin in `src/index.ts`
 
 **Acceptance Criteria:**
 - WebSocket upgrade works on the Fastify server
 - A test WebSocket connection can be established
+
+> **Implementation Notes (4.1):**
+> - `src/plugins/websocket.ts` is a thin re-export of `@fastify/websocket` (`export { default as websocket } from '@fastify/websocket'`). The plugin is registered directly via `server.register(websocket)` in `buildServer()` — matching the CORS pattern — rather than wrapping it in a custom plugin function. This avoids Fastify encapsulation issues since `@fastify/websocket` uses `fastify-plugin` internally to break scope.
+> - Added `ws` and `@types/ws` as dev dependencies for WebSocket client testing (pnpm strict mode prevents importing transitive deps from `@fastify/websocket`).
+> - Tests use `server.injectWS()` (provided by `@fastify/websocket`) for WebSocket testing without starting a real server — similar to Fastify's `server.inject()` for HTTP.
+> - Test routes must be registered inside `server.after()` so the websocket plugin's `onRoute` hook is active when the route is processed. Routes added at the top level (outside `register`/`after`) are processed before queued plugins initialize.
+> - 2 new tests: bidirectional echo via WebSocket upgrade, and `websocketServer` property availability. 67 total tests across all server test files.
 
 ### 4.2 Chat WebSocket endpoint
 

@@ -3,6 +3,7 @@ import 'dotenv/config';
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { config } from './config.js';
+import { websocket } from './plugins/websocket.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
 import {
   probeSandbox,
@@ -26,6 +27,7 @@ export function buildServer(opts?: BuildServerOptions) {
   let sandboxStatus: SandboxProbeResult | null = null;
 
   server.register(cors, { origin: config.webOrigin });
+  server.register(websocket);
 
   server.get('/health', async () => {
     return {
