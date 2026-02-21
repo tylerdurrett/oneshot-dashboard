@@ -45,6 +45,7 @@ Small changes are one-offs. Larger features use `_tasks/` with status folders: `
 
 ## Remember
 
+- Never edit files ending in .human.md. Those were created by a person and should stay that way.
 - Always create tests for your code
 - When possible, visually test your code
 - Do as much as possible to verify your work yourself without asking the user
