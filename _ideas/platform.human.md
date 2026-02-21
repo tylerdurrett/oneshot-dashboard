@@ -1,0 +1,2 @@
+
+The long-running agent code is going to get scheduled and be processed by servers (not serverless) because this shit is long-running AF. And since Claude Code takes quite a bit of RAM, I'm inclined to run this on phyical hardware because it will end up being cheaper. So a fleet of Mac Minis perhaps. I might need to figure out if I can run multiple separate Claude Code accounts on one machine. Ahh I can in sandboxes, I'll just have to auth each one. All good.
