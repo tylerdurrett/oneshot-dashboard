@@ -223,18 +223,27 @@ scripts/
 
 ### 3.1 Sandbox probe and health check
 
-- [ ] Create `src/services/sandbox.ts` with a `probeSandbox()` function that runs `docker sandbox exec -w <workspace> <sandbox-name> claude auth status --json`
-- [ ] Parse the JSON output and verify `loggedIn: true` and `apiProvider: "firstParty"`
-- [ ] Reject API-key fallback auth
-- [ ] On startup, call `probeSandbox()` and log clear success/failure messages with instructions if the sandbox is unavailable or unauthenticated
-- [ ] Add a `GET /health` endpoint enhancement that includes sandbox status
-- [ ] Write tests with mocked `child_process.spawn` for probe success, auth failure, and sandbox unavailable scenarios
+- [x] Create `src/services/sandbox.ts` with a `probeSandbox()` function that runs `docker sandbox exec -w <workspace> <sandbox-name> claude auth status --json`
+- [x] Parse the JSON output and verify `loggedIn: true` and `apiProvider: "firstParty"`
+- [x] Reject API-key fallback auth
+- [x] On startup, call `probeSandbox()` and log clear success/failure messages with instructions if the sandbox is unavailable or unauthenticated
+- [x] Add a `GET /health` endpoint enhancement that includes sandbox status
+- [x] Write tests with mocked `child_process.spawn` for probe success, auth failure, and sandbox unavailable scenarios
 
 **Acceptance Criteria:**
 - `probeSandbox()` correctly identifies healthy, unhealthy, and missing sandboxes
 - Server logs clear instructions when sandbox is not available
 - Health endpoint reports sandbox status
 - Tests cover all error classification paths
+
+> **Implementation Notes (3.1):**
+> - `probeSandbox()` uses dependency injection for the spawn function (`spawnFn: SpawnFn = defaultSpawn`), matching the thread service's database DI pattern. Timeout is also injectable (`timeoutMs = 30_000`) so tests can use short values.
+> - The function **never rejects** — it always resolves with a `SandboxProbeResult { status, message }`. Callers check `result.status` instead of try/catch.
+> - Error classification checks unavailability patterns before auth patterns (per reference doc: "Check auth patterns first" applies to prompt context; for probes, unavailability takes priority since the sandbox must exist before auth matters).
+> - `buildServer()` now accepts `spawnFn?: SpawnFn` in `BuildServerOptions`. The health endpoint closes over a `sandboxStatus` variable updated by `runSandboxProbe()`. Returns `{ status: 'unknown' }` until the probe runs.
+> - `buildServer()` returns `Object.assign(server, { runSandboxProbe })` for full type safety — no `as any` casts needed.
+> - Tests use a `createFakeSpawn()` factory with plain `EventEmitter` objects for stdout/stderr (not `Readable` streams) to avoid buffering timing issues.
+> - 15 sandbox probe tests + 3 health endpoint tests (42 total across all server test files). Covers: healthy OAuth, `loggedIn: false`, API key auth, non-firstParty provider, auth error patterns in stderr, unavailability patterns, spawn ENOENT, unknown errors, timeout, invalid JSON, pattern priority, and correct command args.
 
 ### 3.2 Claude invocation with NDJSON stream parsing
 
