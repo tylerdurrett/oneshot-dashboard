@@ -179,12 +179,14 @@ apps/web/src/app/
 
 ### 4.4 Final Build and Lint Check
 
-- [ ] Run `pnpm build` to confirm no build errors across the monorepo
-- [ ] Run `pnpm lint` to confirm no lint errors
+- [x] Run `pnpm build` to confirm no build errors across the monorepo
+- [x] Run `pnpm lint` to confirm no lint errors
 
 **Acceptance Criteria:**
 - `pnpm build` passes
 - `pnpm lint` passes
+
+> **Notes (2026-02-21):** `pnpm build` passed cleanly on first run. `pnpm lint` initially failed with 2 pre-existing errors in `packages/ui/src/components/ai-elements/prompt-input.tsx` from the AI Elements CLI install (Phase 2): (1) `react-hooks/exhaustive-deps` rule reference but no `react-hooks` ESLint plugin configured — removed the invalid eslint-disable comment; (2) `_id` destructured but unused — added eslint-disable comment for `@typescript-eslint/no-unused-vars` since the destructuring is intentional (omitting `id` from the rest spread). Both `pnpm build` and `pnpm lint` now pass cleanly.
 
 ## Dependency Graph
 
