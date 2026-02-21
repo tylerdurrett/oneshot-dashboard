@@ -387,6 +387,108 @@ describe('useChatSocket', () => {
     expect(MockWebSocket.instances).toHaveLength(3);
   });
 
+  it('sets error when disconnect interrupts streaming', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Start streaming
+    act(() => {
+      result.current.sendMessage('thread-1', 'Hi');
+    });
+    expect(result.current.isStreaming).toBe(true);
+
+    // Simulate some tokens arriving
+    act(() => {
+      getLastWs().simulateMessage({ type: 'token', text: 'Partial' });
+    });
+
+    // Disconnect while streaming
+    act(() => {
+      getLastWs().simulateClose();
+    });
+
+    expect(result.current.isStreaming).toBe(false);
+    expect(result.current.error).toBe(
+      'Connection lost during response. Please try again.',
+    );
+  });
+
+  it('preserves partial message content on streaming disconnect', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      result.current.sendMessage('thread-1', 'Hi');
+    });
+
+    act(() => {
+      getLastWs().simulateMessage({ type: 'token', text: 'Once upon' });
+    });
+    act(() => {
+      getLastWs().simulateMessage({ type: 'token', text: ' a time' });
+    });
+
+    // Disconnect
+    act(() => {
+      getLastWs().simulateClose();
+    });
+
+    // Partial content is preserved
+    const assistant = result.current.messages.find(
+      (m) => m.role === 'assistant',
+    );
+    expect(assistant?.content).toBe('Once upon a time');
+    // Error is also set
+    expect(result.current.error).not.toBeNull();
+  });
+
+  it('does not set error on disconnect when not streaming', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // Disconnect without streaming
+    act(() => {
+      getLastWs().simulateClose();
+    });
+
+    expect(result.current.error).toBeNull();
+  });
+
+  it('caps backoff at 30 seconds', async () => {
+    renderHook(() => useChatSocket());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    autoOpen = false;
+
+    // Close/reconnect cycle: 1s, 2s, 4s, 8s, 16s, 32s→30s(capped)
+    for (const delay of [1000, 2000, 4000, 8000, 16000]) {
+      act(() => { getLastWs().simulateClose(); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(delay); });
+    }
+    const countBefore = MockWebSocket.instances.length;
+
+    // Next close — delay should be capped at 30s, not 32s
+    act(() => { getLastWs().simulateClose(); });
+
+    // At 30s it should reconnect
+    await act(async () => { await vi.advanceTimersByTimeAsync(29999); });
+    expect(MockWebSocket.instances).toHaveLength(countBefore);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(MockWebSocket.instances).toHaveLength(countBefore + 1);
+  });
+
   it('handles ws.send() failure gracefully', async () => {
     const { result } = renderHook(() => useChatSocket());
 

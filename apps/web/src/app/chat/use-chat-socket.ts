@@ -83,10 +83,11 @@ export function useChatSocket(): UseChatSocketReturn {
       wsRef.current = null;
       setConnectionStatus('disconnected');
 
-      // If we were streaming, mark it as interrupted
+      // If we were streaming, mark it as interrupted with an error
       if (streamingIdRef.current) {
         streamingIdRef.current = null;
         setIsStreaming(false);
+        setError('Connection lost during response. Please try again.');
       }
 
       // Schedule reconnect with exponential backoff

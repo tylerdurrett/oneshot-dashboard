@@ -570,17 +570,25 @@ scripts/
 
 ### 7.1 WebSocket reconnection and resilience
 
-- [ ] Auto-reconnect with exponential backoff (1s, 2s, 4s, 8s, max 30s)
-- [ ] Show connection status indicator during reconnection
-- [ ] On reconnect: do not replay messages — just re-establish the connection for new messages
-- [ ] If a stream was in progress during disconnect: show an error indicator on the partial message
-- [ ] Write tests for reconnection behavior
+- [x] Auto-reconnect with exponential backoff (1s, 2s, 4s, 8s, max 30s)
+- [x] Show connection status indicator during reconnection
+- [x] On reconnect: do not replay messages — just re-establish the connection for new messages
+- [x] If a stream was in progress during disconnect: show an error indicator on the partial message
+- [x] Write tests for reconnection behavior
 
 **Acceptance Criteria:**
 - WebSocket auto-reconnects after disconnection
 - Backoff prevents rapid reconnection loops
 - User sees connection status during outage
 - In-progress streams show error on disconnect
+
+> **Implementation Notes (7.1):**
+> - Most of this section's functionality was already implemented in Phase 5.1 (auto-reconnect with exponential backoff, connection status tracking, no message replay) and Phase 5.5 (connection status indicator UI). This section focused on the remaining gap: **error indication on partial messages when disconnect interrupts streaming**.
+> - Added one line to `use-chat-socket.ts` `onclose` handler: when `streamingIdRef.current` is set (stream in progress), `setError('Connection lost during response. Please try again.')` is called alongside clearing the streaming state. The partial message content is preserved in the messages array — the error renders below it via the existing inline error UI.
+> - Non-streaming disconnects do **not** set an error — only the connection status indicator shows, which is correct behavior (reconnection is expected and automatic).
+> - 4 new tests added to `use-chat-socket.test.ts`: disconnect-during-streaming sets error, partial message content preserved on disconnect, no error on non-streaming disconnect, and backoff caps at 30 seconds. 19 total hook tests.
+> - Page-level coverage for partial response + error display was already covered by existing test "preserves partial response alongside error" from Phase 5.5.
+> - All 187 tests pass (106 web + 81 server). Build and lint clean.
 
 ### 7.2 SQLite WAL mode and concurrent access
 
