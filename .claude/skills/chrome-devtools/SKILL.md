@@ -409,44 +409,83 @@ await client.send('Emulation.setCPUThrottlingRate', { rate: 4 });
 
 See reference documentation for advanced patterns and complete API coverage.
 
-## Project-Specific Notes (my-agent-launcher)
+## Project-Specific Notes
 
 ### Dashboard Verification Workflow
 
-The primary use case in this project is verifying dashboard UI changes at `http://localhost:3000`. The dashboard dev server is started with `pnpm --filter @my-agent/dashboard dev`.
-
-**Recommended approach — one-shot commands:**
+**Always read the port from `project.config.json`** — never hardcode it. Dev server: `pnpm dev`.
 
 ```bash
+# Read port first
+PORT=$(node -p "require('./project.config.json').port")
+
 # 1. Screenshot the page
 mkdir -p _screenshots/$(date +%Y-%m-%d)
 node .claude/skills/chrome-devtools/scripts/screenshot.js \
-  --url http://localhost:3000/jobs \
-  --output "_screenshots/$(date +%Y-%m-%d)/$(date +%Y-%m-%d_%H%M%S)_jobs.jpg" \
+  --url "http://localhost:${PORT}/chat" \
+  --output "_screenshots/$(date +%Y-%m-%d)/$(date +%Y-%m-%d_%H%M%S)_chat.jpg" \
   --format jpeg --quality 80 --max-size 0.5
 
-# 2. Check for console errors (most valuable — catches Radix UI violations etc.)
+# 2. Check for console errors
 node .claude/skills/chrome-devtools/scripts/console.js \
-  --url http://localhost:3000/jobs --types error --duration 3000
+  --url "http://localhost:${PORT}/chat" --types error --duration 3000
 ```
 
-### Persistent Browser Caveats
+### Multi-Step Interactions (evaluate + screenshot)
 
-Persistent browser mode (`launch-persistent.js` + subsequent scripts) has a **tab management issue**: `navigate.js` opens a new tab, but `click.js`/`evaluate.js` without `--url` may connect to `about:blank` instead of the navigated page. **Prefer one-shot mode** (each script gets its own `--url`) for reliability.
+**The `--close false` chaining approach is broken for screenshots.** `screenshot.js` without `--url` connects to `about:blank`, not the tab opened by a previous `evaluate.js --close false`. This means you CANNOT: evaluate → screenshot across separate script calls.
 
-For multi-step interactions (e.g., click a button then screenshot the result), use `evaluate.js` with `--url` to perform the click via JavaScript, then take a separate screenshot:
+**For multi-step workflows (inject state, interact, then screenshot), write a custom `.mjs` script:**
 
-```bash
-# Click "New Job" button via JS evaluation
-node .claude/skills/chrome-devtools/scripts/evaluate.js \
-  --url http://localhost:3000/jobs \
-  --script "document.querySelector('button').click()" --close false
+```javascript
+// _screenshots/my-test.mjs
+import { createRequire } from 'module';
+const require = createRequire('<PROJECT_ROOT>/.claude/skills/chrome-devtools/scripts/package.json');
+const puppeteer = require('puppeteer');
 
-# Then screenshot in a separate one-shot call
-node .claude/skills/chrome-devtools/scripts/screenshot.js \
-  --url http://localhost:3000/jobs --output _screenshots/dialog.jpg \
-  --format jpeg --quality 80 --max-size 0.5
+const browser = await puppeteer.launch({ headless: true });
+const page = await browser.newPage();
+await page.setViewport({ width: 1440, height: 900 });
+const config = require('<PROJECT_ROOT>/project.config.json');
+await page.goto(`http://localhost:${config.port}/chat`, { waitUntil: 'networkidle2', timeout: 10000 });
+
+// Interact with the page
+await page.evaluate(() => {
+  // DOM manipulation, click simulation, etc.
+});
+await new Promise(r => setTimeout(r, 300)); // wait for layout
+
+// Mouse interactions (hover, scroll)
+await page.mouse.move(700, 400);
+await page.mouse.wheel({ deltaY: 200 });
+await new Promise(r => setTimeout(r, 100));
+
+// Screenshot
+await page.screenshot({
+  path: '<PROJECT_ROOT>/_screenshots/2026-01-01/result.jpg',
+  type: 'jpeg',
+  quality: 95
+});
+
+await browser.close();
 ```
+
+**Key details for custom scripts:**
+- Puppeteer is installed in `.claude/skills/chrome-devtools/scripts/node_modules/`, NOT the project root. Use `createRequire()` pointed at the skill's `package.json` to import it.
+- Use **absolute paths** for screenshot output — Puppeteer resolves relative paths from the script's location, not the project root.
+- Clean up custom test scripts after use.
+
+### evaluate.js Gotchas
+
+- **No `return` statements** — the script runs inside `page.evaluate()`. Use the expression result or `JSON.stringify(...)` as the last statement.
+- **No `await`** — the script body is not async. Use synchronous patterns or callbacks.
+- **Multi-line scripts with special characters may fail silently.** For complex scripts, write to a file and pass via variable: `SCRIPT=$(cat mytest.js) && node evaluate.js --script "$SCRIPT"`
+
+### Headless Chrome Limitations
+
+- **macOS overlay scrollbars are invisible in screenshots.** Overlay scrollbars only appear during active scrolling and fade immediately. Even `page.mouse.wheel()` + short delay won't capture them. Use `evaluate.js` to check computed styles instead (`scrollbarColor`, `scrollbarWidth`).
+- **DOM injection bypasses React.** Injecting elements directly into the DOM won't trigger React state updates, layout effects, or library behavior (e.g., `use-stick-to-bottom`). You may need to manually set inline styles (like `overflow: auto`) that would normally be set by React lifecycle hooks.
+- **Headless Chrome uses classic (non-overlay) scrollbars** regardless of macOS system settings. Visual behavior may differ from the user's real browser.
 
 ### Selector Tips
 
