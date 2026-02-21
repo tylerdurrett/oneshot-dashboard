@@ -592,13 +592,21 @@ scripts/
 
 ### 7.2 SQLite WAL mode and concurrent access
 
-- [ ] Enable WAL mode on the SQLite database connection in `@repo/db` (or in the server startup)
-- [ ] Verify that both Next.js and Fastify can read/write concurrently without locking errors
-- [ ] Add a startup check that logs a warning if WAL mode is not enabled
+- [x] Enable WAL mode on the SQLite database connection in `@repo/db` (or in the server startup)
+- [x] Verify that both Next.js and Fastify can read/write concurrently without locking errors
+- [x] Add a startup check that logs a warning if WAL mode is not enabled
 
 **Acceptance Criteria:**
 - WAL mode is enabled for the SQLite database
 - Concurrent access from both processes works without errors
+
+> **Implementation Notes (7.2):**
+> - `packages/db/src/index.ts` refactored from `drizzle({ connection: ... })` to manually creating the `@libsql/client` and passing it to `drizzle(client, { schema })` — functionally identical but exposes the client for PRAGMA execution.
+> - Two new exported functions: `enableWalMode()` runs `PRAGMA journal_mode = WAL` and returns the resulting mode string, `getJournalMode()` reads the current journal mode.
+> - WAL mode is enabled in the server startup block (before `server.listen()`) with clear logging: success logs "SQLite WAL mode enabled", non-WAL result logs a warning with the actual mode, and failures log the error with current mode.
+> - Concurrent access concern is moot for v0.0: the web app does NOT directly use the database — it communicates via HTTP/WebSocket APIs to the Fastify server. WAL mode still benefits the server's own concurrent request handling.
+> - 3 new tests in `packages/db/src/__tests__/wal.test.ts`: `enableWalMode()` runs without throwing, `getJournalMode()` returns a string, and `enableWalMode()` returns a valid journal mode value. In-memory SQLite returns "memory" (not "wal"), so tests verify function correctness rather than the specific mode.
+> - All 204 tests pass (106 web + 81 server + 17 db). Build and lint clean.
 
 ### 7.3 End-to-end verification
 

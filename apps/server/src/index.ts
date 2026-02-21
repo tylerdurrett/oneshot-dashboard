@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
 import cors from '@fastify/cors';
+import { enableWalMode, getJournalMode } from '@repo/db';
 import Fastify from 'fastify';
 import { config } from './config.js';
 import { websocket } from './plugins/websocket.js';
@@ -63,6 +64,23 @@ export function buildServer(opts?: BuildServerOptions) {
 // Start the server when this file is run directly (not imported in tests)
 if (!process.env.VITEST) {
   const server = buildServer();
+
+  // Enable WAL mode for concurrent read/write access
+  try {
+    const mode = await enableWalMode();
+    if (mode === 'wal') {
+      server.log.info('SQLite WAL mode enabled');
+    } else {
+      server.log.warn(
+        `SQLite journal mode is "${mode}", expected "wal". Concurrent access may cause locking errors.`,
+      );
+    }
+  } catch (err) {
+    const journalMode = await getJournalMode().catch(() => 'unknown');
+    server.log.warn(
+      `Failed to enable WAL mode (current: ${journalMode}): ${err}`,
+    );
+  }
 
   server.listen({ port: config.port, host: '127.0.0.1' }, async (err) => {
     if (err) {
