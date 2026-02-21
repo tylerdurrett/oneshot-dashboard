@@ -10,14 +10,15 @@
     "test:scripts": "node --test scripts/tests/*.test.mjs",
     "format": "prettier --write .",
     "hello": "node scripts/setup.mjs",
-    "predev": "node scripts/check-setup.mjs && pnpm --filter @repo/db db:migrate",
-    "prestudio": "node scripts/check-setup.mjs && pnpm --filter @repo/db db:migrate",
+    "predev": "node scripts/check-setup.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
+    "prestudio": "node scripts/check-setup.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "studio": "turbo run studio",
     "go": "turbo run dev studio",
     "stop": "node scripts/stop-dev-processes.mjs",
-    "prego": "node scripts/check-setup.mjs && pnpm --filter @repo/db db:migrate",
+    "prego": "node scripts/check-setup.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "new-video": "node scripts/new-video.mjs",
-    "sandbox": "node scripts/sandbox-auth.mjs"
+    "sandbox": "node scripts/sandbox-auth.mjs",
+    "db:restore": "node scripts/restore-db.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
