@@ -21,6 +21,30 @@ vi.mock('../use-chat-socket', () => ({
   useChatSocket: () => hookReturn,
 }));
 
+// Mock TanStack Query hooks
+const mockMutate = vi.fn();
+const mockInvalidateQueries = vi.fn();
+
+vi.mock('../use-threads', () => ({
+  useCreateThread: () => ({
+    mutate: mockMutate,
+    isPending: false,
+  }),
+  useThreadMessages: () => ({
+    data: undefined,
+  }),
+  threadKeys: {
+    all: ['threads'] as const,
+    messages: (id: string) => ['threads', id, 'messages'] as const,
+  },
+}));
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({
+    invalidateQueries: mockInvalidateQueries,
+  }),
+}));
+
 // Mock @repo/ui to avoid Streamdown/StickToBottom complexity in unit tests
 vi.mock('@repo/ui', () => ({
   Conversation: ({ children, className }: { children: React.ReactNode; className?: string }) => (
@@ -69,7 +93,6 @@ vi.mock('@repo/ui', () => ({
 // ---------------------------------------------------------------------------
 
 import ChatPage from '../page';
-import { PLACEHOLDER_THREAD_ID } from '../constants';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -78,6 +101,8 @@ import { PLACEHOLDER_THREAD_ID } from '../constants';
 describe('ChatPage', () => {
   beforeEach(() => {
     hookReturn = { ...defaultReturn, messages: [] };
+    mockMutate.mockReset();
+    mockInvalidateQueries.mockReset();
   });
 
   afterEach(() => {
@@ -103,7 +128,6 @@ describe('ChatPage', () => {
 
   it('has container-query-based max-width classes', () => {
     const { container } = render(<ChatPage />);
-    // The inner content div should have responsive container query classes
     const inner = container.querySelector(
       '.\\@3xl\\:max-w-2xl.\\@5xl\\:max-w-3xl.\\@7xl\\:max-w-4xl',
     );
@@ -186,15 +210,20 @@ describe('ChatPage', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Placeholder thread ID
+  // Thread auto-creation
   // -------------------------------------------------------------------------
 
-  it('exports PLACEHOLDER_THREAD_ID', () => {
-    expect(PLACEHOLDER_THREAD_ID).toBe('placeholder-thread');
+  it('calls createThread.mutate on mount', () => {
+    render(<ChatPage />);
+    expect(mockMutate).toHaveBeenCalledTimes(1);
+    expect(mockMutate).toHaveBeenCalledWith(undefined, expect.objectContaining({
+      onSuccess: expect.any(Function),
+      onSettled: expect.any(Function),
+    }));
   });
 
   // -------------------------------------------------------------------------
-  // Input area (Phase 5.3)
+  // Input area
   // -------------------------------------------------------------------------
 
   it('renders the prompt input area', () => {
@@ -210,14 +239,32 @@ describe('ChatPage', () => {
     expect(textarea.placeholder).toBe('Type a message...');
   });
 
-  it('calls sendMessage with PLACEHOLDER_THREAD_ID on submit', () => {
+  it('calls sendMessage with active thread ID on submit', () => {
     const sendMessage = vi.fn();
     hookReturn = { ...defaultReturn, sendMessage };
+
+    // Simulate the thread being created by triggering the onSuccess callback
+    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+      opts.onSuccess({ id: 'real-thread-id' });
+    });
+
     render(<ChatPage />);
     const textarea = screen.getByTestId('prompt-textarea') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'Hello agent' } });
     fireEvent.submit(screen.getByTestId('prompt-input'));
-    expect(sendMessage).toHaveBeenCalledWith(PLACEHOLDER_THREAD_ID, 'Hello agent');
+    expect(sendMessage).toHaveBeenCalledWith('real-thread-id', 'Hello agent');
+  });
+
+  it('does not send message when no active thread', () => {
+    const sendMessage = vi.fn();
+    hookReturn = { ...defaultReturn, sendMessage };
+    // Don't trigger onSuccess — activeThreadId stays null
+
+    render(<ChatPage />);
+    const textarea = screen.getByTestId('prompt-textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Hello agent' } });
+    fireEvent.submit(screen.getByTestId('prompt-input'));
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 
   it('does not call sendMessage for whitespace-only input', () => {

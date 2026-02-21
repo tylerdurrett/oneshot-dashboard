@@ -439,18 +439,27 @@ scripts/
 
 ### 5.4 Thread data fetching with TanStack Query
 
-- [ ] Install and configure TanStack Query in the chat route (or app-wide if not already set up)
-- [ ] Create query hooks: `useThreads()` for `GET /threads`, `useThreadMessages(threadId)` for `GET /threads/:id/messages`
-- [ ] Create mutation: `useCreateThread()` for `POST /threads`
-- [ ] On page load: if no active thread, create a new one automatically
-- [ ] When switching threads, fetch messages and display them
-- [ ] Write tests for query hooks
+- [x] Install and configure TanStack Query in the chat route (or app-wide if not already set up)
+- [x] Create query hooks: `useThreads()` for `GET /threads`, `useThreadMessages(threadId)` for `GET /threads/:id/messages`
+- [x] Create mutation: `useCreateThread()` for `POST /threads`
+- [x] On page load: if no active thread, create a new one automatically
+- [x] When switching threads, fetch messages and display them
+- [x] Write tests for query hooks
 
 **Acceptance Criteria:**
 - Thread list loads from the server
 - Thread messages load when a thread is selected
 - New threads can be created
 - Data refetches appropriately (e.g., thread list updates after new messages)
+
+> **Implementation Notes (5.4):**
+> - `@tanstack/react-query` v5 installed in `apps/web`. `QueryClientProvider` is scoped to the chat route via `ChatProviders` client component in `chat-providers.tsx`, keeping it out of the global layout. The chat `layout.tsx` remains a server component — `ChatProviders` is the client boundary.
+> - API client (`api.ts`) provides typed fetch functions (`fetchThreads`, `fetchThreadMessages`, `createThread`) with types (`Thread`, `ThreadMessage`) matching server response shapes. Uses the same `NEXT_PUBLIC_SERVER_PORT` env var pattern as `use-chat-socket.ts`.
+> - Query hooks (`use-threads.ts`): `useThreads()`, `useThreadMessages(threadId | null)` (with `enabled: !!threadId`), `useCreateThread()` (invalidates thread list on success). Structured `threadKeys` factory for cache management.
+> - `PLACEHOLDER_THREAD_ID` and `constants.ts` deleted. The page now manages `activeThreadId` via `useState<string | null>`, set by auto-creating a thread on mount. A `creatingRef` guard prevents double-creation in React Strict Mode.
+> - Thread list is invalidated when streaming ends (detected via `wasStreamingRef` tracking `isStreaming` transitions) so `updatedAt` stays current for Phase 6's thread list display.
+> - `useThreadMessages` data is converted to `ChatMessage[]` and set via `setMessages()` when loaded, enabling thread switching in Phase 6. Empty arrays from new threads are skipped to avoid clearing optimistic messages.
+> - 28 new tests added (8 API, 10 hooks, 10 updated page tests replacing PLACEHOLDER_THREAD_ID tests with active-thread-ID tests). 60 total web tests across 6 test files. All 177 tests pass across all packages. Build and lint clean.
 
 ### 5.5 Error display
 

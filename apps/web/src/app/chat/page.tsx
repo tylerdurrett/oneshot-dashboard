@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Conversation,
   ConversationContent,
@@ -15,19 +16,83 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from '@repo/ui';
-import { PLACEHOLDER_THREAD_ID } from './constants';
 import { useChatSocket } from './use-chat-socket';
+import { useCreateThread, useThreadMessages, threadKeys } from './use-threads';
+import type { ChatMessage } from './use-chat-socket';
 
 export default function ChatPage() {
-  const { messages, sendMessage, isStreaming } = useChatSocket();
+  const { messages, sendMessage, setMessages, isStreaming } = useChatSocket();
+  const createThread = useCreateThread();
+  const queryClient = useQueryClient();
+
+  // ---------------------------------------------------------------------------
+  // Active thread state
+  // ---------------------------------------------------------------------------
+
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const creatingRef = useRef(false);
+
+  // Auto-create a thread on mount
+  useEffect(() => {
+    if (activeThreadId) return;
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+
+    createThread.mutate(undefined, {
+      onSuccess: (thread) => {
+        setActiveThreadId(thread.id);
+      },
+      onSettled: () => {
+        creatingRef.current = false;
+      },
+    });
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // Thread message loading (for thread switching in Phase 6)
+  // ---------------------------------------------------------------------------
+
+  const threadMessagesQuery = useThreadMessages(activeThreadId);
+
+  // When thread messages load (e.g. thread switching), update displayed messages
+  useEffect(() => {
+    if (!threadMessagesQuery.data) return;
+    // Only set messages if we have actual history (skip empty arrays from new threads)
+    if (threadMessagesQuery.data.length === 0) return;
+
+    const converted: ChatMessage[] = threadMessagesQuery.data.map((msg) => ({
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+    }));
+    setMessages(converted);
+  }, [threadMessagesQuery.data, setMessages]);
+
+  // ---------------------------------------------------------------------------
+  // Invalidate thread list when streaming ends
+  // ---------------------------------------------------------------------------
+
+  const wasStreamingRef = useRef(false);
+
+  useEffect(() => {
+    if (wasStreamingRef.current && !isStreaming) {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all });
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming, queryClient]);
+
+  // ---------------------------------------------------------------------------
+  // Submit handler
+  // ---------------------------------------------------------------------------
 
   const handleSubmit = useCallback(
     (message: { text: string }) => {
       const text = message.text.trim();
       if (!text) return;
-      sendMessage(PLACEHOLDER_THREAD_ID, text);
+      if (!activeThreadId) return;
+      sendMessage(activeThreadId, text);
     },
-    [sendMessage],
+    [sendMessage, activeThreadId],
   );
 
   return (
