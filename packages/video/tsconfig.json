@@ -1,0 +1,12 @@
+{
+  "extends": "@repo/typescript-config/library.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "outDir": "dist",
+    "paths": {
+      "@repo/video/*": ["./src/*"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}
