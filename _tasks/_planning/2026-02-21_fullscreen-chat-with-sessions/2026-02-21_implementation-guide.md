@@ -364,12 +364,12 @@ scripts/
 
 ### 5.1 WebSocket hook
 
-- [ ] Create `apps/web/src/app/chat/use-chat-socket.ts` — a custom React hook that manages the WebSocket connection
-- [ ] Hook API: `useChatSocket({ serverUrl })` returns `{ sendMessage(threadId, content), messages, isStreaming, error, connectionStatus }`. The `serverUrl` is derived from `NEXT_PUBLIC_SERVER_URL` env var (set in `next.config.ts` from `project.config.json`'s `serverPort`)
-- [ ] Handle incoming event types: `token` (append to current assistant message), `done` (finalize message), `error` (set error state)
-- [ ] Implement auto-reconnect with exponential backoff on disconnect
-- [ ] Track connection status: `connecting`, `connected`, `disconnected`
-- [ ] Write unit tests for the hook using a mock WebSocket
+- [x] Create `apps/web/src/app/chat/use-chat-socket.ts` — a custom React hook that manages the WebSocket connection
+- [x] Hook API: `useChatSocket({ serverUrl })` returns `{ sendMessage(threadId, content), messages, isStreaming, error, connectionStatus }`. The `serverUrl` is derived from `NEXT_PUBLIC_SERVER_URL` env var (set in `next.config.ts` from `project.config.json`'s `serverPort`)
+- [x] Handle incoming event types: `token` (append to current assistant message), `done` (finalize message), `error` (set error state)
+- [x] Implement auto-reconnect with exponential backoff on disconnect
+- [x] Track connection status: `connecting`, `connected`, `disconnected`
+- [x] Write unit tests for the hook using a mock WebSocket
 
 **Acceptance Criteria:**
 - Hook establishes WebSocket connection on mount
@@ -378,6 +378,15 @@ scripts/
 - `done` event finalizes the message
 - Auto-reconnect works with backoff
 - Connection status is tracked accurately
+
+> **Implementation Notes (5.1):**
+> - Hook API simplified from `useChatSocket({ serverUrl })` to `useChatSocket()` — the server URL is derived internally from `NEXT_PUBLIC_SERVER_PORT` env var (exposed via `next.config.ts` reading `project.config.json`). No need to pass it as a parameter since it's a build-time constant.
+> - Also returns `setMessages` so thread switching (Phase 6) can replace the message array when loading a different thread's history.
+> - `sendMessage` uses a ref (`isStreamingRef`) for the streaming guard instead of the state value in the closure, giving `sendMessage` a stable identity (empty dependency array) and avoiding unnecessary re-renders in consumers.
+> - `sendMessage` optimistically appends both the user message and an empty assistant placeholder. Tokens from the server append to this placeholder. The `done` event replaces the temporary streaming ID with the real server-assigned message ID.
+> - `ws.send()` is wrapped in try/catch to handle the edge case where the socket closes between the `readyState` check and the actual send. On failure, the error state is set and the streaming lock is released.
+> - `next.config.ts` reads `serverPort` from `../../project.config.json` with fallback chain: `serverPort` → `port + 2` → `3002`. Exposed as `NEXT_PUBLIC_SERVER_PORT` via Next.js `env` config.
+> - 15 unit tests covering: connection lifecycle, message send format, optimistic messages, token accumulation, done finalization, error handling, error clearing, streaming lock, unmount cleanup, exponential backoff timing, backoff reset on reconnect, ws.send failure, and external message setting. 23 total web tests.
 
 ### 5.2 Chat page layout and message display
 
