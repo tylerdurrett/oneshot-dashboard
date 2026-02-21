@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import {
   Conversation,
   ConversationContent,
@@ -8,11 +9,26 @@ import {
   Message,
   MessageContent,
   MessageResponse,
+  PromptInput,
+  PromptInputBody,
+  PromptInputFooter,
+  PromptInputSubmit,
+  PromptInputTextarea,
 } from '@repo/ui';
+import { PLACEHOLDER_THREAD_ID } from './constants';
 import { useChatSocket } from './use-chat-socket';
 
 export default function ChatPage() {
-  const { messages } = useChatSocket();
+  const { messages, sendMessage, isStreaming } = useChatSocket();
+
+  const handleSubmit = useCallback(
+    (message: { text: string }) => {
+      const text = message.text.trim();
+      if (!text) return;
+      sendMessage(PLACEHOLDER_THREAD_ID, text);
+    },
+    [sendMessage],
+  );
 
   return (
     <div className="flex h-dvh flex-col">
@@ -39,7 +55,17 @@ export default function ChatPage() {
             <ConversationScrollButton />
           </Conversation>
 
-          {/* Input area — implemented in Phase 5.3 */}
+          <div className="border-t border-border p-4">
+            <PromptInput onSubmit={handleSubmit}>
+              <PromptInputBody>
+                <PromptInputTextarea placeholder="Type a message..." />
+              </PromptInputBody>
+              <PromptInputFooter>
+                <div />
+                <PromptInputSubmit status={isStreaming ? 'streaming' : undefined} />
+              </PromptInputFooter>
+            </PromptInput>
+          </div>
         </div>
       </div>
     </div>

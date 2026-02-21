@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UseChatSocketReturn } from '../use-chat-socket';
 
@@ -44,6 +44,23 @@ vi.mock('@repo/ui', () => ({
   MessageContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   MessageResponse: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="message-response">{children}</div>
+  ),
+  PromptInput: ({ children, onSubmit }: { children: React.ReactNode; onSubmit: (msg: { text: string }) => void }) => (
+    <form data-testid="prompt-input" onSubmit={(e) => { e.preventDefault(); const textarea = e.currentTarget.querySelector('textarea'); onSubmit({ text: textarea?.value ?? '' }); }}>
+      {children}
+    </form>
+  ),
+  PromptInputBody: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  PromptInputTextarea: ({ placeholder }: { placeholder?: string }) => (
+    <textarea data-testid="prompt-textarea" placeholder={placeholder} />
+  ),
+  PromptInputFooter: ({ children }: { children: React.ReactNode }) => (
+    <div data-testid="prompt-footer">{children}</div>
+  ),
+  PromptInputSubmit: ({ status }: { status?: string }) => (
+    <button data-testid="prompt-submit" data-status={status ?? 'idle'} type="submit">
+      {status === 'streaming' ? 'Stop' : 'Submit'}
+    </button>
   ),
 }));
 
@@ -174,5 +191,66 @@ describe('ChatPage', () => {
 
   it('exports PLACEHOLDER_THREAD_ID', () => {
     expect(PLACEHOLDER_THREAD_ID).toBe('placeholder-thread');
+  });
+
+  // -------------------------------------------------------------------------
+  // Input area (Phase 5.3)
+  // -------------------------------------------------------------------------
+
+  it('renders the prompt input area', () => {
+    render(<ChatPage />);
+    expect(screen.getByTestId('prompt-input')).toBeDefined();
+    expect(screen.getByTestId('prompt-textarea')).toBeDefined();
+    expect(screen.getByTestId('prompt-submit')).toBeDefined();
+  });
+
+  it('renders textarea with correct placeholder', () => {
+    render(<ChatPage />);
+    const textarea = screen.getByTestId('prompt-textarea') as HTMLTextAreaElement;
+    expect(textarea.placeholder).toBe('Type a message...');
+  });
+
+  it('calls sendMessage with PLACEHOLDER_THREAD_ID on submit', () => {
+    const sendMessage = vi.fn();
+    hookReturn = { ...defaultReturn, sendMessage };
+    render(<ChatPage />);
+    const textarea = screen.getByTestId('prompt-textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: 'Hello agent' } });
+    fireEvent.submit(screen.getByTestId('prompt-input'));
+    expect(sendMessage).toHaveBeenCalledWith(PLACEHOLDER_THREAD_ID, 'Hello agent');
+  });
+
+  it('does not call sendMessage for whitespace-only input', () => {
+    const sendMessage = vi.fn();
+    hookReturn = { ...defaultReturn, sendMessage };
+    render(<ChatPage />);
+    const textarea = screen.getByTestId('prompt-textarea') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '   ' } });
+    fireEvent.submit(screen.getByTestId('prompt-input'));
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('shows idle status on submit button when not streaming', () => {
+    hookReturn = { ...defaultReturn, isStreaming: false };
+    render(<ChatPage />);
+    const btn = screen.getByTestId('prompt-submit');
+    expect(btn.getAttribute('data-status')).toBe('idle');
+    expect(btn.textContent).toBe('Submit');
+  });
+
+  it('shows streaming status on submit button when streaming', () => {
+    hookReturn = { ...defaultReturn, isStreaming: true };
+    render(<ChatPage />);
+    const btn = screen.getByTestId('prompt-submit');
+    expect(btn.getAttribute('data-status')).toBe('streaming');
+    expect(btn.textContent).toBe('Stop');
+  });
+
+  it('has border-t wrapper for the input area', () => {
+    const { container } = render(<ChatPage />);
+    const inputWrapper = container.querySelector('.border-t');
+    expect(inputWrapper).not.toBeNull();
+    expect(inputWrapper!.className).toContain('border-border');
+    expect(inputWrapper!.className).toContain('p-4');
   });
 });

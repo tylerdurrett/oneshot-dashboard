@@ -417,10 +417,10 @@ scripts/
 
 ### 5.3 Chat input with streaming state
 
-- [ ] Use `PromptInputProvider`, `PromptInput`, `PromptInputBody`, `PromptInputTextarea`, `PromptInputFooter`, `PromptInputSubmit` from `@repo/ui`
-- [ ] Wire `onSubmit` to send messages via the WebSocket hook
-- [ ] Pass `status` to `PromptInputSubmit` — `"streaming"` while Claude is responding (disables input), `"ready"` otherwise
-- [ ] Input area positioned at the bottom of the viewport
+- [x] Use `PromptInputProvider`, `PromptInput`, `PromptInputBody`, `PromptInputTextarea`, `PromptInputFooter`, `PromptInputSubmit` from `@repo/ui`
+- [x] Wire `onSubmit` to send messages via the WebSocket hook
+- [x] Pass `status` to `PromptInputSubmit` — `"streaming"` while Claude is responding (disables input), `"ready"` otherwise
+- [x] Input area positioned at the bottom of the viewport
 
 **Acceptance Criteria:**
 - User can type and submit messages
@@ -428,6 +428,14 @@ scripts/
 - Submit button shows appropriate state (send vs stop)
 - Enter key submits, Shift+Enter adds newline
 - **Visual test (chrome-devtools):** Screenshot the input area in ready and streaming states, verify disabled styling and button state
+
+> **Implementation Notes (5.3):**
+> - `PromptInputProvider` was omitted — it's only needed when external components need to trigger file dialogs or read input state, neither of which applies here. `PromptInput` manages its own internal state.
+> - `handleSubmit` trims whitespace and ignores empty submissions before calling `sendMessage(PLACEHOLDER_THREAD_ID, text)`. The `sendMessage` dependency comes from `useChatSocket` which has a stable identity (empty dep array via refs).
+> - Status mapping is minimal: `isStreaming ? 'streaming' : undefined`. The `undefined` case renders as idle (send icon). The `'streaming'` case renders the stop square icon. No `'submitted'` intermediate state is used since `sendMessage` sets `isStreaming` synchronously before sending — there's no gap between submit and streaming.
+> - Input area uses `border-t border-border p-4` wrapper matching the prototype pattern, positioned naturally at the bottom of the flex column (after the `flex-1` Conversation area).
+> - Enter/Shift+Enter behavior is handled natively by `PromptInputTextarea` — no additional wiring needed.
+> - 7 new tests added (18 total in page.test.tsx, 41 total web tests): input rendering, placeholder text, submit wiring with PLACEHOLDER_THREAD_ID, whitespace rejection, idle status display, streaming status display, and border-t wrapper styling.
 
 ### 5.4 Thread data fetching with TanStack Query
 
