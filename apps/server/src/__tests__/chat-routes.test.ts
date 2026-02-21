@@ -594,6 +594,120 @@ describe('chat WebSocket route', () => {
       expect(capturedArgs).toContain('sid-1');
     });
 
+    it('uses correct session ID per thread in multi-thread scenario', async () => {
+      const calls: { threadContent: string; args: string[] }[] = [];
+      let callCount = 0;
+
+      const spawnFn = ((cmd: string, args: string[]) => {
+        callCount++;
+        // Track which content was sent with which args
+        const promptIdx = args.indexOf('-p');
+        const promptContent = promptIdx >= 0 ? args[promptIdx + 1] : '';
+        calls.push({ threadContent: promptContent ?? '', args: [...args] });
+
+        const inner = createFakeSpawn({
+          stdout: ndjson({
+            type: 'result',
+            result: `reply-${callCount}`,
+            session_id: `sid-${callCount}`,
+          }),
+          exitCode: 0,
+        });
+        return inner(cmd, args);
+      }) as unknown as SpawnFn;
+
+      server = buildServer({ logger: false, database: testDb, spawnFn });
+      await server.ready();
+
+      // Create two threads
+      const threadId1 = await createThread(server, 'Thread 1');
+      const threadId2 = await createThread(server, 'Thread 2');
+
+      const ws = await server.injectWS('/chat');
+
+      // Send message in thread 1 → gets sid-1
+      const first = collectWsMessages(ws);
+      ws.send(
+        JSON.stringify({ type: 'message', threadId: threadId1, content: 'msg in thread 1' }),
+      );
+      await first;
+
+      // Send message in thread 2 → gets sid-2
+      const second = collectWsMessages(ws);
+      ws.send(
+        JSON.stringify({ type: 'message', threadId: threadId2, content: 'msg in thread 2' }),
+      );
+      await second;
+
+      // Send another message in thread 1 — should resume with sid-1, NOT sid-2
+      const third = collectWsMessages(ws);
+      ws.send(
+        JSON.stringify({ type: 'message', threadId: threadId1, content: 'follow-up in thread 1' }),
+      );
+      await third;
+      ws.close();
+
+      // The third invocation should have used --resume with thread 1's session ID
+      expect(calls).toHaveLength(3);
+      const thirdCall = calls[2]!;
+      expect(thirdCall.args).toContain('--resume');
+      expect(thirdCall.args).toContain('sid-1'); // Thread 1's session ID, not sid-2
+    });
+
+    it('loads full message history for resumed thread via HTTP', async () => {
+      let callCount = 0;
+      const spawnFn = ((_cmd: string, _args: string[]) => {
+        callCount++;
+        const inner = createFakeSpawn({
+          stdout: ndjson({
+            type: 'result',
+            result: `reply-${callCount}`,
+            session_id: `sid-${callCount}`,
+          }),
+          exitCode: 0,
+        });
+        return inner(_cmd, _args);
+      }) as unknown as SpawnFn;
+
+      server = buildServer({ logger: false, database: testDb, spawnFn });
+      await server.ready();
+
+      const threadId = await createThread(server);
+      const ws = await server.injectWS('/chat');
+
+      // Send two messages to build up history
+      const first = collectWsMessages(ws);
+      ws.send(
+        JSON.stringify({ type: 'message', threadId, content: 'First question' }),
+      );
+      await first;
+
+      const second = collectWsMessages(ws);
+      ws.send(
+        JSON.stringify({ type: 'message', threadId, content: 'Second question' }),
+      );
+      await second;
+      ws.close();
+
+      // Fetch message history via HTTP (simulates what frontend does on thread switch)
+      const res = await server.inject({
+        method: 'GET',
+        url: `/threads/${threadId}/messages`,
+      });
+      const body = res.json();
+
+      // Should have 4 messages: user, assistant, user, assistant
+      expect(body.messages).toHaveLength(4);
+      expect(body.messages[0].role).toBe('user');
+      expect(body.messages[0].content).toBe('First question');
+      expect(body.messages[1].role).toBe('assistant');
+      expect(body.messages[1].content).toBe('reply-1');
+      expect(body.messages[2].role).toBe('user');
+      expect(body.messages[2].content).toBe('Second question');
+      expect(body.messages[3].role).toBe('assistant');
+      expect(body.messages[3].content).toBe('reply-2');
+    });
+
     it('handles resume failure by retrying without --resume', async () => {
       const calls: string[][] = [];
 

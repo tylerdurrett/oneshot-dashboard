@@ -540,17 +540,25 @@ scripts/
 
 ### 6.3 Thread resumption flow
 
-- [ ] When selecting a previous thread from the dropdown:
+- [x] When selecting a previous thread from the dropdown:
   1. Fetch messages via `GET /threads/:id/messages` and display them
   2. The WebSocket will use the thread's `claudeSessionId` for `--resume` on the next message
   3. If resume fails (stale session), the server starts a fresh Claude session — user still sees their history
-- [ ] Write integration tests for the thread switching flow
+- [x] Write integration tests for the thread switching flow
 
 **Acceptance Criteria:**
 - Switching threads loads full message history
 - Sending a message in a resumed thread uses `--resume`
 - Stale session fallback works — messages display, new session starts
 - No visual disruption during thread switches
+
+> **Implementation Notes (6.3):**
+> - The core thread resumption functionality was already implemented in prior phases: `handleSelectThread` (Phase 6.1) clears messages and sets `activeThreadId`, `useThreadMessages` (Phase 5.4) refetches history, and the server's `handleChatMessage` (Phase 4.2) reads `claudeSessionId` for `--resume`. This section focused on integration tests validating the full flow.
+> - Frontend `useThreadMessages` mock upgraded from static `{ data: undefined }` to a dynamic `threadMessagesMap` keyed by threadId, enabling tests to verify message loading on thread switch. `useThreads` mock also made dynamic via `mockThreadsList`.
+> - Thread switch calls in tests wrapped in `act()` to flush React state updates from `setActiveThreadId()` before asserting.
+> - 5 new frontend tests in `page.test.tsx`: message history loading on switch, empty history handling (useEffect guard skips empty arrays), correct threadId in sendMessage after switch, no-op on same-thread selection, and ThreadSelector `data-active-thread` attribute update.
+> - 2 new backend tests in `chat-routes.test.ts`: multi-thread session isolation (verifies `--resume` uses thread 1's `sid-1` not thread 2's `sid-2` when returning to thread 1), and full message history retrieval via HTTP after multi-turn conversation (4 messages: user, assistant, user, assistant).
+> - All 102 web tests, 81 server tests pass. Build and lint clean.
 
 ---
 

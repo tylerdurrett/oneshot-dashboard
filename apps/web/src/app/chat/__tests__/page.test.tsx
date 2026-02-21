@@ -1,4 +1,4 @@
-import { render, screen, cleanup, fireEvent } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UseChatSocketReturn } from '../use-chat-socket';
 
@@ -25,18 +25,23 @@ vi.mock('../use-chat-socket', () => ({
 const mockMutate = vi.fn();
 const mockInvalidateQueries = vi.fn();
 
+// Dynamic mock data for thread switching tests
+const defaultThreadsList = [
+  { id: 'thread-1', title: 'Test thread', claudeSessionId: null, createdAt: 1000, updatedAt: 2000 },
+];
+let mockThreadsList = [...defaultThreadsList];
+let threadMessagesMap: Record<string, Array<{ id: string; threadId: string; role: string; content: string; createdAt: number }>> = {};
+
 vi.mock('../use-threads', () => ({
   useCreateThread: () => ({
     mutate: mockMutate,
     isPending: false,
   }),
-  useThreadMessages: () => ({
-    data: undefined,
+  useThreadMessages: (threadId: string | null) => ({
+    data: threadId ? threadMessagesMap[threadId] : undefined,
   }),
   useThreads: () => ({
-    data: [
-      { id: 'thread-1', title: 'Test thread', claudeSessionId: null, createdAt: 1000, updatedAt: 2000 },
-    ],
+    data: mockThreadsList,
   }),
   threadKeys: {
     all: ['threads'] as const,
@@ -140,6 +145,8 @@ describe('ChatPage', () => {
     mockInvalidateQueries.mockReset();
     mockOnSelectThread.mockReset();
     mockOnNewThread.mockReset();
+    mockThreadsList = [...defaultThreadsList];
+    threadMessagesMap = {};
   });
 
   afterEach(() => {
@@ -494,5 +501,125 @@ describe('ChatPage', () => {
     hookReturn = { ...defaultReturn, connectionStatus: 'connected' };
     render(<ChatPage />);
     expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Thread resumption flow (6.3)
+  // -------------------------------------------------------------------------
+
+  describe('thread resumption flow', () => {
+    it('loads message history when switching to a thread with messages', () => {
+      const setMessages = vi.fn();
+      hookReturn = { ...defaultReturn, setMessages };
+
+      // Add a second thread to the list
+      mockThreadsList = [
+        ...defaultThreadsList,
+        { id: 'thread-2', title: 'Previous chat', claudeSessionId: 'sess-old', createdAt: 900, updatedAt: 1500 },
+      ];
+
+      // Set up stored messages for thread-2
+      threadMessagesMap['thread-2'] = [
+        { id: 'm1', threadId: 'thread-2', role: 'user', content: 'Old question', createdAt: 100 },
+        { id: 'm2', threadId: 'thread-2', role: 'assistant', content: 'Old answer', createdAt: 101 },
+      ];
+
+      // Auto-create sets activeThreadId to 'thread-1'
+      mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+        opts.onSuccess({ id: 'thread-1' });
+      });
+
+      render(<ChatPage />);
+
+      // Switch to thread-2 via the captured handler (wrap in act to flush state)
+      act(() => { mockOnSelectThread('thread-2'); });
+
+      // Should have cleared messages first, then loaded history
+      expect(setMessages).toHaveBeenCalledWith([]);
+      expect(setMessages).toHaveBeenCalledWith([
+        { id: 'm1', role: 'user', content: 'Old question' },
+        { id: 'm2', role: 'assistant', content: 'Old answer' },
+      ]);
+    });
+
+    it('does not call setMessages for thread with empty history', () => {
+      const setMessages = vi.fn();
+      hookReturn = { ...defaultReturn, setMessages };
+
+      // Thread-2 has no messages (empty array)
+      threadMessagesMap['thread-2'] = [];
+
+      mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+        opts.onSuccess({ id: 'thread-1' });
+      });
+
+      render(<ChatPage />);
+      setMessages.mockClear(); // Clear calls from mount
+
+      // Switch to empty thread (wrap in act to flush state)
+      act(() => { mockOnSelectThread('thread-2'); });
+
+      // Should only have the clear call, not a second setMessages with empty array
+      // (the useEffect guard skips empty arrays to preserve the new thread empty state)
+      expect(setMessages).toHaveBeenCalledTimes(1);
+      expect(setMessages).toHaveBeenCalledWith([]);
+    });
+
+    it('sends message with switched thread ID after thread switch', () => {
+      const sendMessage = vi.fn();
+      hookReturn = { ...defaultReturn, sendMessage };
+
+      // Auto-create sets activeThreadId to 'thread-1'
+      mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+        opts.onSuccess({ id: 'thread-1' });
+      });
+
+      render(<ChatPage />);
+
+      // Switch to thread-2 (wrap in act to flush state update)
+      act(() => { mockOnSelectThread('thread-2'); });
+
+      // Now submit a message — should use thread-2
+      const textarea = screen.getByTestId('prompt-textarea') as HTMLTextAreaElement;
+      fireEvent.change(textarea, { target: { value: 'Hello in thread 2' } });
+      fireEvent.submit(screen.getByTestId('prompt-input'));
+      expect(sendMessage).toHaveBeenCalledWith('thread-2', 'Hello in thread 2');
+    });
+
+    it('does not clear messages when selecting the already-active thread', () => {
+      const setMessages = vi.fn();
+      hookReturn = { ...defaultReturn, setMessages };
+
+      // Auto-create sets activeThreadId to 'thread-1'
+      mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+        opts.onSuccess({ id: 'thread-1' });
+      });
+
+      render(<ChatPage />);
+      setMessages.mockClear(); // Clear mount-related calls
+
+      // Select the same thread that's already active (wrap in act for consistency)
+      act(() => { mockOnSelectThread('thread-1'); });
+
+      // handleSelectThread has an early return for same thread
+      expect(setMessages).not.toHaveBeenCalled();
+    });
+
+    it('updates ThreadSelector active thread after switching', () => {
+      mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+        opts.onSuccess({ id: 'thread-1' });
+      });
+
+      render(<ChatPage />);
+
+      // Verify initial active thread
+      expect(screen.getByTestId('thread-selector').getAttribute('data-active-thread')).toBe('thread-1');
+
+      // Switch to thread-2 (wrap in act to flush state update)
+      act(() => { mockOnSelectThread('thread-2'); });
+
+      // ThreadSelector should show thread-2 as active
+      expect(screen.getByTestId('thread-selector').getAttribute('data-active-thread')).toBe('thread-2');
+    });
   });
 });
