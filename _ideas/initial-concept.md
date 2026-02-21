@@ -128,3 +128,5 @@ We get projects
 We get tasks, schedules, timelines, gantt charts
 Perhaps this is when we get artifact creation (remotion videos, images, etc)
 Somewhere in this mix the agent schedules can do work directly on repos. That might be earlier than later.
+
+Next steps: review this, think about screens and workflows.
