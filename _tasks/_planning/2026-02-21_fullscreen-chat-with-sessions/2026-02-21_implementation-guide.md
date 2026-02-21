@@ -390,14 +390,14 @@ scripts/
 
 ### 5.2 Chat page layout and message display
 
-- [ ] Create `apps/web/src/app/chat/page.tsx` as a client component
-- [ ] Fullscreen layout: `h-dvh`, dark theme, no nav or sidebar
-- [ ] Use container-query-based scaling for message content width (not fixed `max-w-3xl`) so content adapts to viewport
-- [ ] Compose using AI Elements: `Conversation`, `ConversationContent`, `ConversationScrollButton`, `Message`, `MessageContent`, `MessageResponse`
-- [ ] Render messages from both the loaded history (HTTP) and live streaming (WebSocket)
-- [ ] Streaming assistant messages show content as it arrives (token by token via `MessageResponse`)
-- [ ] Auto-scroll to bottom on new messages (handled by `Conversation` + `StickToBottom`)
-- [ ] Add the `dark` class to the root HTML element for the chat route (or use layout-level class)
+- [x] Create `apps/web/src/app/chat/page.tsx` as a client component
+- [x] Fullscreen layout: `h-dvh`, dark theme, no nav or sidebar
+- [x] Use container-query-based scaling for message content width (not fixed `max-w-3xl`) so content adapts to viewport
+- [x] Compose using AI Elements: `Conversation`, `ConversationContent`, `ConversationScrollButton`, `Message`, `MessageContent`, `MessageResponse`
+- [x] Render messages from both the loaded history (HTTP) and live streaming (WebSocket)
+- [x] Streaming assistant messages show content as it arrives (token by token via `MessageResponse`)
+- [x] Auto-scroll to bottom on new messages (handled by `Conversation` + `StickToBottom`)
+- [x] Add the `dark` class to the root HTML element for the chat route (or use layout-level class)
 
 **Acceptance Criteria:**
 - `/chat` renders a fullscreen dark chat interface
@@ -406,6 +406,14 @@ scripts/
 - Auto-scroll works when new content arrives
 - Content width scales with container, not uncomfortably wide on large screens
 - **Visual test (chrome-devtools):** Screenshot `/chat` at desktop and narrow widths, verify dark theme, layout, and container-query scaling
+
+> **Implementation Notes (5.2):**
+> - Created `apps/web/src/app/chat/layout.tsx` as a server component wrapping children in `<div className="dark min-h-screen bg-background text-foreground">`, matching the prototype layout pattern.
+> - `page.tsx` uses a two-div container query pattern: outer `@container` div establishes the query context at full viewport width, inner div uses `@3xl:max-w-2xl @5xl:max-w-3xl @7xl:max-w-4xl` with `mx-auto` for responsive centering. This is necessary because CSS container query elements cannot query themselves.
+> - `PLACEHOLDER_THREAD_ID` was moved to a separate `constants.ts` file because Next.js App Router disallows named exports from page files (only `default`, `metadata`, `generateStaticParams`, etc. are valid).
+> - `ConversationEmptyState` is shown when `messages.length === 0` with "What can I help you with?" title — this will be replaced by thread auto-creation in Phase 5.4.
+> - `MessageResponse` (Streamdown-based) naturally handles streaming because its memo comparison detects changed `children` as tokens accumulate via `useChatSocket`.
+> - 11 unit tests in `page.test.tsx` covering: layout structure (h-dvh, @container, container query max-width classes), empty state (shown/hidden), message rendering (user, assistant, multi-message order, streaming partial content), component presence, and PLACEHOLDER_THREAD_ID constant. 34 total web tests across 4 test files.
 
 ### 5.3 Chat input with streaming state
 
