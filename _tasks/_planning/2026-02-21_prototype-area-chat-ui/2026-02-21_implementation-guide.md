@@ -98,15 +98,17 @@ apps/web/src/app/
 
 ### 3.1 Create Prototype Layout and Index
 
-- [ ] Create `apps/web/src/app/prototype/layout.tsx` — a minimal layout that renders only `{children}`. No nav, no shared chrome. Apply the `dark` class to a wrapper div so prototypes render in dark mode by default
-- [ ] Create `apps/web/src/app/prototype/page.tsx` — a simple index page with a heading ("Prototypes") and a list of links to available prototypes. Start with one link: `/prototype/chat` → "Fullscreen Chat"
-- [ ] Write a basic test for the prototype index page in `apps/web/src/__tests__/prototype-index.test.tsx` — verify it renders and contains the link to the chat prototype
+- [x] Create `apps/web/src/app/prototype/layout.tsx` — a minimal layout that renders only `{children}`. No nav, no shared chrome. Apply the `dark` class to a wrapper div so prototypes render in dark mode by default
+- [x] Create `apps/web/src/app/prototype/page.tsx` — a simple index page with a heading ("Prototypes") and a list of links to available prototypes. Start with one link: `/prototype/chat` → "Fullscreen Chat"
+- [x] Write a basic test for the prototype index page in `apps/web/src/__tests__/prototype-index.test.tsx` — verify it renders and contains the link to the chat prototype
 
 **Acceptance Criteria:**
 - `/prototype` loads and displays a list with one link to `/prototype/chat`
 - The prototype layout provides no app chrome — child pages control their full visual experience
 - Dark mode is applied by default within the prototype area
 - Test passes
+
+> **Notes (2026-02-21):** Layout wraps children in `<div className="dark min-h-screen bg-background text-foreground">` to apply dark mode variables and fill the viewport with the dark background. Index page uses a data-driven `prototypes` array for easy extension. Page follows existing codebase patterns (centered layout, semantic Tailwind tokens, `max-w-2xl`). Link cards use `border-border` and `hover:bg-accent` for interactive feedback. All 8 tests pass (3 new + 5 existing), `pnpm build` clean. Pre-existing lint errors in `@repo/ui` (from Phase 2 AI Elements install) are unrelated.
 
 ### 3.2 Visual Verification — Prototype Index
 
