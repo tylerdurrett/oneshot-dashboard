@@ -463,11 +463,11 @@ scripts/
 
 ### 5.5 Error display
 
-- [ ] Show inline error messages in the chat when: sandbox is unavailable, Claude errors during streaming, WebSocket disconnects
-- [ ] For streaming errors: preserve any tokens already received, show error indicator after partial response
-- [ ] Show connection status indicator when WebSocket is disconnected
-- [ ] Errors never crash the page — wrap in error boundaries where appropriate
-- [ ] Write tests for error display states
+- [x] Show inline error messages in the chat when: sandbox is unavailable, Claude errors during streaming, WebSocket disconnects
+- [x] For streaming errors: preserve any tokens already received, show error indicator after partial response
+- [x] Show connection status indicator when WebSocket is disconnected
+- [x] Errors never crash the page — wrap in error boundaries where appropriate
+- [x] Write tests for error display states
 
 **Acceptance Criteria:**
 - Sandbox-down error shows "Agent is offline. Check the Docker sandbox."
@@ -475,6 +475,14 @@ scripts/
 - Connection status is visible when disconnected
 - Page never crashes on any error scenario
 - **Visual test (chrome-devtools):** Screenshot error states — inline error message, connection status indicator, partial response with error
+
+> **Implementation Notes (5.5):**
+> - Inline error display renders after messages inside `ConversationContent` as a `role="alert"` div with destructive theme styling (`border-destructive/50`, `bg-destructive/10`, `text-destructive`). Sandbox/offline errors are detected via regex (`/sandbox|offline/i`) and show the user-friendly "Agent is offline. Check the Docker sandbox." message.
+> - Partial responses are preserved by design — error renders *after* the message list, not replacing it. The `useChatSocket` hook already keeps accumulated tokens in the message array when an error occurs.
+> - Connection status indicator renders as a `role="status"` bar between the conversation area and the input area, showing "Connecting..." or "Disconnected. Reconnecting..." based on `connectionStatus`. Hidden when connected.
+> - Next.js App Router error boundary (`error.tsx`) catches uncaught React errors with a dark-themed fullscreen fallback UI and "Try again" button that calls `reset()`.
+> - No external component library additions needed — all styling uses existing Tailwind design tokens (`destructive`, `muted`, `border`, etc.).
+> - 11 new tests added: 5 inline error tests (render, null, sandbox keyword, offline keyword, partial response preservation), 3 connection status tests (disconnected, connecting, connected hidden), 4 error boundary tests (message, fallback, reset click, layout classes). 72 total web tests across 7 test files. 189 total tests across all packages. Build and lint clean.
 
 ---
 

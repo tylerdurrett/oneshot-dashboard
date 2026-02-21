@@ -295,9 +295,84 @@ describe('ChatPage', () => {
 
   it('has border-t wrapper for the input area', () => {
     const { container } = render(<ChatPage />);
-    const inputWrapper = container.querySelector('.border-t');
+    const inputWrapper = container.querySelector('.border-t.p-4');
     expect(inputWrapper).not.toBeNull();
     expect(inputWrapper!.className).toContain('border-border');
-    expect(inputWrapper!.className).toContain('p-4');
+  });
+
+  // -------------------------------------------------------------------------
+  // Error display
+  // -------------------------------------------------------------------------
+
+  it('shows inline error message when error is set', () => {
+    hookReturn = { ...defaultReturn, error: 'Something broke' };
+    render(<ChatPage />);
+    const alert = screen.getByRole('alert');
+    expect(alert).toBeDefined();
+    expect(alert.textContent).toBe('Something broke');
+  });
+
+  it('does not show error when error is null', () => {
+    hookReturn = { ...defaultReturn, error: null };
+    render(<ChatPage />);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows sandbox-specific error message for sandbox errors', () => {
+    hookReturn = { ...defaultReturn, error: 'sandbox unavailable' };
+    render(<ChatPage />);
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Agent is offline. Check the Docker sandbox.',
+    );
+  });
+
+  it('shows sandbox-specific error message for offline errors', () => {
+    hookReturn = { ...defaultReturn, error: 'Agent is offline' };
+    render(<ChatPage />);
+    expect(screen.getByRole('alert').textContent).toBe(
+      'Agent is offline. Check the Docker sandbox.',
+    );
+  });
+
+  it('preserves partial response alongside error', () => {
+    hookReturn = {
+      ...defaultReturn,
+      error: 'Stream interrupted',
+      messages: [
+        { id: '1', role: 'user', content: 'Tell me a story' },
+        { id: '2', role: 'assistant', content: 'Once upon a time...' },
+      ],
+    };
+    render(<ChatPage />);
+    // Both the partial message and the error should be visible
+    expect(screen.getByText('Once upon a time...')).toBeDefined();
+    expect(screen.getByRole('alert')).toBeDefined();
+    expect(screen.getByRole('alert').textContent).toBe('Stream interrupted');
+  });
+
+  // -------------------------------------------------------------------------
+  // Connection status indicator
+  // -------------------------------------------------------------------------
+
+  it('shows connection status when disconnected', () => {
+    hookReturn = { ...defaultReturn, connectionStatus: 'disconnected' };
+    render(<ChatPage />);
+    const status = screen.getByRole('status');
+    expect(status).toBeDefined();
+    expect(status.textContent).toBe('Disconnected. Reconnecting...');
+  });
+
+  it('shows connecting status when connecting', () => {
+    hookReturn = { ...defaultReturn, connectionStatus: 'connecting' };
+    render(<ChatPage />);
+    const status = screen.getByRole('status');
+    expect(status).toBeDefined();
+    expect(status.textContent).toBe('Connecting...');
+  });
+
+  it('does not show connection status when connected', () => {
+    hookReturn = { ...defaultReturn, connectionStatus: 'connected' };
+    render(<ChatPage />);
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });

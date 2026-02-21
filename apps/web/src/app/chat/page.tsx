@@ -21,7 +21,8 @@ import { useCreateThread, useThreadMessages, threadKeys } from './use-threads';
 import type { ChatMessage } from './use-chat-socket';
 
 export default function ChatPage() {
-  const { messages, sendMessage, setMessages, isStreaming } = useChatSocket();
+  const { messages, sendMessage, setMessages, isStreaming, error, connectionStatus } =
+    useChatSocket();
   const createThread = useCreateThread();
   const queryClient = useQueryClient();
 
@@ -116,10 +117,30 @@ export default function ChatPage() {
                   </Message>
                 ))
               )}
+              {error && (
+                <div
+                  role="alert"
+                  className="mx-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+                >
+                  {/sandbox|offline/i.test(error)
+                    ? 'Agent is offline. Check the Docker sandbox.'
+                    : error}
+                </div>
+              )}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
 
+          {connectionStatus !== 'connected' && (
+            <div
+              role="status"
+              className="border-t border-border bg-muted px-4 py-2 text-center text-xs text-muted-foreground"
+            >
+              {connectionStatus === 'connecting'
+                ? 'Connecting...'
+                : 'Disconnected. Reconnecting...'}
+            </div>
+          )}
           <div className="border-t border-border p-4">
             <PromptInput onSubmit={handleSubmit}>
               <PromptInputBody>
