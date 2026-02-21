@@ -16,6 +16,12 @@ pnpm go
 
 Then open Claude Code and start building.
 
+When you want to stop both long-running local processes (`dev` + `studio`), run:
+
+```bash
+pnpm stop
+```
+
 ## How to build with Claude Code
 
 ### Small tasks
