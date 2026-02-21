@@ -336,15 +336,23 @@ scripts/
 
 ### 4.3 Write WebSocket integration tests
 
-- [ ] Test the full flow: connect → send message → receive tokens → receive done
-- [ ] Test error scenarios: invalid thread ID, sandbox unavailable
-- [ ] Test thread title auto-generation on first message
-- [ ] Use mocked sandbox service to avoid Docker dependency in tests
+- [x] Test the full flow: connect → send message → receive tokens → receive done
+- [x] Test error scenarios: invalid thread ID, sandbox unavailable
+- [x] Test thread title auto-generation on first message
+- [x] Use mocked sandbox service to avoid Docker dependency in tests
 
 **Acceptance Criteria:**
 - All WebSocket flow tests pass
 - Error scenarios are covered
 - Tests run without Docker
+
+> **Implementation Notes (4.3):**
+> - 12 integration tests in `src/__tests__/chat-routes.test.ts` organized into 6 groups: happy path (3), title auto-generation (2), error scenarios (4), streaming lock (1), session resume (2).
+> - Reuses the same test infrastructure patterns: `createTestDb()` (in-memory SQLite), `createFakeSpawn()` (mocked child_process), `ndjson()` helper, and `server.injectWS('/chat')` for WebSocket testing.
+> - `collectWsMessages()` helper collects all WS messages until `done` or `error` with a configurable timeout, simplifying assertions across tests.
+> - Streaming lock test uses a two-phase spawn mock: emits a token immediately (via `process.nextTick`), then delays the result by 100ms. The test waits for the first token (confirming the lock is active) before sending the second message. This avoids the race condition where both messages enter `handleChatMessage()` before `setStreaming(true)` is called (since it runs after async DB operations).
+> - Session resume test uses `updateThreadSessionId()` to manually set a stale session ID, then verifies `--resume` flag is passed and the retry without `--resume` succeeds with a new session ID persisted.
+> - All 79 tests pass across 6 test files (12 new + 67 existing). Lint clean.
 
 ---
 
