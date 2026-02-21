@@ -9,6 +9,7 @@
 | [ui-principles.md](ui-principles.md) | Solid | Layout paradigm, chat panel, performance, component philosophy, feature design workflow. |
 | [user-journeys.md](user-journeys.md) | Two journeys drafted | Birth the agent + clarity funnel. More journeys needed for v1+. |
 | [versions.md](versions.md) | v0 scoped, v1/v2 rough | v0 is actionable. v1 and v2 need the planning process to continue. |
+| [architecture.md](architecture.md) | v0 decided | Fastify agent server, Docker sandboxes, WebSocket streaming, SQLite. Scaling path outlined. |
 | [initial-concept.md](initial-concept.md) | Reference | Original braindump. Still full of ideas not yet captured in other docs. |
 
 ## v0 Is Ready to Execute

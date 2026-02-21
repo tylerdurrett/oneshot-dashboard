@@ -21,7 +21,8 @@ your-project/
 │   ├── check-setup.mjs       ← Pre-dev configuration check
 │   ├── new-video.mjs         ← Scaffold new Remotion compositions
 │   ├── get-port.mjs          ← Read dev server port from config
-│   └── get-studio-port.mjs   ← Read Remotion Studio port from config
+│   ├── get-studio-port.mjs   ← Read Remotion Studio port from config
+│   └── stop-dev-processes.mjs ← Stop local dev + studio processes (pnpm stop)
 ├── _tasks/                ← Feature planning (for larger features)
 ├── .claude/                  ← Claude Code skills and configuration
 ├── package.json              ← Root-level scripts and dependencies
