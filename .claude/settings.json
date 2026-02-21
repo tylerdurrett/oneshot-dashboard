@@ -25,7 +25,8 @@
       "Bash(node scripts/check-setup.mjs:*)",
       "Bash(echo:*)",
       "WebFetch(domain:ai-sdk.dev)",
-      "WebFetch(domain:elements.ai-sdk.dev)"
+      "WebFetch(domain:elements.ai-sdk.dev)",
+      "Bash(pnpm --filter @repo/db test:*)"
     ],
     "deny": [
       "Read(.env)",

@@ -39,6 +39,24 @@ When building UI, follow `docs/ui-conventions.md`. Key rules:
 - Dark-theme-first. Only animate `transform`/`opacity`. Optimistic updates via TanStack Query.
 - Scrollbar is styled globally — don't add per-component scrollbar styles.
 
+## Database Workflow
+
+Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (never `db:push`) for real work.
+
+**Process — every time you change the schema:**
+1. Edit `packages/db/src/schema.ts` (this is the source of truth)
+2. Run `pnpm --filter @repo/db db:generate` — creates a versioned SQL migration file in `packages/db/drizzle/`
+3. Review the generated `.sql` file to verify it does what you expect
+4. Run `pnpm --filter @repo/db db:migrate` — applies the migration to your local database
+5. Commit both the schema change AND the migration file together
+
+**Rules:**
+- Never edit generated migration files. If a migration is wrong, fix `schema.ts` and generate a new one.
+- One migration per logical change. Don't batch unrelated schema changes.
+- Migration files are committed to git — they're the reproducible history of the database.
+- `db:migrate` runs automatically on `pnpm dev` / `pnpm go` / `pnpm studio`, so pending migrations are always applied.
+- `db:push` exists for throwaway prototyping only. It skips migration files and can drop data.
+
 ## Conventions
 
 - Package names use `@repo/*` scope

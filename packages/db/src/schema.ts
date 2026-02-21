@@ -1,7 +1,2 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-});
+// Database schema — source of truth for all tables.
+// After editing, run: pnpm --filter @repo/db db:generate && pnpm --filter @repo/db db:migrate
