@@ -10,6 +10,7 @@
 - Chat/agent knows what the user is looking at. Chat/agent can navigate the user anywhere.
 - Chat/agent creates artifacts. UI also provides direct affordances for manual artifact creation and editing.
 - The context view isn't always an "artifact" — it might be a collection (docs, assets, agents, projects, tasks), a settings form, or any other view. Whatever is shown is available to the chat agent's context.
+- Mobile chat experience will be crucial to get right. It will be about responsiveness and feel.
 
 ## Chat Panel
 

@@ -40,3 +40,5 @@ Slugish UI is not acceptable.
 We need to use methods that ensure buttery smooth UI in a couple of ways:
 1. Instant, optimistic updates with background actions. Tanstack Query tends to have good performance characteristics.
 2. For things involving dragging elements or animation, we need to be sure the animation is built in a performant way, using GPU-optimized properties that don't reflow content.
+---
+Mobile chat will be absolutely crucial to get right as well. That's going to have to be fleshed out with some hands on practice.
