@@ -1,16 +1,32 @@
 import 'dotenv/config';
 
+import cors from '@fastify/cors';
 import Fastify from 'fastify';
 import { config } from './config.js';
+import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
+import type { Database } from './services/thread.js';
 
-export function buildServer(opts?: { logger?: boolean }) {
+export interface BuildServerOptions {
+  logger?: boolean;
+  database?: Database;
+}
+
+export function buildServer(opts?: BuildServerOptions) {
   const server = Fastify({
     logger: opts?.logger ?? true,
   });
 
+  server.register(cors, { origin: config.webOrigin });
+
   server.get('/health', async () => {
     return { status: 'ok' };
   });
+
+  const routeOpts: ThreadRoutesOptions = {};
+  if (opts?.database) {
+    routeOpts.database = opts.database;
+  }
+  server.register(threadRoutes, routeOpts);
 
   return server;
 }

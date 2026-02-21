@@ -154,13 +154,13 @@ scripts/
 
 ### 2.3 Thread HTTP routes
 
-- [ ] Create `src/routes/threads.ts` with Fastify route plugin:
+- [x] Create `src/routes/threads.ts` with Fastify route plugin:
   - `GET /threads` — returns `{ threads: [...] }` via `listThreads()`
   - `GET /threads/:id/messages` — returns `{ messages: [...] }` via `getThreadMessages(id)`, 404 if thread not found
   - `POST /threads` — accepts `{ title?: string }` body, creates thread with title (or "New conversation"), returns `{ thread: { id, title, ... } }`
-- [ ] Register routes in `src/index.ts`
-- [ ] Write integration tests in `src/__tests__/threads-routes.test.ts` using `fastify.inject()`
-- [ ] Enable CORS for the frontend origin (derived from `project.config.json` web port)
+- [x] Register routes in `src/index.ts`
+- [x] Write integration tests in `src/__tests__/threads-routes.test.ts` using `fastify.inject()`
+- [x] Enable CORS for the frontend origin (derived from `project.config.json` web port)
 
 **Acceptance Criteria:**
 - All three endpoints return correct responses
@@ -168,6 +168,13 @@ scripts/
 - `GET /threads/:id/messages` returns 404 for nonexistent thread
 - Integration tests pass
 - CORS headers are present in responses
+
+> **Implementation Notes (2.3):**
+> - Route plugin (`threadRoutes`) accepts an optional `database` parameter via `ThreadRoutesOptions`, following the same dependency injection pattern as the service layer. This enables full integration testing with in-memory SQLite via `buildServer({ database: testDb })`.
+> - `buildServer()` now accepts `BuildServerOptions` with optional `logger` and `database` fields. The database is threaded through to the route plugin.
+> - CORS is registered via `@fastify/cors` with origin set to `config.webOrigin` (`http://localhost:{port}` derived from `project.config.json`).
+> - Added `webOrigin` to `config.ts` to centralize the web origin derivation.
+> - 10 integration tests covering: empty thread list, thread ordering, thread creation with/without title, 404 for missing thread, empty/populated messages, CORS headers, and CORS preflight.
 
 ### 2.4 Integrate with Turborepo and monorepo tooling
 

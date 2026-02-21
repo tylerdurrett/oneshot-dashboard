@@ -35,6 +35,9 @@ export const config = {
   /** Fastify server port. Uses serverPort if available, otherwise port + 2. */
   port: projectConfig.serverPort ?? projectConfig.port + 2,
 
+  /** Origin of the web app, used for CORS. */
+  webOrigin: `http://localhost:${projectConfig.port}`,
+
   /** Docker sandbox name. */
   sandboxName: process.env.SANDBOX_NAME ?? 'my-sandbox',
 
