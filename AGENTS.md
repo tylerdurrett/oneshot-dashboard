@@ -30,6 +30,15 @@ This repo is meant to be used by NON-DEVELOPERS who are using coding agents to v
 | `pnpm new-video <Name>` | Scaffold a new video composition |
 | `pnpm dlx shadcn@latest add <component> --cwd packages/ui` | Add a Shadcn component |
 
+## UI Conventions
+
+When building UI, follow `docs/ui-conventions.md`. Key rules:
+- Don't extract components until the 3rd use (or if it's a semantic concept with behavior)
+- Use Tailwind values directly; only create semantic tokens when a meaning clearly repeats
+- Reusable components → `packages/ui/`, feature-specific → colocated
+- Dark-theme-first. Only animate `transform`/`opacity`. Optimistic updates via TanStack Query.
+- Scrollbar is styled globally — don't add per-component scrollbar styles.
+
 ## Conventions
 
 - Package names use `@repo/*` scope
