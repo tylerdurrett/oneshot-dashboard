@@ -12,6 +12,15 @@ export {
   CardHeader,
   CardTitle,
 } from './components/card';
+export {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from './components/dropdown-menu';
 
 // AI Elements
 export * from './components/ai-elements/conversation';

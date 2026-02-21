@@ -494,12 +494,12 @@ scripts/
 
 ### 6.1 Thread title bar and selector dropdown
 
-- [ ] Create `apps/web/src/app/chat/thread-selector.tsx` — a dropdown component showing the current thread title and a list of previous threads
-- [ ] Display current thread title at the top of the chat
-- [ ] Dropdown shows threads with title + relative timestamp (e.g., "2 hours ago")
-- [ ] Ordered by most recent first
-- [ ] Selecting a thread: loads its messages, switches the active thread for WebSocket messages
-- [ ] Use Shadcn `DropdownMenu` or `Select` component as the base
+- [x] Create `apps/web/src/app/chat/thread-selector.tsx` — a dropdown component showing the current thread title and a list of previous threads
+- [x] Display current thread title at the top of the chat
+- [x] Dropdown shows threads with title + relative timestamp (e.g., "2 hours ago")
+- [x] Ordered by most recent first
+- [x] Selecting a thread: loads its messages, switches the active thread for WebSocket messages
+- [x] Use Shadcn `DropdownMenu` or `Select` component as the base
 
 **Acceptance Criteria:**
 - Thread title is visible at the top of the chat
@@ -507,6 +507,17 @@ scripts/
 - Selecting a thread loads its messages and resumes context
 - Current thread is highlighted in the dropdown
 - **Visual test (chrome-devtools):** Screenshot the title bar and open dropdown with multiple threads
+
+> **Implementation Notes (6.1):**
+> - `ThreadSelector` component uses `DropdownMenu` from `@repo/ui` (Radix-based) rather than `Select` — more flexible for the thread list UX with timestamps, active highlighting, and the "New thread" action at the bottom.
+> - DropdownMenu components were already in `packages/ui/src/components/dropdown-menu.tsx` but weren't exported from the package index. Added the necessary exports to `packages/ui/src/index.ts`.
+> - `formatTimeAgo()` utility in `apps/web/src/app/chat/format-time-ago.ts` converts epoch-second timestamps to relative strings ("just now", "2m ago", "3h ago", "5d ago", "2w ago", "3mo ago", "1y ago"). No external date library needed.
+> - `lucide-react` added as a direct dependency of `apps/web` (pnpm strict mode prevents importing it transitively from `@repo/ui`). Used for `ChevronDown` and `Plus` icons.
+> - The title bar is a `border-b` div positioned above the `Conversation` component inside the container-query-scaled inner div, so it respects the same responsive max-width.
+> - Active thread is highlighted with `bg-accent/50` class on the corresponding `DropdownMenuItem`.
+> - The "New thread" button is integrated directly into the `ThreadSelector` dropdown (below a separator) rather than as a separate top-right button, since the plan specified it should be in the dropdown (6.1) and also as a standalone button (6.2). The standalone "+" button will be added in 6.2.
+> - Thread switching in `page.tsx`: `handleSelectThread` sets `activeThreadId` and clears messages immediately — the `useThreadMessages` query then refetches and populates from the server. `handleNewThread` creates a thread via the mutation and switches to it.
+> - 18 new tests added: 8 `formatTimeAgo` tests, 10 `ThreadSelector` tests. Page tests updated with 4 new tests (title bar rendering, thread list passing, thread switching, new thread creation) plus mock updates for `useThreads` and `ThreadSelector`. 95 total web tests, 208 total across all packages. Build and lint clean.
 
 ### 6.2 New thread button
 

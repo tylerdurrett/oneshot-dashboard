@@ -17,13 +17,15 @@ import {
   PromptInputTextarea,
 } from '@repo/ui';
 import { useChatSocket } from './use-chat-socket';
-import { useCreateThread, useThreadMessages, threadKeys } from './use-threads';
+import { useCreateThread, useThreadMessages, useThreads, threadKeys } from './use-threads';
+import { ThreadSelector } from './thread-selector';
 import type { ChatMessage } from './use-chat-socket';
 
 export default function ChatPage() {
   const { messages, sendMessage, setMessages, isStreaming, error, connectionStatus } =
     useChatSocket();
   const createThread = useCreateThread();
+  const threadsQuery = useThreads();
   const queryClient = useQueryClient();
 
   // ---------------------------------------------------------------------------
@@ -50,7 +52,7 @@ export default function ChatPage() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Thread message loading (for thread switching in Phase 6)
+  // Thread message loading
   // ---------------------------------------------------------------------------
 
   const threadMessagesQuery = useThreadMessages(activeThreadId);
@@ -83,6 +85,35 @@ export default function ChatPage() {
   }, [isStreaming, queryClient]);
 
   // ---------------------------------------------------------------------------
+  // Thread switching and creation
+  // ---------------------------------------------------------------------------
+
+  const handleSelectThread = useCallback(
+    (threadId: string) => {
+      if (threadId === activeThreadId) return;
+      setActiveThreadId(threadId);
+      setMessages([]);
+      // Messages will load via useThreadMessages query
+    },
+    [activeThreadId, setMessages],
+  );
+
+  const handleNewThread = useCallback(() => {
+    if (creatingRef.current) return;
+    creatingRef.current = true;
+
+    createThread.mutate(undefined, {
+      onSuccess: (thread) => {
+        setActiveThreadId(thread.id);
+        setMessages([]);
+      },
+      onSettled: () => {
+        creatingRef.current = false;
+      },
+    });
+  }, [createThread, setMessages]);
+
+  // ---------------------------------------------------------------------------
   // Submit handler
   // ---------------------------------------------------------------------------
 
@@ -101,6 +132,16 @@ export default function ChatPage() {
       {/* Container query context — scales content width with available space */}
       <div className="@container flex w-full flex-1 flex-col overflow-hidden">
         <div className="mx-auto flex w-full flex-1 flex-col overflow-hidden @3xl:max-w-2xl @5xl:max-w-3xl @7xl:max-w-4xl">
+          {/* Title bar */}
+          <div className="flex items-center border-b border-border px-3 py-2" data-testid="title-bar">
+            <ThreadSelector
+              threads={threadsQuery.data ?? []}
+              activeThreadId={activeThreadId}
+              onSelectThread={handleSelectThread}
+              onNewThread={handleNewThread}
+            />
+          </div>
+
           <Conversation className="flex-1">
             <ConversationContent>
               {messages.length === 0 ? (

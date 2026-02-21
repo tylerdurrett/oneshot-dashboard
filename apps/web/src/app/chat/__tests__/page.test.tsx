@@ -33,6 +33,11 @@ vi.mock('../use-threads', () => ({
   useThreadMessages: () => ({
     data: undefined,
   }),
+  useThreads: () => ({
+    data: [
+      { id: 'thread-1', title: 'Test thread', claudeSessionId: null, createdAt: 1000, updatedAt: 2000 },
+    ],
+  }),
   threadKeys: {
     all: ['threads'] as const,
     messages: (id: string) => ['threads', id, 'messages'] as const,
@@ -43,6 +48,33 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: () => ({
     invalidateQueries: mockInvalidateQueries,
   }),
+}));
+
+// Mock ThreadSelector to avoid DropdownMenu complexity in page tests
+const mockOnSelectThread = vi.fn();
+const mockOnNewThread = vi.fn();
+
+vi.mock('../thread-selector', () => ({
+  ThreadSelector: ({
+    threads,
+    activeThreadId,
+    onSelectThread,
+    onNewThread,
+  }: {
+    threads: Array<{ id: string; title: string }>;
+    activeThreadId: string | null;
+    onSelectThread: (id: string) => void;
+    onNewThread: () => void;
+  }) => {
+    // Capture handlers for testing
+    mockOnSelectThread.mockImplementation(onSelectThread);
+    mockOnNewThread.mockImplementation(onNewThread);
+    return (
+      <div data-testid="thread-selector" data-active-thread={activeThreadId}>
+        <span data-testid="thread-count">{threads.length}</span>
+      </div>
+    );
+  },
 }));
 
 // Mock @repo/ui to avoid Streamdown/StickToBottom complexity in unit tests
@@ -103,6 +135,8 @@ describe('ChatPage', () => {
     hookReturn = { ...defaultReturn, messages: [] };
     mockMutate.mockReset();
     mockInvalidateQueries.mockReset();
+    mockOnSelectThread.mockReset();
+    mockOnNewThread.mockReset();
   });
 
   afterEach(() => {
@@ -132,6 +166,60 @@ describe('ChatPage', () => {
       '.\\@3xl\\:max-w-2xl.\\@5xl\\:max-w-3xl.\\@7xl\\:max-w-4xl',
     );
     expect(inner).not.toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Title bar and thread selector
+  // -------------------------------------------------------------------------
+
+  it('renders the title bar', () => {
+    render(<ChatPage />);
+    expect(screen.getByTestId('title-bar')).toBeDefined();
+  });
+
+  it('renders ThreadSelector in the title bar', () => {
+    render(<ChatPage />);
+    expect(screen.getByTestId('thread-selector')).toBeDefined();
+  });
+
+  it('passes thread list to ThreadSelector', () => {
+    render(<ChatPage />);
+    expect(screen.getByTestId('thread-count').textContent).toBe('1');
+  });
+
+  it('clears messages when switching threads via ThreadSelector', () => {
+    const setMessages = vi.fn();
+    hookReturn = { ...defaultReturn, setMessages };
+
+    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
+      opts.onSuccess({ id: 'thread-1' });
+    });
+
+    render(<ChatPage />);
+
+    // Simulate thread switch via the captured handler
+    mockOnSelectThread('thread-2');
+    expect(setMessages).toHaveBeenCalledWith([]);
+  });
+
+  it('creates new thread and clears messages when onNewThread is called', () => {
+    const setMessages = vi.fn();
+    hookReturn = { ...defaultReturn, setMessages };
+
+    // First call: auto-create on mount. Second call: from onNewThread
+    let callCount = 0;
+    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void; onSettled: () => void }) => {
+      callCount++;
+      opts.onSuccess({ id: `thread-${callCount}` });
+      opts.onSettled();
+    });
+
+    render(<ChatPage />);
+    expect(callCount).toBe(1); // auto-create
+
+    mockOnNewThread();
+    expect(callCount).toBe(2); // new thread
+    expect(setMessages).toHaveBeenCalledWith([]);
   });
 
   // -------------------------------------------------------------------------
