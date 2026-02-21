@@ -23,7 +23,7 @@ export function readDevPortFromConfig(configPath) {
 }
 
 export function getTargetPorts(devPort) {
-  return [devPort, devPort + 1];
+  return [devPort, devPort + 1, devPort + 2];
 }
 
 export function parseLsofPids(output) {
@@ -99,10 +99,10 @@ function wait(ms) {
 async function main() {
   const configPath = path.join(root, 'project.config.json');
   const devPort = readDevPortFromConfig(configPath);
-  const [webPort, studioPort] = getTargetPorts(devPort);
+  const [webPort, studioPort, serverPort] = getTargetPorts(devPort);
 
   const pidMap = new Map();
-  for (const port of [webPort, studioPort]) {
+  for (const port of [webPort, studioPort, serverPort]) {
     pidMap.set(port, findListeningPidsOnPort(port));
   }
 
@@ -110,12 +110,12 @@ async function main() {
 
   if (allPids.length === 0) {
     console.log(
-      `No running dev/studio processes found on ports ${webPort} and ${studioPort}.`,
+      `No running dev processes found on ports ${webPort}, ${studioPort}, and ${serverPort}.`,
     );
     return;
   }
 
-  console.log(`Found running processes on ports ${webPort} and ${studioPort}:`);
+  console.log(`Found running processes on ports ${webPort}, ${studioPort}, and ${serverPort}:`);
   for (const [port, pids] of pidMap.entries()) {
     if (pids.length > 0) {
       console.log(formatPortPidLine(port, pids));
@@ -141,7 +141,7 @@ async function main() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
     console.error(
-      `Failed to stop dev/studio processes: ${
+      `Failed to stop dev processes: ${
         error instanceof Error ? error.message : String(error)
       }`,
     );

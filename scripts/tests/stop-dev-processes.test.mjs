@@ -29,8 +29,8 @@ test('readDevPortFromConfig falls back to default for missing/invalid config', (
   assert.equal(readDevPortFromConfig(invalidConfigPath), 3000);
 });
 
-test('getTargetPorts includes web and studio ports', () => {
-  assert.deepEqual(getTargetPorts(3300), [3300, 3301]);
+test('getTargetPorts includes web, studio, and server ports', () => {
+  assert.deepEqual(getTargetPorts(3300), [3300, 3301, 3302]);
 });
 
 test('parseLsofPids parses, filters, and deduplicates pids', () => {

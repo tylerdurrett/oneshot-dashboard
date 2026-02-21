@@ -7,6 +7,7 @@ This repo is meant to be used by NON-DEVELOPERS who are using coding agents to v
 ## Monorepo Structure
 
 - **`apps/web`** (`@repo/web`) — Next.js 15 app (App Router, Tailwind v4, Vitest)
+- **`apps/server`** (`@repo/server`) — Fastify agent server (WebSocket, Docker sandbox bridge)
 - **`packages/ui`** (`@repo/ui`) — Shadcn components + Tailwind, shared across apps
 - **`packages/db`** (`@repo/db`) — Drizzle ORM + SQLite (libsql), schema and migrations
 - **`packages/typescript-config`** (`@repo/typescript-config`) — Shared tsconfig presets (base, nextjs, library)
@@ -19,15 +20,16 @@ This repo is meant to be used by NON-DEVELOPERS who are using coding agents to v
 | --- | --- |
 | `pnpm hello` | Interactive project setup (port, etc.) |
 | `pnpm build` | Build all packages and apps via Turbo |
-| `pnpm dev` | Start Next.js dev server (auto-runs setup if needed) |
+| `pnpm dev` | Start Next.js + agent server concurrently (auto-runs setup if needed) |
 | `pnpm lint` | Lint all packages |
 | `pnpm test` | Run Vitest across all packages |
 | `pnpm format` | Format all files with Prettier |
 | `pnpm --filter @repo/db db:generate` | Generate Drizzle migrations |
 | `pnpm --filter @repo/db db:migrate` | Apply Drizzle migrations |
 | `pnpm studio` | Launch Remotion Studio for video preview (auto-runs setup if needed) |
-| `pnpm go` | Start Next.js dev server + Remotion Studio concurrently (auto-runs setup if needed) |
+| `pnpm go` | Start Next.js + agent server + Remotion Studio concurrently (auto-runs setup if needed) |
 | `pnpm new-video <Name>` | Scaffold a new video composition |
+| `pnpm --filter @repo/server dev` | Start agent server only |
 | `pnpm dlx shadcn@latest add <component> --cwd packages/ui` | Add a Shadcn component |
 
 ## UI Conventions

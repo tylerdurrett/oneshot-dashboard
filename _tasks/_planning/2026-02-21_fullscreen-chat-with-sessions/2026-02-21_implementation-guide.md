@@ -180,23 +180,23 @@ scripts/
 
 **Port convention:** Web = N, Remotion Studio = N+1, Agent Server = N+2 (where N is the port from `pnpm hello`).
 
-- [ ] Update `scripts/setup.mjs` (`pnpm hello`):
+- [x] Update `scripts/setup.mjs` (`pnpm hello`):
   - Add `serverPort` (webPort + 2) to `project.config.json` output
   - Update the console output to show: "Dev server on port N, Remotion Studio on N+1, Agent server on N+2"
-- [ ] Create `scripts/get-server-port.mjs` (mirrors `get-port.mjs` but reads `serverPort`, defaults to 3002)
-- [ ] Update `apps/server/package.json` dev script to read port: `"dev": "tsx watch src/index.ts"` (port read in `src/config.ts` from `project.config.json`)
-- [ ] Verify `turbo.json` `dev` task picks up `apps/server` automatically (it should — `dev` task has no filter and `apps/*` is in the workspace)
-- [ ] Test that `pnpm dev` starts Next.js, and the Fastify server concurrently
-- [ ] Update `pnpm go` if needed — currently `turbo run dev studio`, which should pick up the server's `dev` task via turbo
-- [ ] Update `scripts/stop-dev-processes.mjs`:
+- [x] Create `scripts/get-server-port.mjs` (mirrors `get-port.mjs` but reads `serverPort`, defaults to 3002)
+- [x] Update `apps/server/package.json` dev script to read port: `"dev": "tsx watch src/index.ts"` (port read in `src/config.ts` from `project.config.json`)
+- [x] Verify `turbo.json` `dev` task picks up `apps/server` automatically (it should — `dev` task has no filter and `apps/*` is in the workspace)
+- [x] Test that `pnpm dev` starts Next.js, and the Fastify server concurrently
+- [x] Update `pnpm go` if needed — currently `turbo run dev studio`, which should pick up the server's `dev` task via turbo
+- [x] Update `scripts/stop-dev-processes.mjs`:
   - Change `getTargetPorts(devPort)` to return `[devPort, devPort + 1, devPort + 2]` (adds server port)
   - Update console messages to mention all three services
-- [ ] Update `AGENTS.md`:
+- [x] Update `AGENTS.md`:
   - Add `apps/server` (`@repo/server`) to the Monorepo Structure section
   - Add `pnpm --filter @repo/server dev` to the Key Commands table
   - Update `pnpm dev` description to mention it starts the agent server too
   - Update `pnpm go` description if changed
-- [ ] Run `pnpm hello` to regenerate `project.config.json` with the new `serverPort` field
+- [x] Run `pnpm hello` to regenerate `project.config.json` with the new `serverPort` field
 
 **Acceptance Criteria:**
 - `pnpm hello` writes both `port` and `serverPort` to `project.config.json`
@@ -204,6 +204,14 @@ scripts/
 - `pnpm go` starts all three services (web, studio, server)
 - `pnpm stop` kills processes on all three ports (web, studio, server)
 - `AGENTS.md` reflects the new app and commands
+
+> **Implementation Notes (2.4):**
+> - `project.config.json` was updated directly with `serverPort: 3202` (port 3200 + 2) instead of running interactive `pnpm hello`, since setup is interactive and the config already existed.
+> - `pnpm go` (`turbo run dev studio`) automatically picks up `@repo/server#dev` — no changes needed. The server runs as part of the `dev` pipeline.
+> - `turbo.json` required no changes — the existing `dev` task (persistent, no cache) automatically includes all workspace packages with a `dev` script.
+> - `apps/server/package.json` dev script was already correct (`tsx watch src/index.ts`) — port reading was already handled in `src/config.ts` from Phase 2.1.
+> - `get-server-port.mjs` includes a fallback chain: `serverPort` → `port + 2` → `3002`.
+> - Updated `getTargetPorts` test assertion from `[3300, 3301]` to `[3300, 3301, 3302]`.
 
 ---
 

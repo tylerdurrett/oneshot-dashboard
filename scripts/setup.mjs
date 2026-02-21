@@ -50,6 +50,7 @@ function writeProjectConfig(port) {
     config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
   config.port = port;
+  config.serverPort = port + 2;
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + '\n');
 }
 
@@ -84,7 +85,7 @@ const steps = [
       writeProjectConfig(port);
 
       console.log(`\n  Saved port ${port} to project.config.json`);
-      console.log(`  Remotion Studio will run on port ${port + 1}`);
+      console.log(`  Dev server on port ${port}, Remotion Studio on ${port + 1}, Agent server on ${port + 2}`);
       return { port };
     },
   },
