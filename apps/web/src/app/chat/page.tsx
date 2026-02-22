@@ -148,8 +148,9 @@ export default function ChatIndexPage() {
                     <MessageContent>
                       <MessageResponse>{msg.content}</MessageResponse>
                       {msg.role === 'assistant' && isStreaming && (
-                        <div className={msg.content ? 'hidden' : ''}>
+                        <div className={`flex items-center gap-2 text-sm text-muted-foreground${msg.content ? ' hidden' : ''}`}>
                           <Spinner className="size-4" />
+                          Thinking...
                         </div>
                       )}
                     </MessageContent>
