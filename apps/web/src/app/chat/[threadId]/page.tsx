@@ -121,14 +121,15 @@ export default function ThreadPage() {
     (deletedThreadId: string) => {
       deleteThreadMutation.mutate(deletedThreadId, {
         onSuccess: () => {
-          // If we deleted the active thread, redirect to /chat (draft mode)
+          // If we deleted the active thread, clear messages and redirect to draft mode
           if (deletedThreadId === threadId) {
+            setMessages([]);
             router.push('/chat');
           }
         },
       });
     },
-    [deleteThreadMutation, threadId, router],
+    [deleteThreadMutation, threadId, router, setMessages],
   );
 
   // Navigate to /chat for a new draft conversation — no thread is created
