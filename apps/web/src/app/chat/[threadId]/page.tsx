@@ -21,8 +21,8 @@ import {
   PromptInputTextarea,
   Spinner,
 } from '@repo/ui';
-import { useChatSocket } from '../use-chat-socket';
-import { useCreateThread, useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
+import { useChatSocketContext } from '../chat-socket-context';
+import { useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
 import { ThreadSelector } from '../thread-selector';
 import type { ChatMessage } from '../use-chat-socket';
 
@@ -46,8 +46,7 @@ export default function ThreadPage() {
   const threadId = params.threadId;
 
   const { messages, sendMessage, setMessages, isStreaming, error, connectionStatus } =
-    useChatSocket();
-  const createThread = useCreateThread();
+    useChatSocketContext();
   const deleteThreadMutation = useDeleteThread();
   const threadsQuery = useThreads();
   const queryClient = useQueryClient();
@@ -114,7 +113,7 @@ export default function ThreadPage() {
     (deletedThreadId: string) => {
       deleteThreadMutation.mutate(deletedThreadId, {
         onSuccess: () => {
-          // If we deleted the active thread, redirect to /chat (creates new thread)
+          // If we deleted the active thread, redirect to /chat (draft mode)
           if (deletedThreadId === threadId) {
             router.push('/chat');
           }
@@ -124,20 +123,12 @@ export default function ThreadPage() {
     [deleteThreadMutation, threadId, router],
   );
 
-  const creatingRef = useRef(false);
+  // Navigate to /chat for a new draft conversation — no thread is created
+  // until the user sends their first message (lazy thread creation).
   const handleNewThread = useCallback(() => {
-    if (creatingRef.current) return;
-    creatingRef.current = true;
-
-    createThread.mutate(undefined, {
-      onSuccess: (thread) => {
-        router.push(`/chat/${thread.id}`);
-      },
-      onSettled: () => {
-        creatingRef.current = false;
-      },
-    });
-  }, [createThread, router]);
+    setMessages([]);
+    router.push('/chat');
+  }, [router, setMessages]);
 
   // ---------------------------------------------------------------------------
   // Submit handler

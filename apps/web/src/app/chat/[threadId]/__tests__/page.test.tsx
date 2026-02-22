@@ -17,8 +17,8 @@ const defaultReturn: UseChatSocketReturn = {
 
 let hookReturn = { ...defaultReturn };
 
-vi.mock('../../use-chat-socket', () => ({
-  useChatSocket: () => hookReturn,
+vi.mock('../../chat-socket-context', () => ({
+  useChatSocketContext: () => hookReturn,
 }));
 
 // Mock next/navigation
@@ -32,7 +32,6 @@ vi.mock('next/navigation', () => ({
 }));
 
 // Mock TanStack Query hooks
-const mockMutate = vi.fn();
 const mockInvalidateQueries = vi.fn();
 
 // Dynamic mock data for thread switching tests
@@ -46,10 +45,6 @@ let threadMessagesError: Record<string, Error> = {};
 const mockDeleteMutate = vi.fn();
 
 vi.mock('../../use-threads', () => ({
-  useCreateThread: () => ({
-    mutate: mockMutate,
-    isPending: false,
-  }),
   useDeleteThread: () => ({
     mutate: mockDeleteMutate,
     isPending: false,
@@ -177,7 +172,6 @@ import ThreadPage from '../page';
 describe('ThreadPage', () => {
   beforeEach(() => {
     hookReturn = { ...defaultReturn, messages: [] };
-    mockMutate.mockReset();
     mockDeleteMutate.mockReset();
     mockInvalidateQueries.mockReset();
     mockOnSelectThread.mockReset();
@@ -260,30 +254,20 @@ describe('ThreadPage', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('creates new thread and navigates when onNewThread is called', () => {
-    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void; onSettled: () => void }) => {
-      opts.onSuccess({ id: 'new-thread-id' });
-      opts.onSettled();
-    });
-
+  it('navigates to /chat (draft mode) when onNewThread is called', () => {
     render(<ThreadPage />);
     mockOnNewThread();
 
-    expect(mockMutate).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/chat/new-thread-id');
+    // Lazy thread creation: navigates to /chat without creating a DB record.
+    // The thread is only created when the user sends their first message.
+    expect(mockPush).toHaveBeenCalledWith('/chat');
   });
 
-  it('creates a new thread and navigates when clicking the standalone "+" button', () => {
-    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void; onSettled: () => void }) => {
-      opts.onSuccess({ id: 'new-thread-id' });
-      opts.onSettled();
-    });
-
+  it('navigates to /chat (draft mode) when clicking the standalone "+" button', () => {
     render(<ThreadPage />);
     fireEvent.click(screen.getByTestId('new-thread-btn'));
 
-    expect(mockMutate).toHaveBeenCalledTimes(1);
-    expect(mockPush).toHaveBeenCalledWith('/chat/new-thread-id');
+    expect(mockPush).toHaveBeenCalledWith('/chat');
   });
 
   it('renders the standalone new thread button in the title bar', () => {

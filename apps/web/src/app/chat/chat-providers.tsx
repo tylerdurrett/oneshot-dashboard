@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { ChatSocketProvider } from './chat-socket-context';
 
 export function ChatProviders({ children }: { children: React.ReactNode }) {
   // Create QueryClient inside state to avoid re-creation on re-renders
@@ -19,6 +20,8 @@ export function ChatProviders({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ChatSocketProvider>{children}</ChatSocketProvider>
+    </QueryClientProvider>
   );
 }
