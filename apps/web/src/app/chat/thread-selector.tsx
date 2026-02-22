@@ -95,7 +95,7 @@ export function ThreadSelector({
                         </span>
                         <button
                           type="button"
-                          className="rounded-sm p-0.5 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 [div[role=menuitem]:hover_&]:opacity-100 [div[role=menuitem][data-highlighted]_&]:opacity-100"
+                          className="rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-foreground/7 hover:text-foreground focus-visible:opacity-100 [div[role=menuitem]:hover_&]:opacity-100 [div[role=menuitem][data-highlighted]_&]:opacity-100"
                           onClick={(e) => handleMenuClick(e, thread)}
                           aria-label={`Thread options for ${thread.title}`}
                           data-testid={`thread-menu-${thread.id}`}
