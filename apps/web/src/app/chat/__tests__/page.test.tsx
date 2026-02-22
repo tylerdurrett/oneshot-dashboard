@@ -44,10 +44,21 @@ describe('ChatIndexPage (redirect)', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows a spinner while creating the thread', () => {
+  it('does not show spinner immediately (avoids flash for fast operations)', () => {
+    vi.useFakeTimers();
     mockCreateThread.mockReturnValue(new Promise(() => {})); // never resolves
     render(<ChatIndexPage />);
+    expect(screen.queryByTestId('spinner')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('shows a spinner after a delay while creating the thread', () => {
+    vi.useFakeTimers();
+    mockCreateThread.mockReturnValue(new Promise(() => {})); // never resolves
+    render(<ChatIndexPage />);
+    act(() => vi.advanceTimersByTime(500));
     expect(screen.getByTestId('spinner')).toBeDefined();
+    vi.useRealTimers();
   });
 
   it('creates a thread on mount', async () => {

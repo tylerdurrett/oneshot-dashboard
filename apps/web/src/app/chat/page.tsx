@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@repo/ui';
 import { createThread } from './api';
@@ -13,6 +13,9 @@ import { createThread } from './api';
 export default function ChatIndexPage() {
   const router = useRouter();
   const creatingRef = useRef(false);
+  // Delay showing the spinner so fast redirects (e.g. after thread deletion)
+  // don't cause a jarring flash of loading UI.
+  const [showSpinner, setShowSpinner] = useState(false);
 
   useEffect(() => {
     if (creatingRef.current) return;
@@ -27,9 +30,14 @@ export default function ChatIndexPage() {
       });
   }, [router]);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSpinner(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     <div className="flex h-dvh items-center justify-center">
-      <Spinner className="size-6" />
+      {showSpinner && <Spinner className="size-6" />}
     </div>
   );
 }
