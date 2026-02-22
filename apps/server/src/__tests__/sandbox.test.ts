@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
+import { config } from '../config.js';
 import {
   extractTextFromStreamLine,
   invokeClaude,
@@ -276,8 +277,8 @@ describe('probeSandbox', () => {
         'sandbox',
         'exec',
         '-w',
-        '/workspace',
-        'my-sandbox',
+        config.sandboxWorkspace,
+        config.sandboxName,
         'claude',
         'auth',
         'status',
@@ -464,7 +465,7 @@ describe('invokeClaude', () => {
       await collectEvents(emitter);
 
       expect(capturedArgs).toEqual([
-        'sandbox', 'exec', '-w', '/workspace', 'my-sandbox',
+        'sandbox', 'exec', '-w', config.sandboxWorkspace, config.sandboxName,
         'claude',
         '-p', 'hello',
         '--output-format', 'stream-json',

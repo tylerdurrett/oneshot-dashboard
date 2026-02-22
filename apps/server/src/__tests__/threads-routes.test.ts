@@ -2,6 +2,7 @@ import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { threads, messages } from '@repo/db';
+import { config } from '../config.js';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
 
@@ -276,11 +277,11 @@ describe('thread routes', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/threads',
-        headers: { origin: 'http://localhost:3200' },
+        headers: { origin: config.webOrigin },
       });
 
       expect(response.headers['access-control-allow-origin']).toBe(
-        'http://localhost:3200',
+        config.webOrigin,
       );
 
       await server.close();
@@ -293,14 +294,14 @@ describe('thread routes', () => {
         method: 'OPTIONS',
         url: '/threads',
         headers: {
-          origin: 'http://localhost:3200',
+          origin: config.webOrigin,
           'access-control-request-method': 'POST',
         },
       });
 
       expect(response.statusCode).toBe(204);
       expect(response.headers['access-control-allow-origin']).toBe(
-        'http://localhost:3200',
+        config.webOrigin,
       );
 
       await server.close();
