@@ -539,6 +539,24 @@ describe('ThreadPage', () => {
       ]);
     });
 
+    it('does not overwrite messages during active streaming (draft-to-thread navigation)', () => {
+      const setMessages = vi.fn();
+      hookReturn = { ...defaultReturn, setMessages, isStreaming: true };
+
+      // Simulate the DB returning only the user message while streaming is active
+      threadMessagesMap['thread-1'] = [
+        { id: 'm1', threadId: 'thread-1', role: 'user', content: 'Hello', createdAt: 100 },
+      ];
+
+      render(<ThreadPage />);
+
+      // setMessages should NOT be called with DB data — the streaming assistant
+      // placeholder would be wiped out, causing the spinner to disappear.
+      expect(setMessages).not.toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ id: 'm1' })]),
+      );
+    });
+
     it('does not call setMessages for thread with empty history', () => {
       const setMessages = vi.fn();
       hookReturn = { ...defaultReturn, setMessages };

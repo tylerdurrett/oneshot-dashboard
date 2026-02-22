@@ -62,10 +62,18 @@ export default function ThreadPage() {
     threadMessagesQuery.isError &&
     /404/.test(threadMessagesQuery.error?.message ?? '');
 
+  // Track isStreaming via ref so the load effect doesn't re-trigger on streaming changes
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
+
   // When thread messages load, update displayed messages
   useEffect(() => {
     if (!threadMessagesQuery.data) return;
     if (threadMessagesQuery.data.length === 0) return;
+    // Bug fix: Don't overwrite in-flight streaming messages with stale DB data.
+    // When navigating from draft mode during active streaming, the DB may only
+    // contain the user message, wiping out the assistant placeholder + spinner.
+    if (isStreamingRef.current) return;
 
     const converted: ChatMessage[] = threadMessagesQuery.data.map((msg) => ({
       id: msg.id,
