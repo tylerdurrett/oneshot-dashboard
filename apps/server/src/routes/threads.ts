@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   createThread,
+  deleteThread,
   getThread,
   getThreadMessages,
   listThreads,
@@ -43,4 +44,18 @@ export async function threadRoutes(
     const thread = await createThread(title, db);
     return reply.status(201).send({ thread });
   });
+
+  server.delete<{ Params: { id: string } }>(
+    '/threads/:id',
+    async (request, reply) => {
+      const { id } = request.params;
+      const deleted = await deleteThread(id, db);
+
+      if (!deleted) {
+        return reply.status(404).send({ error: 'Thread not found' });
+      }
+
+      return reply.status(200).send({ success: true });
+    },
+  );
 }

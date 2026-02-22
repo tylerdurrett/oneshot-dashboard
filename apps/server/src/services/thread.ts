@@ -89,6 +89,22 @@ export async function updateThreadSessionId(
     .where(eq(threads.id, threadId));
 }
 
+/** Delete a thread and all its messages. Returns true if the thread existed. */
+export async function deleteThread(id: string, database: Database = db) {
+  const thread = await database
+    .select()
+    .from(threads)
+    .where(eq(threads.id, id));
+
+  if (thread.length === 0) return false;
+
+  // Delete messages first (no cascade on FK), then the thread
+  await database.delete(messages).where(eq(messages.threadId, id));
+  await database.delete(threads).where(eq(threads.id, id));
+
+  return true;
+}
+
 /** Update a thread's title. */
 export async function updateThreadTitle(
   threadId: string,

@@ -19,8 +19,26 @@ export {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
+export {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  AlertDialogPortal,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from './components/alert-dialog';
+export { ConfirmationDialog } from './components/confirmation-dialog';
+export type { ConfirmationDialogProps } from './components/confirmation-dialog';
 
 export { Spinner } from './components/spinner';
 

@@ -36,7 +36,10 @@
       "Bash(pnpm --filter @repo/web tsc:*)",
       "Bash(npx tsc:*)",
       "Bash(pnpm test:*)",
-      "Bash(pnpm --filter @repo/web test:*)"
+      "Bash(pnpm --filter @repo/web test:*)",
+      "Bash(pnpm --filter @repo/ui test:*)",
+      "Bash(pnpm --filter @repo/server test)",
+      "Bash(pnpm --filter @repo/server exec vitest run:*)"
     ],
     "deny": [
       "Read(.env)",

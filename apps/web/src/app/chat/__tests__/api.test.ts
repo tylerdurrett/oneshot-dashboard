@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fetchThreads, fetchThreadMessages, createThread } from '../api';
+import { fetchThreads, fetchThreadMessages, createThread, deleteThread } from '../api';
 
 // ---------------------------------------------------------------------------
 // Stub fetch
@@ -125,6 +125,26 @@ describe('createThread', () => {
     expect(mockFetch).toHaveBeenCalledWith(
       expect.stringContaining('http://localhost:3002/threads'),
       expect.any(Object),
+    );
+  });
+});
+
+describe('deleteThread', () => {
+  it('sends DELETE request to correct URL', async () => {
+    mockFetch.mockReturnValue(jsonResponse({ success: true }));
+
+    await deleteThread('t1');
+
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:3202/threads/t1', {
+      method: 'DELETE',
+    });
+  });
+
+  it('throws on non-ok response', async () => {
+    mockFetch.mockReturnValue(jsonResponse({}, 404));
+
+    await expect(deleteThread('bad-id')).rejects.toThrow(
+      'Failed to delete thread: 404',
     );
   });
 });

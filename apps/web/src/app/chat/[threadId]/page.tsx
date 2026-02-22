@@ -22,7 +22,7 @@ import {
   Spinner,
 } from '@repo/ui';
 import { useChatSocket } from '../use-chat-socket';
-import { useCreateThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
+import { useCreateThread, useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
 import { ThreadSelector } from '../thread-selector';
 import type { ChatMessage } from '../use-chat-socket';
 
@@ -48,6 +48,7 @@ export default function ThreadPage() {
   const { messages, sendMessage, setMessages, isStreaming, error, connectionStatus } =
     useChatSocket();
   const createThread = useCreateThread();
+  const deleteThreadMutation = useDeleteThread();
   const threadsQuery = useThreads();
   const queryClient = useQueryClient();
 
@@ -107,6 +108,20 @@ export default function ThreadPage() {
       router.push(`/chat/${newThreadId}`);
     },
     [threadId, router],
+  );
+
+  const handleDeleteThread = useCallback(
+    (deletedThreadId: string) => {
+      deleteThreadMutation.mutate(deletedThreadId, {
+        onSuccess: () => {
+          // If we deleted the active thread, redirect to /chat (creates new thread)
+          if (deletedThreadId === threadId) {
+            router.push('/chat');
+          }
+        },
+      });
+    },
+    [deleteThreadMutation, threadId, router],
   );
 
   const creatingRef = useRef(false);
@@ -171,6 +186,7 @@ export default function ThreadPage() {
               activeThreadId={threadId}
               onSelectThread={handleSelectThread}
               onNewThread={handleNewThread}
+              onDeleteThread={handleDeleteThread}
             />
             <Button
               variant="ghost"

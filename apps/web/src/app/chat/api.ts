@@ -57,3 +57,10 @@ export async function createThread(title?: string): Promise<Thread> {
   const data: { thread: Thread } = await res.json();
   return data.thread;
 }
+
+export async function deleteThread(threadId: string): Promise<void> {
+  const res = await fetch(`${getBaseUrl()}/threads/${threadId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`Failed to delete thread: ${res.status}`);
+}

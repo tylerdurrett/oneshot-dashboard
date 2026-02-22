@@ -5,6 +5,7 @@ import { threads, messages } from '@repo/db';
 import {
   addMessage,
   createThread,
+  deleteThread,
   getThread,
   getThreadMessages,
   listThreads,
@@ -185,6 +186,37 @@ describe('thread service', () => {
 
       const updated = await getThread(thread.id, testDb);
       expect(updated!.updatedAt).toBeGreaterThan(original);
+    });
+  });
+
+  describe('deleteThread', () => {
+    it('deletes a thread and its messages', async () => {
+      const thread = await createThread('To delete', testDb);
+      await addMessage(thread.id, 'user', 'Hello', testDb);
+      await addMessage(thread.id, 'assistant', 'Hi', testDb);
+
+      const result = await deleteThread(thread.id, testDb);
+
+      expect(result).toBe(true);
+      expect(await getThread(thread.id, testDb)).toBeUndefined();
+      expect(await getThreadMessages(thread.id, testDb)).toEqual([]);
+    });
+
+    it('returns false for nonexistent thread', async () => {
+      const result = await deleteThread('nonexistent', testDb);
+      expect(result).toBe(false);
+    });
+
+    it('does not affect other threads', async () => {
+      const thread1 = await createThread('Keep', testDb);
+      const thread2 = await createThread('Delete', testDb);
+      await addMessage(thread1.id, 'user', 'Stay', testDb);
+      await addMessage(thread2.id, 'user', 'Go', testDb);
+
+      await deleteThread(thread2.id, testDb);
+
+      expect(await getThread(thread1.id, testDb)).toBeDefined();
+      expect(await getThreadMessages(thread1.id, testDb)).toHaveLength(1);
     });
   });
 

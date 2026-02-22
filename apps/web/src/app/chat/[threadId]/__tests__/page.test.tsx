@@ -43,9 +43,15 @@ let mockThreadsList = [...defaultThreadsList];
 let threadMessagesMap: Record<string, Array<{ id: string; threadId: string; role: string; content: string; createdAt: number }>> = {};
 let threadMessagesError: Record<string, Error> = {};
 
+const mockDeleteMutate = vi.fn();
+
 vi.mock('../../use-threads', () => ({
   useCreateThread: () => ({
     mutate: mockMutate,
+    isPending: false,
+  }),
+  useDeleteThread: () => ({
+    mutate: mockDeleteMutate,
     isPending: false,
   }),
   useThreadMessages: (threadId: string | null) => {
@@ -80,6 +86,7 @@ vi.mock('@tanstack/react-query', () => ({
 // Mock ThreadSelector to avoid DropdownMenu complexity in page tests
 const mockOnSelectThread = vi.fn();
 const mockOnNewThread = vi.fn();
+const mockOnDeleteThread = vi.fn();
 
 vi.mock('../../thread-selector', () => ({
   ThreadSelector: ({
@@ -87,15 +94,18 @@ vi.mock('../../thread-selector', () => ({
     activeThreadId,
     onSelectThread,
     onNewThread,
+    onDeleteThread,
   }: {
     threads: Array<{ id: string; title: string }>;
     activeThreadId: string | null;
     onSelectThread: (id: string) => void;
     onNewThread: () => void;
+    onDeleteThread: (id: string) => void;
   }) => {
     // Capture handlers for testing
     mockOnSelectThread.mockImplementation(onSelectThread);
     mockOnNewThread.mockImplementation(onNewThread);
+    mockOnDeleteThread.mockImplementation(onDeleteThread);
     return (
       <div data-testid="thread-selector" data-active-thread={activeThreadId}>
         <span data-testid="thread-count">{threads.length}</span>
@@ -168,9 +178,11 @@ describe('ThreadPage', () => {
   beforeEach(() => {
     hookReturn = { ...defaultReturn, messages: [] };
     mockMutate.mockReset();
+    mockDeleteMutate.mockReset();
     mockInvalidateQueries.mockReset();
     mockOnSelectThread.mockReset();
     mockOnNewThread.mockReset();
+    mockOnDeleteThread.mockReset();
     mockPush.mockReset();
     mockReplace.mockReset();
     mockThreadsList = [...defaultThreadsList];

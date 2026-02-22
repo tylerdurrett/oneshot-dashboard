@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Thread } from '../api';
 
@@ -30,8 +30,8 @@ vi.mock('@repo/ui', () => {
         {children}
       </button>
     ),
-    DropdownMenu: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="dropdown-menu">{children}</div>
+    DropdownMenu: ({ children, open, onOpenChange }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => (
+      <div data-testid="dropdown-menu" data-open={open}>{children}</div>
     ),
     DropdownMenuTrigger: ({
       children,
@@ -81,6 +81,35 @@ vi.mock('@repo/ui', () => {
       <div data-testid="dropdown-label">{children}</div>
     ),
     DropdownMenuSeparator: () => <hr data-testid="dropdown-separator" />,
+    ConfirmationDialog: ({
+      open,
+      title,
+      description,
+      confirmLabel,
+      onConfirm,
+      onOpenChange,
+    }: {
+      open: boolean;
+      title: string;
+      description: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+      variant?: string;
+      onConfirm: () => void;
+      onOpenChange: (open: boolean) => void;
+    }) =>
+      open ? (
+        <div data-testid="confirmation-dialog">
+          <span data-testid="confirmation-title">{title}</span>
+          <span data-testid="confirmation-description">{description}</span>
+          <button onClick={onConfirm} data-testid="confirm-delete">
+            {confirmLabel}
+          </button>
+          <button onClick={() => onOpenChange(false)} data-testid="cancel-delete">
+            Cancel
+          </button>
+        </div>
+      ) : null,
   };
 });
 
@@ -128,6 +157,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     expect(screen.getByTestId('thread-selector-trigger').textContent).toContain(
@@ -142,6 +172,7 @@ describe('ThreadSelector', () => {
         activeThreadId={null}
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     expect(screen.getByTestId('thread-selector-trigger').textContent).toContain(
@@ -156,6 +187,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     // "First conversation" appears in both trigger and list
@@ -170,6 +202,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     expect(screen.getByText('3000s ago')).toBeDefined();
@@ -183,6 +216,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     const activeItem = screen.getByTestId('thread-item-thread-1');
@@ -200,6 +234,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={onSelectThread}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     screen.getByTestId('thread-item-thread-2').click();
@@ -214,6 +249,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={onNewThread}
+        onDeleteThread={vi.fn()}
       />,
     );
     screen.getByTestId('new-thread-button').click();
@@ -227,6 +263,7 @@ describe('ThreadSelector', () => {
         activeThreadId={null}
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     expect(screen.getByText('No threads yet')).toBeDefined();
@@ -239,6 +276,7 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     expect(screen.getByText('Threads')).toBeDefined();
@@ -251,8 +289,104 @@ describe('ThreadSelector', () => {
         activeThreadId="thread-1"
         onSelectThread={vi.fn()}
         onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
       />,
     );
     expect(screen.getByText('New thread')).toBeDefined();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Delete thread tests
+  // ---------------------------------------------------------------------------
+
+  it('shows three-dot menu button on each thread item', () => {
+    render(
+      <ThreadSelector
+        threads={threads}
+        activeThreadId="thread-1"
+        onSelectThread={vi.fn()}
+        onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('thread-menu-thread-1')).toBeDefined();
+    expect(screen.getByTestId('thread-menu-thread-2')).toBeDefined();
+  });
+
+  it('opens confirmation dialog when three-dot menu is clicked', () => {
+    render(
+      <ThreadSelector
+        threads={threads}
+        activeThreadId="thread-1"
+        onSelectThread={vi.fn()}
+        onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
+      />,
+    );
+    // No confirmation dialog initially
+    expect(screen.queryByTestId('confirmation-dialog')).toBeNull();
+
+    // Click the three-dot menu for thread-1
+    fireEvent.click(screen.getByTestId('thread-menu-thread-1'));
+
+    // Confirmation dialog should appear
+    expect(screen.getByTestId('confirmation-dialog')).toBeDefined();
+    expect(screen.getByTestId('confirmation-title').textContent).toBe('Delete thread?');
+    expect(screen.getByTestId('confirmation-description').textContent).toContain(
+      'First conversation',
+    );
+  });
+
+  it('calls onDeleteThread when delete is confirmed', () => {
+    const onDeleteThread = vi.fn();
+    render(
+      <ThreadSelector
+        threads={threads}
+        activeThreadId="thread-1"
+        onSelectThread={vi.fn()}
+        onNewThread={vi.fn()}
+        onDeleteThread={onDeleteThread}
+      />,
+    );
+    // Open confirmation dialog
+    fireEvent.click(screen.getByTestId('thread-menu-thread-1'));
+    // Confirm
+    fireEvent.click(screen.getByTestId('confirm-delete'));
+    expect(onDeleteThread).toHaveBeenCalledWith('thread-1');
+  });
+
+  it('closes confirmation dialog when cancelled', () => {
+    render(
+      <ThreadSelector
+        threads={threads}
+        activeThreadId="thread-1"
+        onSelectThread={vi.fn()}
+        onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
+      />,
+    );
+    // Open confirmation dialog
+    fireEvent.click(screen.getByTestId('thread-menu-thread-2'));
+    expect(screen.getByTestId('confirmation-dialog')).toBeDefined();
+
+    // Cancel
+    fireEvent.click(screen.getByTestId('cancel-delete'));
+    expect(screen.queryByTestId('confirmation-dialog')).toBeNull();
+  });
+
+  it('does not call onSelectThread when three-dot menu is clicked', () => {
+    const onSelectThread = vi.fn();
+    render(
+      <ThreadSelector
+        threads={threads}
+        activeThreadId="thread-1"
+        onSelectThread={onSelectThread}
+        onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('thread-menu-thread-1'));
+    // onSelectThread should NOT have been called
+    expect(onSelectThread).not.toHaveBeenCalled();
   });
 });

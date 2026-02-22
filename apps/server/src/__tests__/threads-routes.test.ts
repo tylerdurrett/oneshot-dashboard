@@ -203,6 +203,72 @@ describe('thread routes', () => {
     });
   });
 
+  describe('DELETE /threads/:id', () => {
+    it('returns 404 for nonexistent thread', async () => {
+      const server = buildServer({ logger: false, database: testDb });
+
+      const response = await server.inject({
+        method: 'DELETE',
+        url: '/threads/nonexistent',
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: 'Thread not found' });
+
+      await server.close();
+    });
+
+    it('deletes a thread and returns success', async () => {
+      const server = buildServer({ logger: false, database: testDb });
+
+      const createRes = await server.inject({
+        method: 'POST',
+        url: '/threads',
+        payload: { title: 'To delete' },
+      });
+      const threadId = createRes.json().thread.id;
+
+      const deleteRes = await server.inject({
+        method: 'DELETE',
+        url: `/threads/${threadId}`,
+      });
+
+      expect(deleteRes.statusCode).toBe(200);
+      expect(deleteRes.json()).toEqual({ success: true });
+
+      // Verify it's gone
+      const listRes = await server.inject({ method: 'GET', url: '/threads' });
+      expect(listRes.json().threads).toHaveLength(0);
+
+      await server.close();
+    });
+
+    it('deletes thread messages along with the thread', async () => {
+      const server = buildServer({ logger: false, database: testDb });
+
+      const createRes = await server.inject({
+        method: 'POST',
+        url: '/threads',
+        payload: { title: 'With messages' },
+      });
+      const threadId = createRes.json().thread.id;
+
+      const { addMessage } = await import('../services/thread.js');
+      await addMessage(threadId, 'user', 'Hello', testDb);
+
+      await server.inject({ method: 'DELETE', url: `/threads/${threadId}` });
+
+      // Thread is gone, so messages endpoint returns 404
+      const msgRes = await server.inject({
+        method: 'GET',
+        url: `/threads/${threadId}/messages`,
+      });
+      expect(msgRes.statusCode).toBe(404);
+
+      await server.close();
+    });
+  });
+
   describe('CORS', () => {
     it('includes CORS headers in responses', async () => {
       const server = buildServer({ logger: false, database: testDb });

@@ -5,6 +5,7 @@ import {
   fetchThreads,
   fetchThreadMessages,
   createThread,
+  deleteThread,
 } from './api';
 import type { Thread, ThreadMessage } from './api';
 
@@ -43,6 +44,18 @@ export function useCreateThread() {
     mutationFn: (title?: string) => createThread(title),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: threadKeys.all });
+    },
+  });
+}
+
+export function useDeleteThread() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (threadId: string) => deleteThread(threadId),
+    onSuccess: (_data, threadId) => {
+      queryClient.invalidateQueries({ queryKey: threadKeys.all });
+      queryClient.removeQueries({ queryKey: threadKeys.messages(threadId) });
     },
   });
 }
