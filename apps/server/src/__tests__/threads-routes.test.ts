@@ -306,5 +306,25 @@ describe('thread routes', () => {
 
       await server.close();
     });
+
+    it('allows DELETE method in CORS preflight', async () => {
+      const server = buildServer({ logger: false, database: testDb });
+
+      const response = await server.inject({
+        method: 'OPTIONS',
+        url: '/threads/some-id',
+        headers: {
+          origin: config.webOrigin,
+          'access-control-request-method': 'DELETE',
+        },
+      });
+
+      expect(response.statusCode).toBe(204);
+      // Verify DELETE is included in the allowed methods
+      const allowedMethods = response.headers['access-control-allow-methods'];
+      expect(allowedMethods).toContain('DELETE');
+
+      await server.close();
+    });
   });
 });

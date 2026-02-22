@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -11,13 +11,10 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-const mockMutate = vi.fn();
+const mockCreateThread = vi.fn();
 
-vi.mock('../use-threads', () => ({
-  useCreateThread: () => ({
-    mutate: mockMutate,
-    isPending: false,
-  }),
+vi.mock('../api', () => ({
+  createThread: (...args: unknown[]) => mockCreateThread(...args),
 }));
 
 vi.mock('@repo/ui', () => ({
@@ -38,7 +35,7 @@ import ChatIndexPage from '../page';
 
 describe('ChatIndexPage (redirect)', () => {
   beforeEach(() => {
-    mockMutate.mockReset();
+    mockCreateThread.mockReset();
     mockReplace.mockReset();
   });
 
@@ -48,36 +45,37 @@ describe('ChatIndexPage (redirect)', () => {
   });
 
   it('shows a spinner while creating the thread', () => {
+    mockCreateThread.mockReturnValue(new Promise(() => {})); // never resolves
     render(<ChatIndexPage />);
     expect(screen.getByTestId('spinner')).toBeDefined();
   });
 
-  it('creates a thread on mount', () => {
+  it('creates a thread on mount', async () => {
+    mockCreateThread.mockReturnValue(new Promise(() => {}));
     render(<ChatIndexPage />);
-    expect(mockMutate).toHaveBeenCalledTimes(1);
-    expect(mockMutate).toHaveBeenCalledWith(undefined, expect.objectContaining({
-      onSuccess: expect.any(Function),
-      onSettled: expect.any(Function),
-    }));
+    expect(mockCreateThread).toHaveBeenCalledTimes(1);
   });
 
-  it('redirects to /chat/:id after thread creation', () => {
-    mockMutate.mockImplementation((_title: unknown, opts: { onSuccess: (t: { id: string }) => void }) => {
-      opts.onSuccess({ id: 'new-thread-123' });
+  it('redirects to /chat/:id after thread creation', async () => {
+    mockCreateThread.mockResolvedValue({ id: 'new-thread-123' });
+
+    await act(async () => {
+      render(<ChatIndexPage />);
     });
 
-    render(<ChatIndexPage />);
     expect(mockReplace).toHaveBeenCalledWith('/chat/new-thread-123');
   });
 
   it('does not double-create if component re-renders', () => {
+    mockCreateThread.mockReturnValue(new Promise(() => {}));
     const { rerender } = render(<ChatIndexPage />);
     rerender(<ChatIndexPage />);
     // The creatingRef guard prevents a second call
-    expect(mockMutate).toHaveBeenCalledTimes(1);
+    expect(mockCreateThread).toHaveBeenCalledTimes(1);
   });
 
   it('renders fullscreen centered layout', () => {
+    mockCreateThread.mockReturnValue(new Promise(() => {}));
     const { container } = render(<ChatIndexPage />);
     const root = container.firstElementChild as HTMLElement;
     expect(root.className).toContain('h-dvh');

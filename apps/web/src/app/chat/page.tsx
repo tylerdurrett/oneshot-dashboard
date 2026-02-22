@@ -3,30 +3,29 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@repo/ui';
-import { useCreateThread } from './use-threads';
+import { createThread } from './api';
 
 /**
  * Bare /chat route — creates a new thread and redirects to /chat/[threadId].
- * This ensures the URL always contains a thread ID once the user lands on chat.
+ * Uses the API function directly (not useMutation) so the redirect callback
+ * isn't lost during React Strict Mode's double-mount cycle.
  */
 export default function ChatIndexPage() {
   const router = useRouter();
-  const createThread = useCreateThread();
   const creatingRef = useRef(false);
 
   useEffect(() => {
     if (creatingRef.current) return;
     creatingRef.current = true;
 
-    createThread.mutate(undefined, {
-      onSuccess: (thread) => {
+    createThread()
+      .then((thread) => {
         router.replace(`/chat/${thread.id}`);
-      },
-      onSettled: () => {
+      })
+      .catch(() => {
         creatingRef.current = false;
-      },
-    });
-  }, []);
+      });
+  }, [router]);
 
   return (
     <div className="flex h-dvh items-center justify-center">

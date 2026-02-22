@@ -28,7 +28,11 @@ export function buildServer(opts?: BuildServerOptions) {
 
   let sandboxStatus: SandboxProbeResult | null = null;
 
-  server.register(cors, { origin: config.webOrigin });
+  // @fastify/cors v11 defaults to GET,HEAD,POST only — explicitly allow DELETE for thread deletion
+  server.register(cors, {
+    origin: config.webOrigin,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  });
   server.register(websocket);
 
   server.get('/health', async () => {
