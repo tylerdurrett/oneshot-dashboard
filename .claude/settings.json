@@ -35,7 +35,8 @@
       "Bash(pnpm --filter @repo/web build:*)",
       "Bash(pnpm --filter @repo/web tsc:*)",
       "Bash(npx tsc:*)",
-      "Bash(pnpm test:*)"
+      "Bash(pnpm test:*)",
+      "Bash(pnpm --filter @repo/web test:*)"
     ],
     "deny": [
       "Read(.env)",
