@@ -31,6 +31,8 @@ This repo is meant to be used by NON-DEVELOPERS who are using coding agents to v
 | `pnpm new-video <Name>` | Scaffold a new video composition |
 | `pnpm sandbox` | Check Docker sandbox auth status (guides through setup if needed) |
 | `pnpm --filter @repo/server dev` | Start agent server only |
+| `pnpm --filter <pkg> test` | Run tests for a single package (e.g. `@repo/web`, `@repo/server`) |
+| `pnpm --filter <pkg> exec tsc --noEmit` | Type-check a single package without building |
 | `pnpm dlx shadcn@latest add <component> --cwd packages/ui` | Add a Shadcn component |
 
 ## UI Conventions
