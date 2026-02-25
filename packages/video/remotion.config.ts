@@ -15,6 +15,8 @@ try {
   Config.setStudioPort(3001);
 }
 
+Config.setShouldOpenBrowser(false);
+
 Config.overrideWebpackConfig((currentConfiguration) => {
   return enableTailwind(currentConfiguration);
 });
