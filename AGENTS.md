@@ -2,73 +2,27 @@
 
 This is a Turborepo monorepo starter kit, fully set up for efficient agentic development.
 
-This repo is meant to be used by NON-DEVELOPERS who are using coding agents to vibe code. With that in mind, whenever you create documentation, do not make it overly technical. The users may not understand or care about code, but they're very interested in creating things in the repo with agents, so frame documentation around that process. Think: what can the user do with agents and how do I share that with them - NOT, how can the user code this. The exception to that is any AGENTS.md file like this - this is used exclusively by the agent. It should be extremely concise because it goes into every context, and it should have just enough to keep the agent from making stupid mistakes or having to look up too much.
+This repo is meant to be used by NON-DEVELOPERS who are using coding agents to vibe code. With that in mind, whenever you create documentation, do not make it overly technical. The users may not understand or care about code, but they're very interested in creating things in the repo with agents, so frame documentation around that process. Think: what can the user do with agents and how do I share that with them - NOT, how can the user code this. The exception to that is any AGENTS.md file like this - this is used exclusively by the agent.
 
-## Monorepo Structure
-
-- **`apps/web`** (`@repo/web`) — Next.js 15 app (App Router, Tailwind v4, Vitest)
-- **`apps/server`** (`@repo/server`) — Fastify agent server (WebSocket, Docker sandbox bridge)
-- **`packages/ui`** (`@repo/ui`) — Shadcn components + Tailwind, shared across apps
-- **`packages/db`** (`@repo/db`) — Drizzle ORM + SQLite (libsql), schema and migrations
-- **`packages/typescript-config`** (`@repo/typescript-config`) — Shared tsconfig presets (base, nextjs, library)
-- **`packages/video`** (`@repo/video`) — Remotion compositions, Studio entry, and Player exports
-- **`packages/eslint-config`** (`@repo/eslint-config`) — Shared ESLint flat config (base, react)
-
-## Key Commands
-
-| Command | Description |
-| --- | --- |
-| `pnpm hello` | Interactive project setup (port, etc.) |
-| `pnpm build` | Build all packages and apps via Turbo |
-| `pnpm dev` | Start Next.js + agent server concurrently (auto-runs setup if needed) |
-| `pnpm lint` | Lint all packages |
-| `pnpm test` | Run Vitest across all packages |
-| `pnpm format` | Format all files with Prettier |
-| `pnpm --filter @repo/db db:generate` | Generate Drizzle migrations |
-| `pnpm --filter @repo/db db:migrate` | Apply Drizzle migrations |
-| `pnpm studio` | Launch Remotion Studio for video preview (auto-runs setup if needed) |
-| `pnpm go` | Start Next.js + agent server + Remotion Studio concurrently (auto-runs setup if needed) |
-| `pnpm new-video <Name>` | Scaffold a new video composition |
-| `pnpm sandbox` | Check Docker sandbox auth status (guides through setup if needed) |
-| `pnpm --filter @repo/server dev` | Start agent server only |
-| `pnpm --filter <pkg> test` | Run tests for a single package (e.g. `@repo/web`, `@repo/server`) |
-| `pnpm --filter <pkg> exec tsc --noEmit` | Type-check a single package without building |
-| `pnpm dlx shadcn@latest add <component> --cwd packages/ui` | Add a Shadcn component |
+AGENTS.md should be VERY concise because it goes into every context, and it should have just enough to keep the agent in line and productive.
 
 ## UI Conventions
 
 When building UI, follow `docs/ui-conventions.md`. Key rules:
-- Don't extract components until the 3rd use (or if it's a semantic concept with behavior)
-- Use Tailwind values directly; only create semantic tokens when a meaning clearly repeats
 - Reusable components → `packages/ui/`, feature-specific → colocated
-- Dark-theme-first. Only animate `transform`/`opacity`. Optimistic updates via TanStack Query.
+- Dark-theme-first. Only animate `transform`/`opacity`.
+- Optimistic updates via TanStack Query.
 - Scrollbar is styled globally — don't add per-component scrollbar styles.
 
 ## Database Workflow
 
 Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (never `db:push`) for real work.
 
-**Process — every time you change the schema:**
-1. Edit `packages/db/src/schema.ts` (this is the source of truth)
-2. Run `pnpm --filter @repo/db db:generate` — creates a versioned SQL migration file in `packages/db/drizzle/`
-3. Review the generated `.sql` file to verify it does what you expect
-4. Run `pnpm --filter @repo/db db:migrate` — applies the migration to your local database
-5. Commit both the schema change AND the migration file together
-
-**Rules:**
-- Never edit generated migration files. If a migration is wrong, fix `schema.ts` and generate a new one.
-- One migration per logical change. Don't batch unrelated schema changes.
-- Migration files are committed to git — they're the reproducible history of the database.
-- `db:migrate` runs automatically on `pnpm dev` / `pnpm go` / `pnpm studio`, so pending migrations are always applied.
-- `db:push` exists for throwaway prototyping only. It skips migration files and can drop data.
-
 ## Environment Variables
 
 Follows the Next.js convention, applied consistently across all apps:
 - **`.env`** — Committed to git. Contains non-sensitive defaults with comments explaining each variable. This is the documentation for what env vars exist.
 - **`.env.local`** — NOT committed (gitignored). Contains secrets and local overrides.
-- **`.env.development`**, **`.env.production`** — Committed. Environment-specific defaults.
-- When adding a new env var, always update the app's `.env` with a safe default or placeholder.
 
 ## Conventions
 
