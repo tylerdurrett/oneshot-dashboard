@@ -14,7 +14,7 @@ export type CredentialInjectionResult =
 
 /** Status of the host token after a refresh check. */
 export type HostTokenStatus =
-  | { fresh: true; expiresAt: number | null }
+  | { fresh: true; expiresAt: number | null; credentials: unknown }
   | { fresh: false; refreshed: boolean; message: string };
 
 /** Testable wrapper — `process.platform` is read-only so tests mock this function instead. */
@@ -236,4 +236,124 @@ export async function injectCredentials(
     child.stdin?.write(credentialsJson);
     child.stdin?.end();
   });
+}
+
+// ---------------------------------------------------------------------------
+// Host Token Refresh & Pipeline
+// ---------------------------------------------------------------------------
+
+let inflightRefresh: Promise<HostTokenStatus> | null = null;
+
+/**
+ * Check whether the host's OAuth token is near expiry and refresh if needed.
+ * Spawns `claude -p "."` on the host to trigger the CLI's built-in OAuth refresh.
+ * Concurrent calls share a single in-flight spawn. Never rejects.
+ */
+export async function ensureHostTokenFresh(
+  spawnFn: SpawnFn = defaultSpawn,
+): Promise<HostTokenStatus> {
+  if (inflightRefresh) return inflightRefresh;
+
+  const promise = doEnsureHostTokenFresh(spawnFn).finally(() => {
+    inflightRefresh = null;
+  });
+  inflightRefresh = promise;
+  return promise;
+}
+
+async function doEnsureHostTokenFresh(
+  spawnFn: SpawnFn,
+): Promise<HostTokenStatus> {
+  const keychainResult = await readKeychainCredentials(spawnFn);
+  if (!keychainResult.ok) {
+    return { fresh: false, refreshed: false, message: keychainResult.message };
+  }
+
+  const expiresAt = getHostTokenExpiresAt(keychainResult.credentials);
+  const now = Date.now();
+
+  if (expiresAt === null || expiresAt - now > config.hostRefreshThresholdMs) {
+    return { fresh: true, expiresAt, credentials: keychainResult.credentials };
+  }
+
+  return new Promise<HostTokenStatus>((resolve) => {
+    let child: ReturnType<SpawnFn>;
+    try {
+      child = spawnFn('claude', ['-p', '.'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } catch (err) {
+      resolve({
+        fresh: false,
+        refreshed: false,
+        message: `Failed to spawn host refresh: ${(err as Error).message}`,
+      });
+      return;
+    }
+
+    let resolved = false;
+    function resolveOnce(result: HostTokenStatus) {
+      if (resolved) return;
+      resolved = true;
+      resolve(result);
+    }
+
+    // Host refresh spawns the Claude CLI, which may trigger an OAuth flow —
+    // use the longer inject timeout rather than the keychain read timeout.
+    const timeout = setTimeout(() => {
+      child.kill();
+      resolveOnce({
+        fresh: false,
+        refreshed: false,
+        message: `Host token refresh timed out after ${config.injectTimeoutMs}ms`,
+      });
+    }, config.injectTimeoutMs);
+
+    child.on('close', (code) => {
+      clearTimeout(timeout);
+      if (code === 0 || code === null) {
+        resolveOnce({ fresh: false, refreshed: true, message: 'Host token refreshed' });
+      } else {
+        resolveOnce({
+          fresh: false,
+          refreshed: false,
+          message: `Host refresh exited with code ${code}`,
+        });
+      }
+    });
+
+    child.on('error', (err) => {
+      clearTimeout(timeout);
+      resolveOnce({
+        fresh: false,
+        refreshed: false,
+        message: `Host refresh error: ${err.message}`,
+      });
+    });
+  });
+}
+
+/**
+ * Full credential injection pipeline. Primary public API for credential injection.
+ * Ensures host token freshness, reads credentials, strips the refresh token
+ * (sandbox must not hold it), then injects into the Docker sandbox.
+ */
+export async function refreshAndInjectCredentials(
+  spawnFn: SpawnFn = defaultSpawn,
+): Promise<CredentialInjectionResult> {
+  const hostStatus = await ensureHostTokenFresh(spawnFn);
+
+  // Reuse credentials from the freshness check when no refresh was needed,
+  // otherwise re-read since the host CLI may have rotated the token.
+  let credentials: unknown;
+  if (hostStatus.fresh) {
+    credentials = hostStatus.credentials;
+  } else {
+    const keychainResult = await readKeychainCredentials(spawnFn);
+    if (!keychainResult.ok) return keychainResult;
+    credentials = keychainResult.credentials;
+  }
+
+  const stripped = stripRefreshToken(credentials);
+  return injectCredentials(JSON.stringify(stripped), spawnFn);
 }

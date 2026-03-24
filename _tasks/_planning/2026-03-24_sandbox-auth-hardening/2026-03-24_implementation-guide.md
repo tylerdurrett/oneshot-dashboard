@@ -95,9 +95,11 @@ scripts/
 
 ### 2.2 Host Token Refresh & Pipeline
 
-- [ ] Implement `ensureHostTokenFresh(spawnFn?)` — reads Keychain, checks `expiresAt` against `config.hostRefreshThresholdMs`, spawns `claude -p "."` on host if near-expiry. Concurrent call dedup via module-level inflight promise. Non-fatal: never rejects, returns `HostTokenStatus`.
-- [ ] Implement `refreshAndInjectCredentials(spawnFn?)` — convenience pipeline: `ensureHostTokenFresh()` → `readKeychainCredentials()` → `stripRefreshToken()` → `injectCredentials()`. Returns `CredentialInjectionResult`.
-- [ ] Export `refreshAndInjectCredentials` as the primary public API for other modules
+- [x] Implement `ensureHostTokenFresh(spawnFn?)` — reads Keychain, checks `expiresAt` against `config.hostRefreshThresholdMs`, spawns `claude -p "."` on host if near-expiry. Concurrent call dedup via module-level inflight promise. Non-fatal: never rejects, returns `HostTokenStatus`.
+- [x] Implement `refreshAndInjectCredentials(spawnFn?)` — convenience pipeline: `ensureHostTokenFresh()` → `readKeychainCredentials()` → `stripRefreshToken()` → `injectCredentials()`. Returns `CredentialInjectionResult`.
+- [x] Export `refreshAndInjectCredentials` as the primary public API for other modules
+
+> **Notes:** Diverged from plan in two ways: (1) Added a `credentials` field to the `{ fresh: true }` case of `HostTokenStatus` so the pipeline can reuse cached credentials from the freshness check instead of re-reading the keychain — eliminates a redundant subprocess spawn on the happy path. (2) Used `config.injectTimeoutMs` (15s) instead of `config.keychainTimeoutMs` (10s) for the host refresh timeout, since `claude -p "."` may trigger an OAuth flow and needs more time than a simple keychain read. All 88 existing tests pass.
 
 **Acceptance Criteria:**
 - `ensureHostTokenFresh` skips refresh when token is fresh (no spawn)
