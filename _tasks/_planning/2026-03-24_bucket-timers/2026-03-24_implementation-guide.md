@@ -314,16 +314,18 @@ apps/web/public/sounds/
 
 ### 3.3 Add Bucket Flow
 
-- [ ] Modify `apps/web/src/components/app-shell.tsx`:
+- [x] Modify `apps/web/src/components/app-shell.tsx`:
   - Add context menu (right-click / long-press) to the Timers `NavLink`:
     - Use same long-press pattern as bucket context menu (800ms, pointer capture)
     - On desktop: `onContextMenu` on the nav link
     - Menu option: "Add Bucket" (Plus icon)
   - On "Add Bucket": generate a new bucket with defaults (name: "New Bucket", 1 hour, next available color index, all days active) and open the settings dialog for it
   - Need a way to communicate "add bucket" action from the shell to the timers page — use a custom event or a shared callback via context
-- [ ] Add empty state to `timer-grid.tsx`:
+  - **Note:** Used `CustomEvent` dispatched on `window` with `ADD_BUCKET_EVENT` constant shared between app-shell and timer-grid. Added `NavLinkWithContextMenu` component that wraps the Timers nav link with right-click and long-press handlers. Portal-rendered `NavContextMenu` with forwardRef + viewport clamping (same pattern as `BucketContextMenu`). Added `hasContextMenu` flag to `NavItem` interface and `renderNavItem` helper to select the appropriate nav link variant. `allBucketsRef` used to keep `handleAddBucket` callback stable and avoid per-second event listener re-registration.
+- [x] Add empty state to `timer-grid.tsx`:
   - When no buckets exist for today, show centered message: clock icon, "No buckets yet", and a "Create your first bucket" button
   - Button triggers the same add-bucket flow (creates default + opens settings)
+  - **Note:** Empty state uses `Clock` icon from lucide-react and `Button` from `@repo/ui`. `nextAvailableColorIndex` helper finds the first unused color slot (0-9). New buckets default to all 7 days active. Settings dialog renders in both branches since they have different container structures.
 
 **Acceptance Criteria:**
 - Right-clicking the Timers nav item shows an "Add Bucket" option

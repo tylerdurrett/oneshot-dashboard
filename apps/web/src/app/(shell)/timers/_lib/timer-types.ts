@@ -99,6 +99,10 @@ export const DEFAULT_BUCKETS: TimeBucket[] = [
 
 export const STORAGE_KEY = 'time-buckets-state';
 
+/** Custom event name used to trigger the "add bucket" flow from outside the
+ *  timers page (e.g. from the app shell nav context menu). */
+export const ADD_BUCKET_EVENT = 'add-bucket';
+
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
