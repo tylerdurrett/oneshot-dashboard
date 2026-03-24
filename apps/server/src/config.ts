@@ -31,6 +31,22 @@ function readProjectConfig(): ProjectConfig {
 
 const projectConfig = readProjectConfig();
 
+/** Read an env var as an integer, returning `fallback` if missing or NaN. */
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+/** Read an env var as a boolean (`'true'`/`'1'` → true, `'false'`/`'0'` → false), returning `fallback` if missing or unrecognised. */
+function envBool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.toLowerCase();
+  if (raw === 'true' || raw === '1') return true;
+  if (raw === 'false' || raw === '0') return false;
+  return fallback;
+}
+
 export const config = {
   /** Fastify server port. Uses serverPort if available, otherwise port + 2. */
   port: projectConfig.serverPort ?? projectConfig.port + 2,
@@ -43,4 +59,16 @@ export const config = {
 
   /** Workspace path inside the Docker sandbox. Defaults to the monorepo root. */
   sandboxWorkspace: process.env.SANDBOX_WORKSPACE ?? root,
-} as const;
+
+  // -- Credential injection & circuit breaker --
+
+  keychainTimeoutMs: envInt('KEYCHAIN_TIMEOUT_MS', 10_000),
+  injectTimeoutMs: envInt('INJECT_TIMEOUT_MS', 15_000),
+  /** Refresh host token proactively when it expires within this window. */
+  hostRefreshThresholdMs: envInt('HOST_REFRESH_THRESHOLD_MS', 600_000),
+  credentialSweepIntervalMs: envInt('CREDENTIAL_SWEEP_INTERVAL_MS', 14_400_000),
+  healMaxAttempts: envInt('HEAL_MAX_ATTEMPTS', 3),
+  /** Attempts outside this window are pruned, so the breaker resets naturally. */
+  healWindowMs: envInt('HEAL_WINDOW_MS', 900_000),
+  credentialSweepEnabled: envBool('CREDENTIAL_SWEEP_ENABLED', true),
+};

@@ -57,10 +57,12 @@ scripts/
 
 ### 1.2 Add Config Values
 
-- [ ] Add `envInt()` and `envBool()` utility functions to `apps/server/src/config.ts`
-- [ ] Add config fields: `keychainTimeoutMs` (default 10s), `injectTimeoutMs` (default 15s), `hostRefreshThresholdMs` (default 10min), `credentialSweepIntervalMs` (default 4hr), `healMaxAttempts` (default 3), `healWindowMs` (default 15min), `credentialSweepEnabled` (default true)
-- [ ] Each field reads from an env var with the matching name, falling back to the default
-- [ ] Run `pnpm --filter @repo/server test` — existing tests unaffected
+- [x] Add `envInt()` and `envBool()` utility functions to `apps/server/src/config.ts`
+- [x] Add config fields: `keychainTimeoutMs` (default 10s), `injectTimeoutMs` (default 15s), `hostRefreshThresholdMs` (default 10min), `credentialSweepIntervalMs` (default 4hr), `healMaxAttempts` (default 3), `healWindowMs` (default 15min), `credentialSweepEnabled` (default true)
+- [x] Each field reads from an env var with the matching name, falling back to the default
+- [x] Run `pnpm --filter @repo/server test` — existing tests unaffected
+
+> **Notes:** Removed `as const` from the config object since `envBool` returns a `boolean` value that conflicts with const assertion. Env var names use SCREAMING_SNAKE_CASE matching the field names (e.g., `KEYCHAIN_TIMEOUT_MS` for `keychainTimeoutMs`). All 88 existing tests pass. Env var overrides verified manually.
 
 **Acceptance Criteria:**
 - All new config values are accessible via `config.*`
