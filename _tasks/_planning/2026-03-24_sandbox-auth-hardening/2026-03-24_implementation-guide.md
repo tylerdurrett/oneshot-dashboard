@@ -110,14 +110,16 @@ scripts/
 
 ### 2.3 Credential Service Tests
 
-- [ ] Create `apps/server/src/__tests__/credentials.test.ts`
-- [ ] Test `stripRefreshToken`: strips token, preserves other fields, handles missing `claudeAiOauth` gracefully
-- [ ] Test `getHostTokenExpiresAt`: extracts timestamp, returns null on malformed input
-- [ ] Test `readKeychainCredentials`: mock `security` command via `createFakeSpawn` — success, invalid JSON, timeout. Mock `isMacOS()` for platform guard
-- [ ] Test `injectCredentials`: mock `docker sandbox exec -i` — success, non-zero exit, timeout. Verify stdin receives the JSON payload using a capturing spawn
-- [ ] Test `ensureHostTokenFresh`: fresh token (no-op), expired token (triggers refresh), concurrent dedup (two calls produce one spawn)
-- [ ] Test `refreshAndInjectCredentials`: full pipeline success, keychain failure short-circuits, inject failure after successful read
-- [ ] Run `pnpm --filter @repo/server test`
+- [x] Create `apps/server/src/__tests__/credentials.test.ts`
+- [x] Test `stripRefreshToken`: strips token, preserves other fields, handles missing `claudeAiOauth` gracefully
+- [x] Test `getHostTokenExpiresAt`: extracts timestamp, returns null on malformed input
+- [x] Test `readKeychainCredentials`: mock `security` command via `createFakeSpawn` — success, invalid JSON, timeout. Mock `isMacOS()` for platform guard
+- [x] Test `injectCredentials`: mock `docker sandbox exec -i` — success, non-zero exit, timeout. Verify stdin receives the JSON payload using a capturing spawn
+- [x] Test `ensureHostTokenFresh`: fresh token (no-op), expired token (triggers refresh), concurrent dedup (two calls produce one spawn)
+- [x] Test `refreshAndInjectCredentials`: full pipeline success, keychain failure short-circuits, inject failure after successful read
+- [x] Run `pnpm --filter @repo/server test`
+
+> **Notes:** Used `Object.defineProperty(process, 'platform', ...)` to mock `isMacOS()` instead of `vi.mock` — ESM doesn't intercept intra-module function calls, so mocking the export doesn't affect the internal call site. Added `StdinCapture` interface and stdin support to `createFakeSpawn` (with overloaded signatures) to verify stdin piping. Also added `refreshAndInjectCredentials` tests for the stale-token re-read path and refresh token stripping verification. 28 new tests, all 116 pass.
 
 **Acceptance Criteria:**
 - All credential functions have unit tests covering happy path and error cases

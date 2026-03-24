@@ -16,14 +16,28 @@ export interface FakeSpawnOptions {
   hang?: boolean;
 }
 
-export function createFakeSpawn(options: FakeSpawnOptions): SpawnFn {
+export interface StdinCapture {
+  data: string;
+  ended: boolean;
+}
+
+export function createFakeSpawn(options: FakeSpawnOptions): SpawnFn;
+export function createFakeSpawn(options: FakeSpawnOptions, capture: StdinCapture): SpawnFn;
+export function createFakeSpawn(options: FakeSpawnOptions, capture?: StdinCapture): SpawnFn {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   return ((_command: string, _args: string[]) => {
     const child = new EventEmitter();
     const stdoutEmitter = new EventEmitter();
     const stderrEmitter = new EventEmitter();
+    const stdinObj = capture
+      ? {
+          write: (chunk: string | Buffer) => { capture.data += chunk.toString(); },
+          end: () => { capture.ended = true; },
+        }
+      : { write: () => {}, end: () => {} };
 
     Object.assign(child, {
+      stdin: stdinObj,
       stdout: stdoutEmitter,
       stderr: stderrEmitter,
       kill: () => {
