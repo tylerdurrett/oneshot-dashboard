@@ -209,7 +209,7 @@ apps/web/public/sounds/
 
 ### 2.3 Timer Bucket Component
 
-- [ ] Create `_components/timer-bucket.tsx`:
+- [x] Create `_components/timer-bucket.tsx`:
   - Outer container: `position: relative`, `rounded-lg`, `overflow-hidden`, `select-none`, receives `style` prop for absolute positioning from grid
   - **Layer stack** (back to front, all `absolute inset-0`):
     1. **Muted layer** — `backgroundColor: BUCKET_COLORS[colorIndex].muted`, always full size, always visible (shows "depleted" time)
@@ -220,7 +220,7 @@ apps/web/public/sounds/
        - `transition: 'transform 300ms linear'` — smooth 300ms interpolation between tick updates
     3. **Active pulse overlay** (only when `isActive`):
        - Fill pulse: `absolute inset-0`, `bg-white`, `animate-pulse`, `opacity-20`
-       - Border pulse: `absolute inset-0`, `border-2 border-white/30 rounded-lg`, `animate-[pulse_2s_ease-in-out_infinite]`
+       - Border pulse: `absolute inset-0`, `border-2 border-white/30 rounded-lg`, `animate-pulse`
     4. **Text content** (always visible, on top of all layers):
        - `position: relative` (to sit above the absolute layers), `z-10`
        - Centered via flexbox (`flex flex-col items-center justify-center h-full`)
@@ -229,7 +229,16 @@ apps/web/public/sounds/
        - Remaining time computed as `formatTime(totalMinutes * 60 - elapsedSeconds)`
   - Active container also gets `ring-2 ring-white/40` on the outer div
   - Tap handler: calls `onTap` on click/pointerUp (will be refined in Phase 3 for long-press discrimination)
+  - **Note:** Added `relative` to root container so layer positioning is self-contained (doesn't depend on parent's `position: absolute`). Static transform/transition properties use Tailwind classes (`origin-left`, `transition-transform duration-300 ease-linear`) instead of inline styles. Both pulse layers use standard `animate-pulse` for consistent animation timing.
 - [ ] Visually verify in browser: buckets show names, times count down, color drains left-to-right, active state pulses
+  - **Manual test steps:**
+    1. Open `/timers` in the browser
+    2. Verify 4 colored rectangles appear filling the content area
+    3. Verify each bucket shows its name and remaining time (e.g., "3:00:00") in white text
+    4. Click a bucket — it should get a white ring and pulsing overlay, and the time should start counting down
+    5. Watch for ~5 seconds — the vibrant color should visibly shrink from right to left, revealing muted color underneath
+    6. Click a different bucket — the first bucket should stop (retaining its progress) and the new one should start pulsing
+    7. Click the active bucket again — it should stop (pulse and ring disappear)
 
 **Acceptance Criteria:**
 - Each bucket displays its name and remaining time in white text
