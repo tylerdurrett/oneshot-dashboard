@@ -179,7 +179,7 @@ apps/web/public/sounds/
 
 ### 2.2 Timer Grid Component
 
-- [ ] Create `_components/timer-grid.tsx`:
+- [x] Create `_components/timer-grid.tsx`:
   - `'use client'` directive (uses hooks and DOM measurement)
   - Measures container dimensions using a `ref` and `ResizeObserver` (or `offsetWidth/offsetHeight` on mount + resize)
   - Calls `squarify()` with today's buckets mapped to `TreemapItem` using **remaining seconds** as value: `Math.max(1, bucket.totalMinutes * 60 - bucket.elapsedSeconds)` — this means bucket rectangles shrink as time elapses, and the `Math.max(1, ...)` ensures completed timers still get minimal space
@@ -193,7 +193,13 @@ apps/web/public/sounds/
   - Passes `isActive`, `isCompleted`, computed `style`, and all handler callbacks to each bucket
   - Manages which bucket has settings dialog open (selected bucket state)
   - Renders `BucketSettingsDialog` once, controlled by selected bucket state
-- [ ] Update `timers/page.tsx` to render `<TimerGrid />`
+  - **Note:** Removed min-width/height floor clamping (`Math.max`) since treemap already enforces larger minimums (120x80). Added `useMemo` for treemap computation and bucket lookup map. ResizeObserver uses no-op guard to skip redundant updates. Selected bucket state deferred to Phase 3.2 (not scaffolded as dead code). Used `cn()` from `@repo/ui` for conditional classNames in TimerBucket. Page renders `<TimerGrid />` directly without wrapper div.
+- [x] Create `_components/timer-bucket.tsx` (minimal — full visual layer stack in 2.3):
+  - Renders bucket name, remaining time, and bucket color
+  - Click handler toggles the timer
+  - Active/completed states reflected via ring and opacity
+  - Accessible via `role="button"`, `tabIndex`, and keyboard handler
+- [x] Update `timers/page.tsx` to render `<TimerGrid />`
 
 **Acceptance Criteria:**
 - Opening `/timers` shows colored rectangles filling the content area
