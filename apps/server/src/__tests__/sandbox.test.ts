@@ -1,14 +1,15 @@
 import { EventEmitter } from 'node:events';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { config } from '../config.js';
 import {
   extractTextFromStreamLine,
   invokeClaude,
+  preflightCheck,
   probeSandbox,
   type ClaudeResult,
   type SpawnFn,
 } from '../services/sandbox.js';
-import { createFakeSpawn, ndjson } from './helpers.js';
+import { createFakeSpawn, mockPlatform, ndjson, restorePlatform } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -657,5 +658,124 @@ describe('invokeClaude', () => {
       expect(events.texts).toEqual(['hello']);
       expect(events.result).toEqual({ result: 'hello', sessionId: 's1' });
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// preflightCheck
+// ---------------------------------------------------------------------------
+
+describe('preflightCheck', () => {
+  afterEach(() => {
+    restorePlatform();
+  });
+
+  it('returns ok when sandbox is healthy (no injection needed)', async () => {
+    const spawnFn = createFakeSpawn({
+      stdout: JSON.stringify({
+        loggedIn: true,
+        authMethod: 'oauth',
+        apiProvider: 'firstParty',
+      }),
+      exitCode: 0,
+    });
+
+    const result = await preflightCheck(spawnFn);
+
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe('healthy');
+    expect(result.recoveryAttempted).toBe(false);
+  });
+
+  it('returns not ok immediately for unavailable sandbox (no recovery attempt)', async () => {
+    const spawnFn = createFakeSpawn({
+      stderr: "Error: sandbox 'my-sandbox' does not exist",
+      exitCode: 1,
+    });
+
+    const result = await preflightCheck(spawnFn);
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe('unavailable');
+    expect(result.recoveryAttempted).toBe(false);
+  });
+
+  it('recovers from auth failure via credential injection', async () => {
+    mockPlatform('darwin');
+    let probeCount = 0;
+
+    const spawnFn = ((command: string, args: string[]) => {
+      if (args.includes('auth') && args.includes('status')) {
+        probeCount++;
+        if (probeCount === 1) {
+          return createFakeSpawn({
+            stdout: JSON.stringify({ loggedIn: false }),
+            exitCode: 0,
+          })(command, args);
+        }
+        return createFakeSpawn({
+          stdout: JSON.stringify({
+            loggedIn: true,
+            authMethod: 'oauth',
+            apiProvider: 'firstParty',
+          }),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'security') {
+        return createFakeSpawn({
+          stdout: JSON.stringify({
+            claudeAiOauth: {
+              accessToken: 'test-token',
+              expiresAt: Date.now() + 3_600_000,
+              refreshToken: 'secret-refresh',
+            },
+          }),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (args.includes('-i')) {
+        return createFakeSpawn({ exitCode: 0 })(command, args);
+      }
+
+      return createFakeSpawn({ exitCode: 0 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const result = await preflightCheck(spawnFn);
+
+    expect(result.ok).toBe(true);
+    expect(result.status).toBe('healthy');
+    expect(result.recoveryAttempted).toBe(true);
+  });
+
+  it('returns not ok when auth recovery fails (keychain read fails)', async () => {
+    mockPlatform('darwin');
+
+    const spawnFn = ((command: string, args: string[]) => {
+      if (args.includes('auth') && args.includes('status')) {
+        return createFakeSpawn({
+          stdout: JSON.stringify({ loggedIn: false }),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'security') {
+        return createFakeSpawn({
+          stderr: 'The specified item could not be found in the keychain.',
+          exitCode: 44,
+        })(command, args);
+      }
+
+      return createFakeSpawn({ exitCode: 1 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const result = await preflightCheck(spawnFn);
+
+    expect(result.ok).toBe(false);
+    expect(result.status).toBe('auth_failed');
+    expect(result.recoveryAttempted).toBe(true);
+    expect(result.message).toContain('keychain');
   });
 });

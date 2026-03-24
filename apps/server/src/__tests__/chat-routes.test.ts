@@ -6,7 +6,7 @@ import { threads, messages } from '@repo/db';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
 import type { SpawnFn } from '../services/sandbox.js';
-import { createFakeSpawn, withHealthyPreflight, ndjson } from './helpers.js';
+import { createFakeSpawn, mockPlatform, restorePlatform, withHealthyPreflight, ndjson } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -720,6 +720,139 @@ describe('chat WebSocket route', () => {
       const { getThread } = await import('../services/thread.js');
       const thread = await getThread(threadId, testDb);
       expect(thread?.claudeSessionId).toBe('new-sid');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Preflight integration
+  // -----------------------------------------------------------------------
+
+  describe('preflight integration', () => {
+    afterEach(() => {
+      restorePlatform();
+    });
+
+    it('returns error when sandbox auth fails and recovery is unavailable', async () => {
+      mockPlatform('darwin');
+      let claudeInvoked = false;
+
+      const spawnFn = ((command: string, args: string[]) => {
+        if (args.includes('auth') && args.includes('status')) {
+          return createFakeSpawn({
+            stdout: JSON.stringify({ loggedIn: false }),
+            exitCode: 0,
+          })(command, args);
+        }
+
+        if (command === 'security') {
+          return createFakeSpawn({
+            stderr: 'The specified item could not be found in the keychain.',
+            exitCode: 44,
+          })(command, args);
+        }
+
+        if (args.includes('-p')) {
+          claudeInvoked = true;
+        }
+
+        return createFakeSpawn({ exitCode: 1 })(command, args);
+      }) as unknown as SpawnFn;
+
+      server = buildServer({ logger: false, database: testDb, spawnFn });
+      await server.ready();
+
+      const threadId = await createThread(server);
+      const ws = await server.injectWS('/chat');
+      const collecting = collectWsMessages(ws);
+
+      ws.send(
+        JSON.stringify({ type: 'message', threadId, content: 'Hello' }),
+      );
+
+      const msgs = await collecting;
+      ws.close();
+
+      const errorMsg = msgs.find((m) => m.type === 'error');
+      expect(errorMsg).toBeDefined();
+      expect(errorMsg!.message).toContain('Sandbox not ready');
+      expect(claudeInvoked).toBe(false);
+    });
+
+    it('recovers from auth failure and proceeds to Claude invocation', async () => {
+      mockPlatform('darwin');
+      let probeCount = 0;
+
+      const spawnFn = ((command: string, args: string[]) => {
+        if (args.includes('auth') && args.includes('status')) {
+          probeCount++;
+          if (probeCount === 1) {
+            return createFakeSpawn({
+              stdout: JSON.stringify({ loggedIn: false }),
+              exitCode: 0,
+            })(command, args);
+          }
+          return createFakeSpawn({
+            stdout: JSON.stringify({
+              loggedIn: true,
+              authMethod: 'oauth',
+              apiProvider: 'firstParty',
+            }),
+            exitCode: 0,
+          })(command, args);
+        }
+
+        if (command === 'security') {
+          return createFakeSpawn({
+            stdout: JSON.stringify({
+              claudeAiOauth: {
+                accessToken: 'test-token',
+                expiresAt: Date.now() + 3_600_000,
+                refreshToken: 'secret-refresh',
+              },
+            }),
+            exitCode: 0,
+          })(command, args);
+        }
+
+        if (args.includes('-i') && args.includes('sh')) {
+          return createFakeSpawn({ exitCode: 0 })(command, args);
+        }
+
+        return createFakeSpawn({
+          stdout: ndjson({
+            type: 'result',
+            result: 'Recovered reply',
+            session_id: 'sess-recovered',
+          }),
+          exitCode: 0,
+        })(command, args);
+      }) as unknown as SpawnFn;
+
+      server = buildServer({ logger: false, database: testDb, spawnFn });
+      await server.ready();
+
+      const threadId = await createThread(server);
+      const ws = await server.injectWS('/chat');
+      const collecting = collectWsMessages(ws);
+
+      ws.send(
+        JSON.stringify({ type: 'message', threadId, content: 'Hello after recovery' }),
+      );
+
+      const msgs = await collecting;
+      ws.close();
+
+      const done = msgs.find((m) => m.type === 'done');
+      expect(done).toBeDefined();
+      expect(done!.messageId).toBeDefined();
+
+      const res = await server.inject({
+        method: 'GET',
+        url: `/threads/${threadId}/messages`,
+      });
+      const body = res.json();
+      expect(body.messages).toHaveLength(2);
+      expect(body.messages[1].content).toBe('Recovered reply');
     });
   });
 });

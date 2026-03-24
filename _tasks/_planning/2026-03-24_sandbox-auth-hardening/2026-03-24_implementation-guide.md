@@ -176,16 +176,18 @@ scripts/
 
 ### 3.3 Preflight & Chat Tests
 
-- [ ] Add `preflightCheck` tests to `apps/server/src/__tests__/sandbox.test.ts`:
+- [x] Add `preflightCheck` tests to `apps/server/src/__tests__/sandbox.test.ts`:
   - Healthy sandbox returns ok (single probe, no injection)
   - Auth-failed + successful recovery returns ok with `recoveryAttempted: true`
   - Auth-failed + failed recovery returns not ok
   - Unavailable returns not ok immediately
-- [ ] Add preflight integration tests to `apps/server/src/__tests__/chat-routes.test.ts`:
+- [x] Add preflight integration tests to `apps/server/src/__tests__/chat-routes.test.ts`:
   - Message with healthy sandbox proceeds normally (existing behavior preserved)
   - Message with auth-failed sandbox receives error via WebSocket before any Claude invocation
   - Message with auth-failed + successful recovery proceeds to Claude invocation
-- [ ] Run `pnpm --filter @repo/server test`
+- [x] Run `pnpm --filter @repo/server test`
+
+> **Notes:** Added 4 unit tests in `sandbox.test.ts` and 2 integration tests in `chat-routes.test.ts` (6 new tests, 122 total). Existing happy-path tests already cover "healthy sandbox proceeds normally" via `withHealthyPreflight`. During code review, extracted `mockPlatform()`/`restorePlatform()` helpers from `credentials.test.ts` into shared `helpers.ts` and updated all three test files to use them — eliminated platform mock duplication. Tests use multi-behavior spawn functions that route based on command/args to simulate the full preflight → recovery → re-probe flow.
 
 **Acceptance Criteria:**
 - Preflight logic fully tested at unit and integration levels

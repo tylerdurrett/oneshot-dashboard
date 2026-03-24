@@ -13,20 +13,12 @@ import {
   type StdinCapture,
   createFakeSpawn,
   createRoutingSpawn,
+  mockPlatform,
+  restorePlatform,
 } from './helpers.js';
 
-// ---------------------------------------------------------------------------
-// Platform helper — `isMacOS()` reads `process.platform` which is read-only,
-// so we use defineProperty to swap it for platform-guard tests.
-// ---------------------------------------------------------------------------
-const REAL_PLATFORM = process.platform;
-
-function mockPlatform(platform: string) {
-  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
-}
-
 afterEach(() => {
-  Object.defineProperty(process, 'platform', { value: REAL_PLATFORM, configurable: true });
+  restorePlatform();
 });
 
 // ---------------------------------------------------------------------------

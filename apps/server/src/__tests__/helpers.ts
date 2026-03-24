@@ -112,3 +112,20 @@ export function withHealthyPreflight(innerSpawnFn: SpawnFn): SpawnFn {
 export function ndjson(...events: Record<string, unknown>[]): string {
   return events.map((e) => JSON.stringify(e)).join('\n') + '\n';
 }
+
+// ---------------------------------------------------------------------------
+// Platform mock — `process.platform` is read-only, so tests that exercise
+// macOS-only code paths (e.g., Keychain reads) use defineProperty to swap it.
+// ---------------------------------------------------------------------------
+
+const REAL_PLATFORM = process.platform;
+
+/** Override `process.platform` for the duration of a test. */
+export function mockPlatform(platform: string): void {
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+}
+
+/** Restore `process.platform` to its real value. Call in `afterEach`. */
+export function restorePlatform(): void {
+  Object.defineProperty(process, 'platform', { value: REAL_PLATFORM, configurable: true });
+}
