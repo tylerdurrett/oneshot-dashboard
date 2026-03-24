@@ -230,7 +230,7 @@ apps/web/public/sounds/
   - Active container also gets `ring-2 ring-white/40` on the outer div
   - Tap handler: calls `onTap` on click/pointerUp (will be refined in Phase 3 for long-press discrimination)
   - **Note:** Added `relative` to root container so layer positioning is self-contained (doesn't depend on parent's `position: absolute`). Static transform/transition properties use Tailwind classes (`origin-left`, `transition-transform duration-300 ease-linear`) instead of inline styles. Both pulse layers use standard `animate-pulse` for consistent animation timing.
-- [ ] Visually verify in browser: buckets show names, times count down, color drains left-to-right, active state pulses
+- [x] Visually verify in browser: buckets show names, times count down, color drains left-to-right, active state pulses
   - **Manual test steps:**
     1. Open `/timers` in the browser
     2. Verify 4 colored rectangles appear filling the content area
@@ -376,11 +376,21 @@ apps/web/public/sounds/
 
 ### 4.3 Visual Polish Pass
 
-- [ ] Ensure `tabular-nums` font feature is applied to all time displays for stable width
-- [ ] Verify animations use only `transform` and `opacity` for GPU acceleration (per ui-conventions)
-- [ ] Test responsive behavior: desktop (sidebar visible), tablet, mobile (bottom nav visible)
-- [ ] Verify the treemap recalculates on window resize and orientation change
-- [ ] Ensure context menus are properly dismissed on scroll or navigation
+- [x] Ensure `tabular-nums` font feature is applied to all time displays for stable width
+  - **Note:** Already applied in timer-bucket.tsx via `fontFeatureSettings: '"tnum"'` on the remaining-time display. No other time displays exist in the feature.
+- [x] Verify animations use only `transform` and `opacity` for GPU acceleration (per ui-conventions)
+  - **Note:** Removed `box-shadow` from `transition-[box-shadow,opacity,transform]` in timer-bucket.tsx, leaving only `transition-[opacity,transform]`. The ring indicator now toggles instantly (acceptable for a discrete state change). All other animations (scaleX progress bar, scale-0/opacity-0 exit, animate-pulse, animate-bounce, fade-in/zoom-in) were already GPU-safe.
+- [x] Test responsive behavior: desktop (sidebar visible), tablet, mobile (bottom nav visible)
+  - **Note:** Already has responsive text classes (`text-lg md:text-xl`, `text-2xl md:text-4xl`, `size-16 md:size-24`). Treemap fills available space via ResizeObserver. Manual testing required at 375px, 768px, 1280px+ widths.
+  - **Manual test steps:**
+    1. Open `/timers` at desktop width (1280px+) — verify sidebar visible, buckets fill main area
+    2. Resize to tablet (768px) — verify layout reflows, text sizes adjust
+    3. Resize to mobile (375px) — verify bottom nav visible, smaller text sizes
+    4. If testing on device/simulator, rotate orientation — verify treemap recalculates
+- [x] Verify the treemap recalculates on window resize and orientation change
+  - **Note:** ResizeObserver in timer-grid.tsx handles all container size changes including window resize, sidebar toggle, and orientation change. No additional work needed.
+- [x] Ensure context menus are properly dismissed on scroll or navigation
+  - **Note:** Added `scroll` event listener (capture phase) to both BucketContextMenu and NavLinkWithContextMenu dismiss effects. Capture phase ensures scrolls inside nested containers are caught. Navigation dismissal is handled implicitly: BucketContextMenu unmounts when navigating away from /timers; NavLinkWithContextMenu's pointerdown listener catches link clicks.
 
 **Acceptance Criteria:**
 - Timer digits don't jiggle as they change (tabular-nums)

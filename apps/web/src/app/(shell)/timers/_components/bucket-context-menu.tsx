@@ -88,16 +88,24 @@ export function BucketContextMenu({
         onCloseRef.current();
       }
     };
+    // Close on scroll anywhere in the page (capture phase catches scrolls
+    // inside nested containers before they bubble).
+    const handleScroll = () => {
+      onCloseRef.current();
+    };
+
     // Delay listener registration so the opening pointer event doesn't
     // immediately close the menu.
     const id = requestAnimationFrame(() => {
       document.addEventListener('pointerdown', handlePointerDown);
       document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('scroll', handleScroll, true);
     });
     return () => {
       cancelAnimationFrame(id);
       document.removeEventListener('pointerdown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('scroll', handleScroll, true);
     };
   }, []);
 

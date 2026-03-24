@@ -227,7 +227,7 @@ export function TimerBucket({
         }}
         className={cn(
           'touch-none relative select-none cursor-pointer rounded-lg overflow-hidden',
-          'transition-[box-shadow,opacity,transform] duration-400',
+          'transition-[opacity,transform] duration-400',
           isActive && 'ring-2 ring-white/40',
           isCompleted && animPhase === 'idle' && 'opacity-60',
           animPhase === 'exiting' && 'scale-0 opacity-0',
