@@ -194,10 +194,11 @@ describe('ThreadPage', () => {
   // Layout structure
   // -------------------------------------------------------------------------
 
-  it('renders fullscreen layout with h-dvh', () => {
+  // h-full instead of h-dvh — the AppShell provides the viewport-height constraint
+  it('renders layout filling parent with h-full', () => {
     const { container } = render(<ThreadPage />);
     const root = container.firstElementChild as HTMLElement;
-    expect(root.className).toContain('h-dvh');
+    expect(root.className).toContain('h-full');
   });
 
   it('has container query wrapper', () => {

@@ -110,7 +110,7 @@ export default function ChatIndexPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-full flex-col">
       <div className="@container flex w-full flex-1 flex-col overflow-hidden">
         <div className="mx-auto flex w-full flex-1 flex-col overflow-hidden @3xl:max-w-2xl @5xl:max-w-3xl @7xl:max-w-4xl">
           {/* Title bar */}

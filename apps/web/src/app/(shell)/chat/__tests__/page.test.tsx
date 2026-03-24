@@ -170,10 +170,11 @@ describe('ChatIndexPage (draft mode — lazy thread creation)', () => {
   // Layout
   // -------------------------------------------------------------------------
 
-  it('renders fullscreen layout with h-dvh', () => {
+  // h-full instead of h-dvh — the AppShell provides the viewport-height constraint
+  it('renders layout filling parent with h-full', () => {
     const { container } = render(<ChatIndexPage />);
     const root = container.firstElementChild as HTMLElement;
-    expect(root.className).toContain('h-dvh');
+    expect(root.className).toContain('h-full');
   });
 
   it('renders the chat UI (not a redirect/spinner)', () => {

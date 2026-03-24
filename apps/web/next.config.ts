@@ -17,6 +17,15 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SERVER_PORT: String(getServerPort()),
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/timers',
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

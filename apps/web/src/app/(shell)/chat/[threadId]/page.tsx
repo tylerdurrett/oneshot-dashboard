@@ -158,7 +158,7 @@ export default function ThreadPage() {
 
   if (threadNotFound) {
     return (
-      <div className="flex h-dvh flex-col items-center justify-center gap-4">
+      <div className="flex h-full flex-col items-center justify-center gap-4">
         <h2 className="text-lg font-semibold">Thread not found</h2>
         <p className="text-sm text-muted-foreground">
           This conversation doesn&apos;t exist or may have been deleted.
@@ -175,7 +175,7 @@ export default function ThreadPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-full flex-col">
       {/* Container query context — scales content width with available space */}
       <div className="@container flex w-full flex-1 flex-col overflow-hidden">
         <div className="mx-auto flex w-full flex-1 flex-col overflow-hidden @3xl:max-w-2xl @5xl:max-w-3xl @7xl:max-w-4xl">
