@@ -220,12 +220,14 @@ scripts/
 
 ### 4.2 Auth Recovery in invokeClaude
 
-- [ ] In `runInvocation` (sandbox.ts), when the close handler classifies an auth error:
+- [x] In `runInvocation` (sandbox.ts), when the close handler classifies an auth error:
   1. Check `isCircuitOpen()` — if open, emit error and close as-is
   2. If circuit is closed, call `recordHealAttempt()`, then `refreshAndInjectCredentials(spawnFn)`
   3. If injection succeeds, emit `'auth_recovery'` event, retry the invocation once
   4. If injection fails, emit the original auth error
-- [ ] Add `'auth_recovery'` to the documented event types on `invokeClaude`
+- [x] Add `'auth_recovery'` to the documented event types on `invokeClaude`
+
+> **Notes:** Added `isRecoveryRetry` boolean parameter (default false) to `runInvocation` to prevent infinite retry loops — at most one recovery per invocation. Cached the `matchesPatterns(stderr, stdout, AUTH_FAILURE_PATTERNS)` result in a local `isAuthFailure` variable to avoid redundant string scanning (the resume failure check already tests this). Added a defensive `.catch()` on the `refreshAndInjectCredentials` promise chain even though the function is documented to never reject. Also added `resetCircuitBreaker()` in `beforeEach` for the `preflightCheck` test suite — the invokeClaude auth error tests now record heal attempts via the recovery path, which would otherwise accumulate and open the circuit breaker before the preflight tests run. All 122 tests pass.
 
 **Acceptance Criteria:**
 - Auth error during invocation triggers one injection + retry attempt

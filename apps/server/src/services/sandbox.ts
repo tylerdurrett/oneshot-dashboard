@@ -464,6 +464,7 @@ function classifyInvocationError(
  * - `'error'` (Error) — error during execution
  * - `'close'` () — process completed
  * - `'resume_failed'` () — resume attempt failed, retrying without session ID
+ * - `'auth_recovery'` () — auth failed mid-invocation, credentials injected, retrying once
  *
  * If `sessionId` is provided, attempts `--resume` first. On resume failure,
  * automatically retries without `--resume`.
@@ -529,13 +530,14 @@ function processStreamLine(line: string, emitter: EventEmitter): void {
   }
 }
 
-/** Internal: run a single invocation attempt (may be called recursively on resume failure). */
+/** Internal: run a single invocation attempt (may be called recursively on resume failure or auth recovery). */
 function runInvocation(
   emitter: EventEmitter,
   prompt: string,
   sessionId: string | undefined,
   spawnFn: SpawnFn,
   inactivityTimeoutMs: number,
+  isRecoveryRetry: boolean = false,
 ): void {
   const args = buildClaudeArgs(prompt, sessionId);
 
@@ -625,10 +627,41 @@ function runInvocation(
       return;
     }
 
+    const isAuthFailure = matchesPatterns(stderr, stdout, AUTH_FAILURE_PATTERNS);
+
     // Resume failure: retry without --resume (check auth first per ref doc)
-    if (sessionId && !matchesPatterns(stderr, stdout, AUTH_FAILURE_PATTERNS) && isResumeFailure(stderr, stdout)) {
+    if (sessionId && !isAuthFailure && isResumeFailure(stderr, stdout)) {
       emitter.emit('resume_failed');
       runInvocation(emitter, prompt, undefined, spawnFn, inactivityTimeoutMs);
+      return;
+    }
+
+    // Auth failure during invocation: attempt credential injection and retry once.
+    // isRecoveryRetry prevents infinite loops — at most one recovery per invocation.
+    if (!isRecoveryRetry && isAuthFailure) {
+      const authError = classifyInvocationError(stderr, stdout, code, sessionId);
+
+      if (isCircuitOpen()) {
+        emitter.emit('error', authError);
+        emitter.emit('close');
+        return;
+      }
+
+      recordHealAttempt();
+      refreshAndInjectCredentials(spawnFn)
+        .then((injection) => {
+          if (injection.ok) {
+            emitter.emit('auth_recovery');
+            runInvocation(emitter, prompt, sessionId, spawnFn, inactivityTimeoutMs, true);
+          } else {
+            emitter.emit('error', authError);
+            emitter.emit('close');
+          }
+        })
+        .catch(() => {
+          emitter.emit('error', authError);
+          emitter.emit('close');
+        });
       return;
     }
 

@@ -1,11 +1,12 @@
 import { EventEmitter } from 'node:events';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { config } from '../config.js';
 import {
   extractTextFromStreamLine,
   invokeClaude,
   preflightCheck,
   probeSandbox,
+  resetCircuitBreaker,
   type ClaudeResult,
   type SpawnFn,
 } from '../services/sandbox.js';
@@ -666,6 +667,10 @@ describe('invokeClaude', () => {
 // ---------------------------------------------------------------------------
 
 describe('preflightCheck', () => {
+  beforeEach(() => {
+    resetCircuitBreaker();
+  });
+
   afterEach(() => {
     restorePlatform();
   });
