@@ -72,7 +72,7 @@ apps/web/public/sounds/
 
 ### 1.2 Treemap Algorithm
 
-- [ ] Create `_lib/treemap.ts` with:
+- [x] Create `_lib/treemap.ts` with:
   - `TreemapItem` interface (`id: string`, `value: number`)
   - `TreemapRect` interface (`id: string`, `x: number`, `y: number`, `width: number`, `height: number`)
   - Constants: `MIN_WIDTH = 120`, `MIN_HEIGHT = 80`
@@ -94,7 +94,7 @@ apps/web/public/sounds/
   - `equalGrid(items, x, y, width, height)` — zero-value fallback:
     - Lays items out in an equal-sized grid: `cols = ceil(sqrt(n))`, `rows = ceil(n / cols)`
     - Each item gets `width/cols` by `height/rows`
-- [ ] Write tests in `__tests__/treemap.test.ts`:
+- [x] Write tests in `__tests__/treemap.test.ts`:
   - Empty items returns `[]`
   - Zero-dimension container returns `[]`
   - Single item fills container (with min-size enforcement)
@@ -104,6 +104,7 @@ apps/web/public/sounds/
   - Total area of rectangles ≈ container area (within rounding tolerance)
   - All-zero values produce equal grid layout
   - 100 items completes without stack overflow
+  - **Note:** Internal functions use a shared output array (`out: TreemapRect[]`) instead of returning and spreading intermediate arrays, avoiding O(n log n) copies. The split-point loop uses a running sum instead of slice+reduce, making it O(n) instead of O(n^2). Redundant constant-pinning tests were omitted since behavioral tests already cover min-size enforcement.
 
 **Acceptance Criteria:**
 - `squarify([{id:'a', value:1}], 800, 600)` returns one rect at (0,0) with full dimensions
