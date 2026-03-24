@@ -191,6 +191,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -213,6 +214,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -232,6 +234,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -253,6 +256,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={onResetForToday}
         onSetRemainingTime={vi.fn()}
+        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -275,6 +279,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onAnimationComplete={vi.fn()}
       />,
     );
 

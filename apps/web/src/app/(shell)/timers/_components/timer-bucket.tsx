@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 
 import { cn } from '@repo/ui';
 import { ConfirmationDialog } from '@repo/ui/components/confirmation-dialog';
@@ -19,6 +20,12 @@ const LONG_PRESS_MS = 800;
 /** Maximum movement (px) before a long-press is cancelled. */
 const LONG_PRESS_MOVE_THRESHOLD = 10;
 
+/** Duration (ms) for the success checkmark overlay. */
+const SUCCESS_OVERLAY_MS = 1200;
+
+/** Duration (ms) for the exit shrink/fade animation. */
+const EXIT_ANIMATION_MS = 400;
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -32,6 +39,9 @@ export interface TimerBucketProps {
   onOpenSettings: () => void;
   onResetForToday: () => void;
   onSetRemainingTime: (remainingSeconds: number) => void;
+  /** Called after the completion exit animation finishes so the grid can
+   *  remove this bucket from the treemap layout and let others reflow. */
+  onAnimationComplete: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -47,6 +57,7 @@ export function TimerBucket({
   onOpenSettings,
   onResetForToday,
   onSetRemainingTime,
+  onAnimationComplete,
 }: TimerBucketProps) {
   const totalSeconds = bucket.totalMinutes * 60;
   const remainingSeconds = totalSeconds - bucket.elapsedSeconds;
@@ -56,6 +67,16 @@ export function TimerBucket({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+
+  // -- Completion animation state --
+  // Single enum prevents impossible state combos (e.g. showSuccess + isExiting both true).
+  const [animPhase, setAnimPhase] = useState<'idle' | 'success' | 'exiting'>('idle');
+  const prevCompletedRef = useRef(isCompleted);
+  const animationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Ref for onAnimationComplete so the effect doesn't re-run when the
+  // parent passes a new inline arrow each tick.
+  const onAnimationCompleteRef = useRef(onAnimationComplete);
+  onAnimationCompleteRef.current = onAnimationComplete;
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStartRef = useRef({ x: 0, y: 0 });
@@ -69,6 +90,31 @@ export function TimerBucket({
       }
     };
   }, []);
+
+  // Completion animation: detect false→true transition on isCompleted
+  useEffect(() => {
+    if (isCompleted && !prevCompletedRef.current) {
+      // Clear any in-flight animation timers before scheduling new ones
+      for (const t of animationTimersRef.current) clearTimeout(t);
+
+      setAnimPhase('success');
+
+      const exitTimer = setTimeout(() => {
+        setAnimPhase('exiting');
+      }, SUCCESS_OVERLAY_MS);
+
+      const completeTimer = setTimeout(() => {
+        onAnimationCompleteRef.current();
+      }, SUCCESS_OVERLAY_MS + EXIT_ANIMATION_MS);
+
+      animationTimersRef.current = [exitTimer, completeTimer];
+    }
+    prevCompletedRef.current = isCompleted;
+
+    return () => {
+      for (const t of animationTimersRef.current) clearTimeout(t);
+    };
+  }, [isCompleted]);
 
   const clearLongPress = () => {
     if (longPressTimerRef.current) {
@@ -178,9 +224,11 @@ export function TimerBucket({
           }
         }}
         className={cn(
-          'touch-none relative select-none cursor-pointer rounded-lg overflow-hidden transition-shadow',
+          'touch-none relative select-none cursor-pointer rounded-lg overflow-hidden',
+          'transition-[box-shadow,opacity,transform] duration-400',
           isActive && 'ring-2 ring-white/40',
-          isCompleted && 'opacity-60',
+          isCompleted && animPhase === 'idle' && 'opacity-60',
+          animPhase === 'exiting' && 'scale-0 opacity-0',
         )}
         style={style}
       >
@@ -200,6 +248,11 @@ export function TimerBucket({
             <div className="absolute inset-0 animate-pulse bg-white opacity-20" />
             <div className="absolute inset-0 animate-pulse rounded-lg border-2 border-white/30" />
           </>
+        )}
+        {animPhase === 'success' && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 animate-in fade-in zoom-in duration-300">
+            <Check className="size-16 text-white drop-shadow-lg animate-bounce md:size-24" strokeWidth={3} />
+          </div>
         )}
         <div className="relative z-10 flex h-full flex-col items-center justify-center">
           <span className="text-lg font-bold text-white md:text-xl">

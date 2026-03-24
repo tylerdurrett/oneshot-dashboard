@@ -73,12 +73,40 @@ export function TimerGrid() {
   // Selected bucket for settings dialog
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
 
+  // Tracks buckets whose completion exit animation has finished, so
+  // they can be excluded from the treemap layout and let others reflow.
+  const [hiddenBuckets, setHiddenBuckets] = useState<Set<string>>(
+    () => new Set(),
+  );
+
   const handleDeleteBucket = useCallback(
     (id: string) => {
       removeBucket(id);
       setSelectedBucketId(null);
     },
     [removeBucket],
+  );
+
+  const handleAnimationComplete = useCallback((id: string) => {
+    setHiddenBuckets((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
+  // When a bucket is reset, remove it from hiddenBuckets so it reappears
+  const handleResetForToday = useCallback(
+    (id: string) => {
+      resetBucketForToday(id);
+      setHiddenBuckets((prev) => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    },
+    [resetBucketForToday],
   );
 
   // Ref to track latest allBuckets so handleAddBucket stays stable and
@@ -135,7 +163,13 @@ export function TimerGrid() {
   const innerWidth = Math.max(0, size.width - CONTAINER_PADDING * 2);
   const innerHeight = Math.max(0, size.height - CONTAINER_PADDING * 2);
 
-  const items = useMemo(() => bucketsToItems(todaysBuckets), [todaysBuckets]);
+  // Exclude buckets whose exit animation finished from the treemap so
+  // remaining buckets reflow to fill the freed space.
+  const visibleBuckets = useMemo(
+    () => todaysBuckets.filter((b) => !hiddenBuckets.has(b.id)),
+    [todaysBuckets, hiddenBuckets],
+  );
+  const items = useMemo(() => bucketsToItems(visibleBuckets), [visibleBuckets]);
   const rects = useMemo(
     () => squarify(items, innerWidth, innerHeight),
     [items, innerWidth, innerHeight],
@@ -209,8 +243,9 @@ export function TimerGrid() {
             style={style}
             onToggle={() => toggleBucket(bucket.id)}
             onOpenSettings={() => setSelectedBucketId(bucket.id)}
-            onResetForToday={() => resetBucketForToday(bucket.id)}
+            onResetForToday={() => handleResetForToday(bucket.id)}
             onSetRemainingTime={(s) => setRemainingTime(bucket.id, s)}
+            onAnimationComplete={() => handleAnimationComplete(bucket.id)}
           />
         );
       })}

@@ -344,12 +344,13 @@ apps/web/public/sounds/
 
 ### 4.1 Completion Animation
 
-- [ ] Add completion sequence to `timer-bucket.tsx`:
+- [x] Add completion sequence to `timer-bucket.tsx`:
   - When a bucket enters `completedBuckets`, trigger a two-stage animation:
     1. **Success overlay** (1.2s): white/20 background with checkmark SVG, `animate-in fade-in zoom-in`, checkmark bounces
-    2. **Exit** (0.4s): bucket scales to 0 with opacity fade (`scale-0 opacity-0 transition-all duration-400`)
-  - After exit animation completes, call `onRemove` to remove the bucket from the visible grid
-  - Use `useState` for `showSuccess` and `isExiting` flags, `setTimeout` to sequence stages
+    2. **Exit** (0.4s): bucket scales to 0 with opacity fade (`scale-0 opacity-0 transition-[box-shadow,opacity,transform] duration-400`)
+  - After exit animation completes, call `onAnimationComplete` to remove the bucket from the visible grid
+  - Use single `animPhase` enum (`'idle' | 'success' | 'exiting'`) instead of two booleans, `setTimeout` to sequence stages
+  - **Note:** Diverged from plan: used `animPhase` state enum instead of two separate `showSuccess`/`isExiting` booleans to prevent impossible state combos. Used `transition-[box-shadow,opacity,transform]` instead of `transition-all` to avoid transitioning layout properties (`left`/`top`/`width`/`height`) during treemap reflow. Used ref for `onAnimationComplete` to decouple the effect from callback identity and prevent per-tick effect churn. `Check` icon from lucide-react used instead of inline SVG. `timer-grid.tsx` maintains `hiddenBuckets` set to exclude completed buckets from treemap; `handleResetForToday` clears hidden status so reset buckets reappear. Manual test: use "Set Remaining Time" context menu to set a bucket to ~5 seconds, watch it complete → checkmark → shrink → reflow.
 
 **Acceptance Criteria:**
 - When a timer reaches zero, a checkmark appears over the bucket
