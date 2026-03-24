@@ -115,7 +115,7 @@ apps/web/public/sounds/
 
 ### 1.3 State Management Hook
 
-- [ ] Create `_hooks/use-timer-state.ts` with `useTimerState()` hook:
+- [x] Create `_hooks/use-timer-state.ts` with `useTimerState()` hook:
   - `loadState()` — reads from localStorage, applies daily reset if needed, recovers elapsed time if timer was active
   - `isHydrated` flag — false until client-side load completes (prevents SSR mismatch)
   - 1-second `setInterval` when `activeBucketId` is set, incrementing `elapsedSeconds`
@@ -128,7 +128,8 @@ apps/web/public/sounds/
   - `setRemainingTime(id, remainingSeconds)` — sets `elapsedSeconds` to `totalMinutes * 60 - remainingSeconds`
   - Day-of-week filtering: expose `todaysBuckets` (filtered) alongside `allBuckets`
   - Persist to localStorage on every state change (after hydration)
-- [ ] Write tests in `__tests__/use-timer-state.test.ts`:
+  - **Note:** `loadState()` is exported for direct unit testing. `completedBuckets` is kept as separate state (not derived via useMemo) so the UI can distinguish "just completed this session" from "was already complete on load" — needed for Phase 4 completion animations.
+- [x] Write tests in `__tests__/use-timer-state.test.ts`:
   - Toggle starts/stops a bucket
   - Toggling a different bucket switches active bucket
   - Daily reset zeroes all elapsed times when date changes
@@ -137,6 +138,7 @@ apps/web/public/sounds/
   - Day-of-week filtering returns only today's buckets
   - `addBucket` / `removeBucket` / `updateBucket` work correctly
   - State persists to and loads from localStorage
+  - **Note:** 29 tests total — also covers `loadState()` directly (corrupt JSON, time recovery capping), `setRemainingTime` clamping, and `resetBucketForToday` clearing completedBuckets.
 
 **Acceptance Criteria:**
 - Hook returns `isHydrated: false` on initial render, `true` after mount
