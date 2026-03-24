@@ -47,7 +47,7 @@ apps/web/public/sounds/
 
 ### 1.1 Data Types and Utilities
 
-- [ ] Create `_lib/timer-types.ts` with:
+- [x] Create `_lib/timer-types.ts` with:
   - `TimeBucket` interface (id, name, totalMinutes, elapsedSeconds, colorIndex, daysOfWeek)
   - `TimerState` interface (buckets, activeBucketId, lastActiveTime, lastResetDate)
   - `BUCKET_COLORS` array with 10 color slots, each having `vibrant` and `muted` keys referencing CSS variables (`var(--bucket-1)`, `var(--bucket-1-muted)`, etc.)
@@ -55,13 +55,14 @@ apps/web/public/sounds/
   - `formatTime(seconds)` — returns `H:MM:SS` or `M:SS` string
   - `getResetDate()` — returns `YYYY-MM-DD` string, treating pre-3AM as previous day
   - `isBucketActiveToday(bucket)` — checks if bucket's `daysOfWeek` includes the current day (3AM-adjusted)
-  - `generateBucketId()` — 7-char random string
+  - `generateBucketId()` — uses `crypto.randomUUID()` instead of 7-char random string (matches codebase convention)
   - `STORAGE_KEY` constant (`'time-buckets-state'`)
-- [ ] Write tests in `__tests__/timer-types.test.ts`:
+  - **Note:** Extracted shared `adjustForResetBoundary()` helper and `RESET_HOUR` constant to DRY up the 3AM logic used by both `getResetDate` and `isBucketActiveToday`
+- [x] Write tests in `__tests__/timer-types.test.ts`:
   - `formatTime`: 0s, 59s, 60s, 3599s, 3600s, edge cases
-  - `getResetDate`: mock `Date` for before/after 3AM boundary
-  - `isBucketActiveToday`: mock `Date` for various days, test inclusion/exclusion
-  - `generateBucketId`: returns 7-char string, multiple calls produce unique values
+  - `getResetDate`: explicit Date args for before/after 3AM boundary
+  - `isBucketActiveToday`: explicit Date args for various days, test inclusion/exclusion
+  - `generateBucketId`: returns valid UUID, multiple calls produce unique values
 
 **Acceptance Criteria:**
 - All utility functions are exported and tested
