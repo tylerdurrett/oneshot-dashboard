@@ -157,7 +157,7 @@ apps/web/public/sounds/
 
 ### 2.1 Bucket Color CSS Variables
 
-- [ ] Add 10 bucket color pairs to `apps/web/src/app/globals.css` inside the `.dark` block:
+- [x] Add 10 bucket color pairs to `apps/web/src/app/globals.css` inside the `.dark` block:
   - `--bucket-1` / `--bucket-1-muted` (Blue, hue ~250)
   - `--bucket-2` / `--bucket-2-muted` (Teal, hue ~160)
   - `--bucket-3` / `--bucket-3-muted` (Orange, hue ~45)
@@ -169,7 +169,8 @@ apps/web/public/sounds/
   - `--bucket-9` / `--bucket-9-muted` (Cyan, hue ~200)
   - `--bucket-10` / `--bucket-10-muted` (Magenta, hue ~320)
   - Use OKLCH color space: vibrant ~0.65-0.72 lightness, 0.18-0.22 chroma; muted ~0.35-0.40 lightness, 0.07-0.09 chroma
-- [ ] Add matching `:root` (light) values for the same variables (even though dark-first, prevents broken state if dark class is missing)
+- [x] Add matching `:root` (light) values for the same variables (even though dark-first, prevents broken state if dark class is missing)
+  - **Note:** Light theme vibrant colors use lower lightness (~0.55-0.62) for visibility on white backgrounds; light muted colors use higher lightness (~0.80-0.85) with very low chroma for a subtle appearance. Variables are not registered in `@theme inline` since they're consumed via `var()` in inline styles per `BUCKET_COLORS` in `timer-types.ts`.
 
 **Acceptance Criteria:**
 - All 20 CSS variables (10 vibrant + 10 muted) are defined

@@ -76,6 +76,29 @@
   --sidebar-accent-foreground: 240 5.9% 10%;
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 240 10% 3.9%;
+
+  /* Bucket timer colors — vibrant (light theme: rich on white bg) */
+  --bucket-1: oklch(0.58 0.20 250);
+  --bucket-2: oklch(0.60 0.18 160);
+  --bucket-3: oklch(0.62 0.20 45);
+  --bucket-4: oklch(0.58 0.20 340);
+  --bucket-5: oklch(0.55 0.20 290);
+  --bucket-6: oklch(0.60 0.18 130);
+  --bucket-7: oklch(0.62 0.20 80);
+  --bucket-8: oklch(0.57 0.22 25);
+  --bucket-9: oklch(0.60 0.18 200);
+  --bucket-10: oklch(0.57 0.20 320);
+  /* Bucket timer colors — muted (light theme: subtle on white bg) */
+  --bucket-1-muted: oklch(0.82 0.06 250);
+  --bucket-2-muted: oklch(0.83 0.05 160);
+  --bucket-3-muted: oklch(0.84 0.06 45);
+  --bucket-4-muted: oklch(0.82 0.06 340);
+  --bucket-5-muted: oklch(0.80 0.06 290);
+  --bucket-6-muted: oklch(0.83 0.05 130);
+  --bucket-7-muted: oklch(0.84 0.06 80);
+  --bucket-8-muted: oklch(0.82 0.07 25);
+  --bucket-9-muted: oklch(0.83 0.05 200);
+  --bucket-10-muted: oklch(0.82 0.06 320);
 }
 
 .dark {
@@ -111,6 +134,29 @@
   --sidebar-accent-foreground: 240 4.8% 95.9%;
   --sidebar-border: 240 3.7% 15.9%;
   --sidebar-ring: 224.3 76.3% 48%;
+
+  /* Bucket timer colors — vibrant (dark theme: bright on dark bg) */
+  --bucket-1: oklch(0.68 0.20 250);
+  --bucket-2: oklch(0.70 0.18 160);
+  --bucket-3: oklch(0.72 0.20 45);
+  --bucket-4: oklch(0.68 0.20 340);
+  --bucket-5: oklch(0.65 0.20 290);
+  --bucket-6: oklch(0.70 0.18 130);
+  --bucket-7: oklch(0.72 0.20 80);
+  --bucket-8: oklch(0.67 0.22 25);
+  --bucket-9: oklch(0.70 0.18 200);
+  --bucket-10: oklch(0.67 0.20 320);
+  /* Bucket timer colors — muted (dark theme: dim on dark bg) */
+  --bucket-1-muted: oklch(0.37 0.08 250);
+  --bucket-2-muted: oklch(0.38 0.07 160);
+  --bucket-3-muted: oklch(0.40 0.08 45);
+  --bucket-4-muted: oklch(0.37 0.08 340);
+  --bucket-5-muted: oklch(0.35 0.08 290);
+  --bucket-6-muted: oklch(0.38 0.07 130);
+  --bucket-7-muted: oklch(0.40 0.08 80);
+  --bucket-8-muted: oklch(0.37 0.09 25);
+  --bucket-9-muted: oklch(0.38 0.07 200);
+  --bucket-10-muted: oklch(0.37 0.08 320);
 }
 
 /* Global scrollbar — subtle, dark-theme matched, visible on hover.
