@@ -290,7 +290,7 @@ apps/web/public/sounds/
 
 ### 3.2 Bucket Settings Dialog
 
-- [ ] Create `_components/bucket-settings-dialog.tsx`:
+- [x] Create `_components/bucket-settings-dialog.tsx`:
   - Uses `Dialog` / `DialogContent` / `DialogHeader` / `DialogFooter` from `@repo/ui/components/dialog`
   - Props: `bucket`, `open`, `onOpenChange`, `onSave`, `onDelete`
   - Form fields:
@@ -302,13 +302,14 @@ apps/web/public/sounds/
   - "Save" button calls `onSave` with updated fields
   - "Delete Bucket" button at bottom with destructive styling, triggers `ConfirmationDialog`
   - Local form state initialized from `bucket` prop when dialog opens
+  - **Note:** Uses `cn()` utility for conditional class composition per codebase convention. Day labels consolidated into a single `DAYS` constant with both short and full names to prevent drift. Zero-duration validation added (canSave requires totalMinutes > 0). Dialog is conditionally mounted in `timer-grid.tsx` to avoid re-rendering every second when closed. Uses `bucketMap` O(1) lookup instead of `find()` for selected bucket. `onSave` passed `updateBucket` directly (no trivial wrapper).
 
 **Acceptance Criteria:**
 - Dialog opens with current bucket values pre-filled
 - Changing name, duration, color, or days and saving updates the bucket
 - Color picker shows 10 distinct options with the current selection highlighted
 - Day toggles correctly select/deselect days
-- Cannot save with empty name or zero days selected
+- Cannot save with empty name, zero days selected, or zero duration
 - Delete requires confirmation before removing the bucket
 
 ### 3.3 Add Bucket Flow

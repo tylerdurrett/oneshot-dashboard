@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 import type { TimeBucket } from '../_lib/timer-types';
 import { squarify, type TreemapItem } from '../_lib/treemap';
 import { useTimerState } from '../_hooks/use-timer-state';
+import { BucketSettingsDialog } from './bucket-settings-dialog';
 import { TimerBucket } from './timer-bucket';
 
 // ---------------------------------------------------------------------------
@@ -40,9 +41,22 @@ export function TimerGrid() {
     activeBucketId,
     completedBuckets,
     toggleBucket,
+    updateBucket,
+    removeBucket,
     resetBucketForToday,
     setRemainingTime,
   } = useTimerState();
+
+  // Selected bucket for settings dialog
+  const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+
+  const handleDeleteBucket = useCallback(
+    (id: string) => {
+      removeBucket(id);
+      setSelectedBucketId(null);
+    },
+    [removeBucket],
+  );
 
   // Container measurement via ResizeObserver
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,12 +120,24 @@ export function TimerGrid() {
             isCompleted={completedBuckets.has(bucket.id)}
             style={style}
             onToggle={() => toggleBucket(bucket.id)}
-            onOpenSettings={() => {}}
+            onOpenSettings={() => setSelectedBucketId(bucket.id)}
             onResetForToday={() => resetBucketForToday(bucket.id)}
             onSetRemainingTime={(s) => setRemainingTime(bucket.id, s)}
           />
         );
       })}
+
+      {selectedBucketId && (
+        <BucketSettingsDialog
+          bucket={bucketMap.get(selectedBucketId) ?? null}
+          open
+          onOpenChange={(open) => {
+            if (!open) setSelectedBucketId(null);
+          }}
+          onSave={updateBucket}
+          onDelete={handleDeleteBucket}
+        />
+      )}
     </div>
   );
 }
