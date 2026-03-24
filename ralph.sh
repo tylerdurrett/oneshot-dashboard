@@ -7,6 +7,18 @@
 set -uo pipefail
 # Note: not using set -e — we handle errors explicitly to avoid silent exits.
 
+# Resolve the claude binary — shell aliases aren't expanded in non-interactive scripts.
+# Works on macOS, Linux, and WSL as long as claude is installed normally.
+if command -v claude >/dev/null 2>&1; then
+  CLAUDE="claude"
+elif [ -x "${HOME}/.claude/local/claude" ]; then
+  CLAUDE="${HOME}/.claude/local/claude"
+else
+  echo "Error: 'claude' CLI not found on PATH or at ~/.claude/local/claude."
+  echo "Install Claude Code or add it to your PATH."
+  exit 1
+fi
+
 if [ -z "${1:-}" ]; then
   echo "Usage: $0 <plan-file> [max-iterations] [extra-instructions] [--stop-on-manual-test]"
   echo "  plan-file:           Path to the implementation plan (e.g. _dev-tasks/2026-02-08_notion/01_notion-implementation.md)"
@@ -99,7 +111,7 @@ run_claude_streaming() {
   > "$tmpfile"
 
   # Run claude with streaming. --verbose is required for stream-json.
-  claude "$@" --output-format stream-json --verbose \
+  "$CLAUDE" "$@" --output-format stream-json --verbose \
     | tee "$tmpfile" \
     | jq --unbuffered -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text' 2>/dev/null \
     || true
@@ -107,7 +119,7 @@ run_claude_streaming() {
   # Debug: if tmpfile is empty, claude probably failed
   if [ ! -s "$tmpfile" ]; then
     echo "[ralph] Warning: No output from claude. Retrying with json format for diagnostics..."
-    claude "$@" --output-format json 2>&1 | tee "$tmpfile" || true
+    "$CLAUDE" "$@" --output-format json 2>&1 | tee "$tmpfile" || true
   fi
 }
 
