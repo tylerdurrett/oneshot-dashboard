@@ -857,3 +857,24 @@ These are things we learned by breaking them. Save yourself the pain.
 20. **Multiple callers can race into destructive sandbox recovery.** If two code paths (health loop + job preflight, or two concurrent jobs) independently conclude a sandbox is missing, they can both do `rm → create` simultaneously. One caller deletes the sandbox while the other is mid-exec inside it. Use per-sandbox locks or a join pattern for destructive operations so concurrent callers share one recovery cycle instead of racing.
 
 21. **When adding failure/recovery paths, verify user-facing reporting.** A backend that catches errors, logs them, and retries is only half the fix. If the error message isn't persisted to the run/job record, dashboards and status UIs show empty or generic failure panels. Thread error messages through your full stack: catch block → data store → API response → UI component.
+
+---
+
+## 19. Implementation in This Repo
+
+This repo implements the patterns documented above. Here's where to find each one:
+
+| Pattern | Location |
+|---------|----------|
+| Keychain read + refresh token stripping | `apps/server/src/services/credentials.ts` — `readKeychainCredentials()`, `stripRefreshToken()` |
+| Atomic credential injection | `apps/server/src/services/credentials.ts` — `injectCredentials()` |
+| Host token freshness check | `apps/server/src/services/credentials.ts` — `ensureHostTokenFresh()` |
+| Full injection pipeline | `apps/server/src/services/credentials.ts` — `refreshAndInjectCredentials()` |
+| Inject-on-failure (preflight) | `apps/server/src/services/sandbox.ts` — `preflightCheck()` |
+| Auth recovery during invocation | `apps/server/src/services/sandbox.ts` — `runInvocation()` auth error handler |
+| Circuit breaker | `apps/server/src/services/sandbox.ts` — `isCircuitOpen()`, `recordHealAttempt()` |
+| Background credential sweep | `apps/server/src/index.ts` — `runCredentialSweep()`, `startCredentialSweep()` |
+| Setup script with Keychain injection | `scripts/sandbox-auth.mjs` — `tryKeychainInjection()` |
+| Health endpoint with injection status | `apps/server/src/index.ts` — `GET /health` |
+
+Configuration values (timeouts, thresholds, sweep interval) are in `apps/server/src/config.ts` and can be overridden via environment variables.

@@ -22,6 +22,10 @@ describe('GET /health', () => {
     const body = response.json();
     expect(body.status).toBe('ok');
     expect(body.sandbox.status).toBe('unknown');
+    expect(body.credentialInjection).toEqual({
+      available: expect.any(Boolean),
+      lastSweep: null,
+    });
 
     await server.close();
   });
@@ -46,6 +50,34 @@ describe('GET /health', () => {
     expect(body.sandbox.status).toBe('healthy');
 
     await server.close();
+  });
+
+  it('returns lastSweep timestamp after credential sweep runs', async () => {
+    mockPlatform('darwin');
+    const creds = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'tok',
+        expiresAt: Date.now() + 3_600_000,
+      },
+    });
+    const server = buildServer({
+      logger: false,
+      spawnFn: createRoutingSpawn({
+        security: { stdout: creds, exitCode: 0 },
+        docker: { exitCode: 0 },
+      }),
+    });
+    try {
+      await server.runCredentialSweep();
+
+      const response = await server.inject({ method: 'GET', url: '/health' });
+      const body = response.json();
+      expect(body.credentialInjection.available).toBe(true);
+      expect(body.credentialInjection.lastSweep).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    } finally {
+      await server.close();
+      restorePlatform();
+    }
   });
 
   it('returns sandbox unavailable status after failed probe', async () => {

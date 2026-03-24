@@ -320,6 +320,12 @@ scripts/
 - [ ] Test `pnpm sandbox` after `security delete-generic-password -s "Claude Code-credentials"` (should fall back to browser)
 - [ ] Verify auth status after both paths shows `firstParty` OAuth
 
+> **Manual test steps:**
+> 1. Ensure Docker Desktop is running and a sandbox exists: `docker sandbox ls`
+> 2. **Test injection path:** Run `pnpm sandbox`. Expected: "Trying Keychain credential injection..." → "✓ Credentials injected from Keychain" → "✓ Sandbox ready" with no browser window.
+> 3. **Test fallback path:** Run `security delete-generic-password -s "Claude Code-credentials"` then `pnpm sandbox`. Expected: "No Keychain credentials found" → browser opens for interactive login → "✓ Sandbox ready" after completing login.
+> 4. **Verify auth:** After each path, run `docker sandbox exec -w $(pwd) oneshot-sandbox claude auth status --json` and confirm `loggedIn: true` and `apiProvider: "firstParty"`.
+
 **Acceptance Criteria:**
 - Both paths (injection and interactive) result in a healthy, authenticated sandbox
 
@@ -331,8 +337,10 @@ scripts/
 
 ### 7.1 Enrich Health Endpoint
 
-- [ ] Expand the `/health` response to include `credentialInjection: { available: boolean, lastSweep: string | null }` sourced from a module-level timestamp updated by the credential sweep
-- [ ] Update startup log messages to suggest `pnpm sandbox` (Keychain injection) instead of `docker sandbox exec -it ... claude` for auth recovery
+- [x] Expand the `/health` response to include `credentialInjection: { available: boolean, lastSweep: string | null }` sourced from a module-level timestamp updated by the credential sweep
+- [x] Update startup log messages to suggest `pnpm sandbox` (Keychain injection) instead of `docker sandbox exec -it ... claude` for auth recovery
+
+> **Notes:** Added `lastCredentialSweep` timestamp (ISO 8601 string) to `buildServer` scope, updated on every sweep run (success or failure). Imported `isMacOS` from credentials service for the `available` flag. Startup logs were already updated to `pnpm sandbox` in Phase 5. Added 1 new test verifying the `lastSweep` timestamp format after a sweep, plus updated the existing "unknown probe" test to assert the `credentialInjection` shape. All 135 tests pass.
 
 **Acceptance Criteria:**
 - `/health` response includes credential injection availability and last sweep timestamp
@@ -340,9 +348,11 @@ scripts/
 
 ### 7.2 Update Documentation
 
-- [ ] Update `docs/_reference/docker-sandbox-claude_UPDATED.md` with a section noting this repo's implementation of the patterns
-- [ ] Add inline comments in `credentials.ts` referencing guide sections for each pattern (e.g., "See guide Section 3: inject-before-check pattern")
-- [ ] Run full test suite: `pnpm --filter @repo/server test`
+- [x] Update `docs/_reference/docker-sandbox-claude_UPDATED.md` with a section noting this repo's implementation of the patterns
+- [x] Add inline comments in `credentials.ts` referencing guide sections for each pattern (e.g., "See guide Section 3: inject-before-check pattern")
+- [x] Run full test suite: `pnpm --filter @repo/server test`
+
+> **Notes:** Added Section 19 ("Implementation in This Repo") to the reference guide with a table mapping each pattern to its file and function. Diverged from plan on inline comments: code review flagged "See guide Section N" references as fragile (section numbers go stale on doc reorganization), so these were removed. The existing JSDoc comments already explain the "why" sufficiently. All 135 tests pass.
 
 **Acceptance Criteria:**
 - Documentation reflects the new auth capabilities

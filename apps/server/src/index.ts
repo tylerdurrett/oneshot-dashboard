@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
-import { refreshAndInjectCredentials } from './services/credentials.js';
+import { isMacOS, refreshAndInjectCredentials } from './services/credentials.js';
 import {
   probeSandbox,
   type SandboxProbeResult,
@@ -28,6 +28,8 @@ export function buildServer(opts?: BuildServerOptions) {
   });
 
   let sandboxStatus: SandboxProbeResult | null = null;
+  let lastCredentialSweep: string | null = null;
+  const credentialInjectionAvailable = isMacOS();
 
   // @fastify/cors v11 defaults to GET,HEAD,POST only — explicitly allow DELETE for thread deletion
   server.register(cors, {
@@ -42,6 +44,10 @@ export function buildServer(opts?: BuildServerOptions) {
       sandbox: sandboxStatus
         ? { status: sandboxStatus.status, message: sandboxStatus.message }
         : { status: 'unknown', message: 'Sandbox probe has not run yet' },
+      credentialInjection: {
+        available: credentialInjectionAvailable,
+        lastSweep: lastCredentialSweep,
+      },
     };
   });
 
@@ -71,6 +77,7 @@ export function buildServer(opts?: BuildServerOptions) {
   async function runCredentialSweep(): Promise<void> {
     try {
       const result = await refreshAndInjectCredentials(opts?.spawnFn);
+      lastCredentialSweep = new Date().toISOString();
       if (result.ok) {
         server.log.info('Credential sweep: injection succeeded');
       } else {
