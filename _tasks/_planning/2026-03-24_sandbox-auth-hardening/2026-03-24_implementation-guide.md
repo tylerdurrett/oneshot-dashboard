@@ -136,15 +136,17 @@ scripts/
 
 ### 3.1 Add Preflight to Sandbox Service
 
-- [ ] Add `PreflightResult` type to `apps/server/src/services/sandbox.ts`: `{ ok: boolean, status: SandboxStatus, message: string, recoveryAttempted: boolean }`
-- [ ] Implement `preflightCheck(spawnFn?)` in `sandbox.ts`:
+- [x] Add `PreflightResult` type to `apps/server/src/services/sandbox.ts`: `{ ok: boolean, status: SandboxStatus, message: string, recoveryAttempted: boolean }`
+- [x] Implement `preflightCheck(spawnFn?)` in `sandbox.ts`:
   1. Call existing `probeSandbox(spawnFn)` (no injection — fast path)
   2. If `healthy`, return `{ ok: true, ... }`
   3. If `auth_failed`, attempt recovery: call `refreshAndInjectCredentials(spawnFn)`, then re-probe
   4. If recovery succeeds (re-probe healthy), return `{ ok: true, recoveryAttempted: true, ... }`
   5. If recovery fails or re-probe still unhealthy, return `{ ok: false, ... }`
   6. If `unavailable`, return `{ ok: false, ... }` immediately (can't fix missing sandbox at runtime)
-- [ ] Import `refreshAndInjectCredentials` from `./credentials.js`
+- [x] Import `refreshAndInjectCredentials` from `./credentials.js`
+
+> **Notes:** Implementation follows plan exactly. Added a "why" comment explaining that only `auth_failed` warrants recovery (unavailable = infrastructure problem, not fixable by injection). On injection failure, the error message includes the credential phase for diagnostics. All 116 existing tests pass.
 
 **Acceptance Criteria:**
 - Healthy sandbox: preflight returns ok with no injection (fast path)

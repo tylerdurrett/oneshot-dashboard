@@ -1,6 +1,7 @@
 import { spawn as defaultSpawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { config } from '../config.js';
+import { refreshAndInjectCredentials } from './credentials.js';
 
 /** Possible states a sandbox probe can return. */
 export type SandboxStatus = 'healthy' | 'auth_failed' | 'unavailable';
@@ -10,6 +11,14 @@ export interface SandboxProbeResult {
   status: SandboxStatus;
   /** Human-readable explanation of what happened. */
   message: string;
+}
+
+/** Structured result from a preflight check with optional auth recovery. */
+export interface PreflightResult {
+  ok: boolean;
+  status: SandboxStatus;
+  message: string;
+  recoveryAttempted: boolean;
 }
 
 /** Minimal interface for the spawn function dependency (for DI in tests). */
@@ -199,6 +208,50 @@ export async function probeSandbox(
       });
     });
   });
+}
+
+/**
+ * Preflight check: probe the sandbox, and if auth has failed, attempt
+ * credential injection recovery before giving up. Returns immediately
+ * for healthy or unavailable sandboxes (no injection overhead on the happy path).
+ */
+export async function preflightCheck(
+  spawnFn: SpawnFn = defaultSpawn,
+): Promise<PreflightResult> {
+  const probe = await probeSandbox(spawnFn);
+
+  if (probe.status === 'healthy') {
+    return { ok: true, status: 'healthy', message: probe.message, recoveryAttempted: false };
+  }
+
+  if (probe.status === 'unavailable') {
+    return { ok: false, status: 'unavailable', message: probe.message, recoveryAttempted: false };
+  }
+
+  // Only auth_failed warrants recovery — unavailable means infrastructure is missing,
+  // not fixable by credential injection.
+  const injection = await refreshAndInjectCredentials(spawnFn);
+  if (!injection.ok) {
+    return {
+      ok: false,
+      status: 'auth_failed',
+      message: `Auth recovery failed during ${injection.phase}: ${injection.message}`,
+      recoveryAttempted: true,
+    };
+  }
+
+  // Re-probe after injection to confirm recovery worked
+  const reProbe = await probeSandbox(spawnFn);
+  if (reProbe.status === 'healthy') {
+    return { ok: true, status: 'healthy', message: reProbe.message, recoveryAttempted: true };
+  }
+
+  return {
+    ok: false,
+    status: reProbe.status,
+    message: `Auth recovery injected credentials but sandbox still unhealthy: ${reProbe.message}`,
+    recoveryAttempted: true,
+  };
 }
 
 // ---------------------------------------------------------------------------
