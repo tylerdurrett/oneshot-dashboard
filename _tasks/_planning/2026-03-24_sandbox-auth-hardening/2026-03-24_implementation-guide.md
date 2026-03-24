@@ -156,8 +156,8 @@ scripts/
 
 ### 3.2 Wire Preflight into Chat Handler
 
-- [ ] In `apps/server/src/routes/chat.ts`, import `preflightCheck` from `../services/sandbox.js`
-- [ ] In `handleChatMessage`, before the existing `invokeClaude` call (before "Step 5: Set streaming lock"), add a preflight step:
+- [x] In `apps/server/src/routes/chat.ts`, import `preflightCheck` from `../services/sandbox.js`
+- [x] In `handleChatMessage`, before the existing `invokeClaude` call (before "Step 5: Set streaming lock"), add a preflight step:
   ```
   const preflight = await preflightCheck(spawnFn);
   if (!preflight.ok) {
@@ -165,7 +165,9 @@ scripts/
     return;
   }
   ```
-- [ ] Pass `spawnFn` through the handler chain (it's already available as a parameter)
+- [x] Pass `spawnFn` through the handler chain (it's already available as a parameter)
+
+> **Notes:** Diverged from plan: moved preflight to Step 2 (right after thread validation, before message persist) instead of Step 5 (before streaming lock). This prevents orphaned user messages when preflight fails — if the sandbox is down, no DB writes occur, so retries don't create duplicate messages or consume title-generation logic. Added `withHealthyPreflight` test helper to `helpers.ts` so existing chat-routes tests pass — it wraps any SpawnFn to intercept auth-status probes while passing Claude invocations through. All 116 tests pass.
 
 **Acceptance Criteria:**
 - Chat messages are blocked with a clear error when the sandbox is not ready

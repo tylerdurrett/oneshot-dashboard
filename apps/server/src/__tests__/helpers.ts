@@ -86,6 +86,28 @@ export function createRoutingSpawn(
   }) as unknown as SpawnFn;
 }
 
+/**
+ * Wrap any SpawnFn so that preflight auth-status probes (`claude auth status --json`)
+ * return a healthy response, while all other spawns pass through to the inner function.
+ * Useful for chat-routes tests that already mock invokeClaude but now also need to
+ * satisfy the preflightCheck added before each Claude invocation.
+ */
+export function withHealthyPreflight(innerSpawnFn: SpawnFn): SpawnFn {
+  const healthyAuth = JSON.stringify({
+    loggedIn: true,
+    authMethod: 'firstPartyOauth',
+    apiProvider: 'firstParty',
+  }) + '\n';
+  const healthySpawn = createFakeSpawn({ stdout: healthyAuth, exitCode: 0 });
+
+  return ((command: string, args: string[], ...rest: unknown[]) => {
+    if (args.includes('auth') && args.includes('status')) {
+      return healthySpawn(command, args);
+    }
+    return innerSpawnFn(command, args, ...(rest as [never]));
+  }) as unknown as SpawnFn;
+}
+
 /** Build multi-line NDJSON stdout from event objects. */
 export function ndjson(...events: Record<string, unknown>[]): string {
   return events.map((e) => JSON.stringify(e)).join('\n') + '\n';

@@ -6,7 +6,7 @@ import { threads, messages } from '@repo/db';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
 import type { SpawnFn } from '../services/sandbox.js';
-import { createFakeSpawn, ndjson } from './helpers.js';
+import { createFakeSpawn, withHealthyPreflight, ndjson } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -104,7 +104,7 @@ describe('chat WebSocket route', () => {
 
   describe('happy path', () => {
     it('streams tokens and sends done after successful Claude invocation', async () => {
-      const spawnFn = createFakeSpawn({
+      const spawnFn = withHealthyPreflight(createFakeSpawn({
         stdout: ndjson(
           {
             type: 'content_block_delta',
@@ -117,7 +117,7 @@ describe('chat WebSocket route', () => {
           { type: 'result', result: 'Hello world', session_id: 'sess-1' },
         ),
         exitCode: 0,
-      });
+      }));
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -145,14 +145,14 @@ describe('chat WebSocket route', () => {
     });
 
     it('persists user and assistant messages to the database', async () => {
-      const spawnFn = createFakeSpawn({
+      const spawnFn = withHealthyPreflight(createFakeSpawn({
         stdout: ndjson({
           type: 'result',
           result: 'Bot reply',
           session_id: 'sess-2',
         }),
         exitCode: 0,
-      });
+      }));
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -186,14 +186,14 @@ describe('chat WebSocket route', () => {
     });
 
     it("updates the thread's claudeSessionId after response", async () => {
-      const spawnFn = createFakeSpawn({
+      const spawnFn = withHealthyPreflight(createFakeSpawn({
         stdout: ndjson({
           type: 'result',
           result: 'ok',
           session_id: 'new-session-abc',
         }),
         exitCode: 0,
-      });
+      }));
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -222,14 +222,14 @@ describe('chat WebSocket route', () => {
 
   describe('thread title auto-generation', () => {
     it('updates thread title from first user message', async () => {
-      const spawnFn = createFakeSpawn({
+      const spawnFn = withHealthyPreflight(createFakeSpawn({
         stdout: ndjson({
           type: 'result',
           result: 'ok',
           session_id: 'sid',
         }),
         exitCode: 0,
-      });
+      }));
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -259,7 +259,7 @@ describe('chat WebSocket route', () => {
     it('does not overwrite title on subsequent messages', async () => {
       // We need a spawnFn that can handle two invocations
       let callCount = 0;
-      const spawnFn = ((_cmd: string, _args: string[]) => {
+      const spawnFn = withHealthyPreflight(((_cmd: string, _args: string[]) => {
         callCount++;
         const inner = createFakeSpawn({
           stdout: ndjson({
@@ -270,7 +270,7 @@ describe('chat WebSocket route', () => {
           exitCode: 0,
         });
         return inner(_cmd, _args);
-      }) as unknown as SpawnFn;
+      }) as unknown as SpawnFn);
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -410,7 +410,7 @@ describe('chat WebSocket route', () => {
       // giving us time to send a second message during streaming.
       let invocationCount = 0;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const spawnFn = ((_cmd: string, _args: string[]) => {
+      const spawnFn = withHealthyPreflight(((_cmd: string, _args: string[]) => {
         invocationCount++;
 
         const child = new EventEmitter();
@@ -446,7 +446,7 @@ describe('chat WebSocket route', () => {
         });
 
         return child;
-      }) as unknown as SpawnFn;
+      }) as unknown as SpawnFn);
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -504,7 +504,7 @@ describe('chat WebSocket route', () => {
       let capturedArgs: string[] = [];
       let callCount = 0;
 
-      const spawnFn = ((cmd: string, args: string[]) => {
+      const spawnFn = withHealthyPreflight(((cmd: string, args: string[]) => {
         callCount++;
         capturedArgs = [...args];
         const inner = createFakeSpawn({
@@ -516,7 +516,7 @@ describe('chat WebSocket route', () => {
           exitCode: 0,
         });
         return inner(cmd, args);
-      }) as unknown as SpawnFn;
+      }) as unknown as SpawnFn);
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -549,7 +549,7 @@ describe('chat WebSocket route', () => {
       const calls: { threadContent: string; args: string[] }[] = [];
       let callCount = 0;
 
-      const spawnFn = ((cmd: string, args: string[]) => {
+      const spawnFn = withHealthyPreflight(((cmd: string, args: string[]) => {
         callCount++;
         // Track which content was sent with which args
         const promptIdx = args.indexOf('-p');
@@ -565,7 +565,7 @@ describe('chat WebSocket route', () => {
           exitCode: 0,
         });
         return inner(cmd, args);
-      }) as unknown as SpawnFn;
+      }) as unknown as SpawnFn);
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -607,7 +607,7 @@ describe('chat WebSocket route', () => {
 
     it('loads full message history for resumed thread via HTTP', async () => {
       let callCount = 0;
-      const spawnFn = ((_cmd: string, _args: string[]) => {
+      const spawnFn = withHealthyPreflight(((_cmd: string, _args: string[]) => {
         callCount++;
         const inner = createFakeSpawn({
           stdout: ndjson({
@@ -618,7 +618,7 @@ describe('chat WebSocket route', () => {
           exitCode: 0,
         });
         return inner(_cmd, _args);
-      }) as unknown as SpawnFn;
+      }) as unknown as SpawnFn);
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();
@@ -662,7 +662,7 @@ describe('chat WebSocket route', () => {
     it('handles resume failure by retrying without --resume', async () => {
       const calls: string[][] = [];
 
-      const spawnFn = ((cmd: string, args: string[]) => {
+      const spawnFn = withHealthyPreflight(((cmd: string, args: string[]) => {
         calls.push([...args]);
         const isResume = args.includes('--resume');
 
@@ -684,7 +684,7 @@ describe('chat WebSocket route', () => {
           exitCode: 0,
         });
         return inner(cmd, args);
-      }) as unknown as SpawnFn;
+      }) as unknown as SpawnFn);
 
       server = buildServer({ logger: false, database: testDb, spawnFn });
       await server.ready();

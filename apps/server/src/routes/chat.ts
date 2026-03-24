@@ -10,6 +10,7 @@ import {
 } from '../services/thread.js';
 import {
   invokeClaude,
+  preflightCheck,
   type SpawnFn,
   type ClaudeResult,
   type InvokeClaudeOptions,
@@ -70,20 +71,28 @@ async function handleChatMessage(
     return;
   }
 
-  // Step 2: Persist the user message
+  // Step 2: Preflight — verify sandbox is healthy before persisting the message,
+  // so a failed preflight doesn't leave orphaned user messages with no response.
+  const preflight = await preflightCheck(spawnFn);
+  if (!preflight.ok) {
+    sendError(socket, `Sandbox not ready: ${preflight.message}`);
+    return;
+  }
+
+  // Step 3: Persist the user message
   await addMessage(threadId, 'user', content, db);
 
-  // Step 3: Auto-generate title on first message
+  // Step 4: Auto-generate title on first message
   const existingMessages = await getThreadMessages(threadId, db);
   if (existingMessages.length === 1) {
     const title = generateTitle(content);
     await updateThreadTitle(threadId, title, db);
   }
 
-  // Step 4: Look up claudeSessionId
+  // Step 5: Look up claudeSessionId
   const sessionId = thread.claudeSessionId ?? undefined;
 
-  // Step 5: Set streaming lock and invoke Claude
+  // Step 6: Set streaming lock and invoke Claude
   setStreaming(true);
 
   const invokeOpts: InvokeClaudeOptions = { prompt: content, sessionId };
