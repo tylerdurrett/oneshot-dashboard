@@ -20,7 +20,7 @@ if (!fs.existsSync(configPath)) {
   } else {
     console.log('');
     console.log('  Tip: Run `pnpm hello` to pick a custom port.');
-    console.log('  Starting on the default port (3000) for now.');
+    console.log('  Starting on the default port (4900) for now.');
     console.log('');
   }
 }

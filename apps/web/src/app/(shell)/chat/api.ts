@@ -23,7 +23,7 @@ export interface ThreadMessage {
 // ---------------------------------------------------------------------------
 
 function getBaseUrl(): string {
-  const port = process.env.NEXT_PUBLIC_SERVER_PORT ?? '3002';
+  const port = process.env.NEXT_PUBLIC_SERVER_PORT ?? '4902';
   return `http://localhost:${port}`;
 }
 

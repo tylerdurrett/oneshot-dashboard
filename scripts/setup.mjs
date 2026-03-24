@@ -31,7 +31,7 @@ function isPortAvailable(port) {
   });
 }
 
-async function findAvailablePort(start = 3000, step = 100, maxAttempts = 20) {
+async function findAvailablePort(start = 4900, step = 100, maxAttempts = 20) {
   const unavailable = [];
   for (let i = 0; i < maxAttempts; i++) {
     const port = start + i * step;
@@ -65,7 +65,7 @@ const steps = [
       const { port: suggested, unavailable } = await findAvailablePort();
 
       if (suggested === null) {
-        console.log('  Could not find an open port in the 3000\u20134900 range.');
+        console.log('  Could not find an open port in the 4900\u20136800 range.');
         console.log('  You can enter any port number.\n');
       } else if (unavailable.length > 0) {
         console.log(
@@ -75,7 +75,7 @@ const steps = [
         console.log(`  Port ${suggested} is available.\n`);
       }
 
-      const defaultPort = suggested ?? 3000;
+      const defaultPort = suggested ?? 4900;
       const answer = await ask(
         rl,
         `  Which port should the dev server use? [${defaultPort}] `,

@@ -12,7 +12,7 @@ try {
   );
   Config.setStudioPort(config.port + 1);
 } catch {
-  Config.setStudioPort(3001);
+  Config.setStudioPort(4901);
 }
 
 Config.setShouldOpenBrowser(false);

@@ -25,8 +25,8 @@ test('readDevPortFromConfig falls back to default for missing/invalid config', (
 
   fs.writeFileSync(invalidConfigPath, JSON.stringify({ port: 'not-a-number' }));
 
-  assert.equal(readDevPortFromConfig(missingConfigPath), 3000);
-  assert.equal(readDevPortFromConfig(invalidConfigPath), 3000);
+  assert.equal(readDevPortFromConfig(missingConfigPath), 4900);
+  assert.equal(readDevPortFromConfig(invalidConfigPath), 4900);
 });
 
 test('getTargetPorts includes web, studio, and server ports', () => {

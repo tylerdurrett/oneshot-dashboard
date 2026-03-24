@@ -6,9 +6,9 @@ function getServerPort(): number {
   try {
     const configPath = resolve(import.meta.dirname, '../../project.config.json');
     const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    return config.serverPort ?? (config.port ? config.port + 2 : 3002);
+    return config.serverPort ?? (config.port ? config.port + 2 : 4902);
   } catch {
-    return 3002;
+    return 4902;
   }
 }
 

@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const defaultPort = 3000;
+const defaultPort = 4900;
 const signalWaitMs = 750;
 
 export function readDevPortFromConfig(configPath) {

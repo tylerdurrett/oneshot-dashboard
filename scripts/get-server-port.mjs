@@ -10,8 +10,8 @@ try {
   const config = JSON.parse(
     fs.readFileSync(path.join(root, 'project.config.json'), 'utf8'),
   );
-  const serverPort = config.serverPort ?? (config.port ? config.port + 2 : 3002);
+  const serverPort = config.serverPort ?? (config.port ? config.port + 2 : 4902);
   process.stdout.write(String(serverPort));
 } catch {
-  process.stdout.write('3002');
+  process.stdout.write('4902');
 }

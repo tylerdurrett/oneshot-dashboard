@@ -92,7 +92,7 @@ describe('useChatSocket', () => {
     renderHook(() => useChatSocket());
 
     expect(MockWebSocket.instances).toHaveLength(1);
-    expect(getLastWs().url).toBe('ws://localhost:3002/chat');
+    expect(getLastWs().url).toBe('ws://localhost:4902/chat');
   });
 
   it('sets connectionStatus to connected on open', async () => {

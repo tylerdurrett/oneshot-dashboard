@@ -12,5 +12,5 @@ try {
   );
   process.stdout.write(String(config.port));
 } catch {
-  process.stdout.write('3000');
+  process.stdout.write('4900');
 }

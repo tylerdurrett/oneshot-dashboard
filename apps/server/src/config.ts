@@ -17,15 +17,15 @@ function readProjectConfig(): ProjectConfig {
       'utf8',
     );
     const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return { port: 3000 };
+    if (typeof parsed !== 'object' || parsed === null) return { port: 4900 };
     const obj = parsed as Record<string, unknown>;
     return {
-      port: typeof obj.port === 'number' ? obj.port : 3000,
+      port: typeof obj.port === 'number' ? obj.port : 4900,
       serverPort:
         typeof obj.serverPort === 'number' ? obj.serverPort : undefined,
     };
   } catch {
-    return { port: 3000 };
+    return { port: 4900 };
   }
 }
 

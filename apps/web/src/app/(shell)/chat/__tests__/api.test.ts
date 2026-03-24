@@ -123,7 +123,7 @@ describe('createThread', () => {
     await createThread();
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('http://localhost:3002/threads'),
+      expect.stringContaining('http://localhost:4902/threads'),
       expect.any(Object),
     );
   });
