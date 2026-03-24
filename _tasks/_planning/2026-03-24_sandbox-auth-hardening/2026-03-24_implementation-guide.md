@@ -257,13 +257,15 @@ scripts/
 
 ### 5.1 Credential Sweep Lifecycle
 
-- [ ] In `apps/server/src/index.ts`, import `refreshAndInjectCredentials` from `./services/credentials.js`
-- [ ] Add sweep setup after server listen (inside the `!process.env.VITEST` block):
+- [x] In `apps/server/src/index.ts`, import `refreshAndInjectCredentials` from `./services/credentials.js`
+- [x] Add sweep setup after server listen (inside the `!process.env.VITEST` block):
   1. Run initial `refreshAndInjectCredentials()` alongside the existing `runSandboxProbe()` (non-blocking)
   2. If `config.credentialSweepEnabled`, start a `setInterval` calling `refreshAndInjectCredentials()` every `config.credentialSweepIntervalMs`
   3. Log success/failure at each sweep
-- [ ] Add graceful shutdown: `server.addHook('onClose', ...)` clears the interval
-- [ ] Expose `stopCredentialSweep()` on the server object (same pattern as `runSandboxProbe`) for testability
+- [x] Add graceful shutdown: `server.addHook('onClose', ...)` clears the interval
+- [x] Expose `stopCredentialSweep()` on the server object (same pattern as `runSandboxProbe`) for testability
+
+> **Notes:** Also exposed `runCredentialSweep` and `startCredentialSweep` on the server object for testability. The `onClose` hook uses a synchronous callback (not `async`) since `stopCredentialSweep` is synchronous. Updated the auth-failed startup log to suggest `pnpm sandbox` instead of the raw `docker sandbox exec` command, matching the new Keychain injection workflow. Initial sweep runs in `Promise.all` alongside `runSandboxProbe` for concurrent startup.
 
 **Acceptance Criteria:**
 - Credential sweep runs on startup and then every 4 hours (configurable)
@@ -273,11 +275,13 @@ scripts/
 
 ### 5.2 Sweep Tests
 
-- [ ] Add tests in `apps/server/src/__tests__/health.test.ts` (or a new `credential-sweep.test.ts` if cleaner):
+- [x] Add tests in `apps/server/src/__tests__/health.test.ts` (or a new `credential-sweep.test.ts` if cleaner):
   - Verify sweep calls `refreshAndInjectCredentials` with the server's spawnFn
   - Verify `stopCredentialSweep` prevents further calls
   - Verify sweep error doesn't propagate (server stays up)
-- [ ] Run `pnpm --filter @repo/server test`
+- [x] Run `pnpm --filter @repo/server test`
+
+> **Notes:** Added 5 tests in `health.test.ts`: successful sweep, failed sweep (no throw), `startCredentialSweep` recurring calls, `stopCredentialSweep` prevents calls, and `onClose` hook cleanup. Extracted `createCountingSpawn` helper to avoid 3× inline duplication of the tracking spawn pattern. Used `config.credentialSweepIntervalMs` constant instead of hardcoded `14_400_000`. All 134 tests pass.
 
 **Acceptance Criteria:**
 - Sweep lifecycle tested (start, stop, error handling)

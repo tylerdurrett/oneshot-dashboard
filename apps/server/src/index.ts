@@ -7,6 +7,7 @@ import { config } from './config.js';
 import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
+import { refreshAndInjectCredentials } from './services/credentials.js';
 import {
   probeSandbox,
   type SandboxProbeResult,
@@ -62,7 +63,49 @@ export function buildServer(opts?: BuildServerOptions) {
     return result;
   }
 
-  return Object.assign(server, { runSandboxProbe });
+  // -- Credential sweep lifecycle --
+
+  let sweepIntervalId: ReturnType<typeof setInterval> | null = null;
+
+  /** Run a single credential sweep. Logs result but never throws. */
+  async function runCredentialSweep(): Promise<void> {
+    try {
+      const result = await refreshAndInjectCredentials(opts?.spawnFn);
+      if (result.ok) {
+        server.log.info('Credential sweep: injection succeeded');
+      } else {
+        server.log.warn(`Credential sweep: ${result.phase} — ${result.message}`);
+      }
+    } catch (err) {
+      server.log.error(`Credential sweep unexpected error: ${err}`);
+    }
+  }
+
+  function startCredentialSweep(): void {
+    if (sweepIntervalId) return;
+    sweepIntervalId = setInterval(
+      () => void runCredentialSweep(),
+      config.credentialSweepIntervalMs,
+    );
+  }
+
+  function stopCredentialSweep(): void {
+    if (sweepIntervalId) {
+      clearInterval(sweepIntervalId);
+      sweepIntervalId = null;
+    }
+  }
+
+  server.addHook('onClose', () => {
+    stopCredentialSweep();
+  });
+
+  return Object.assign(server, {
+    runSandboxProbe,
+    runCredentialSweep,
+    startCredentialSweep,
+    stopCredentialSweep,
+  });
 }
 
 // Start the server when this file is run directly (not imported in tests)
@@ -92,20 +135,31 @@ if (!process.env.VITEST) {
       process.exit(1);
     }
 
-    // Probe sandbox after server is listening (non-blocking to startup)
-    const result = await server.runSandboxProbe();
+    // Probe sandbox and run initial credential sweep in parallel (non-blocking)
+    const [result] = await Promise.all([
+      server.runSandboxProbe(),
+      server.runCredentialSweep(),
+    ]);
 
     if (result.status === 'healthy') {
       server.log.info(result.message);
     } else if (result.status === 'auth_failed') {
       server.log.warn(result.message);
       server.log.warn(
-        `To authenticate: docker sandbox exec -it ${config.sandboxName} claude`,
+        `To fix: pnpm sandbox`,
       );
     } else {
       server.log.warn(result.message);
       server.log.warn(
         `To create sandbox: docker sandbox run --name ${config.sandboxName} claude ${config.sandboxWorkspace}`,
+      );
+    }
+
+    // Start recurring credential sweep if enabled
+    if (config.credentialSweepEnabled) {
+      server.startCredentialSweep();
+      server.log.info(
+        `Credential sweep started (interval: ${config.credentialSweepIntervalMs}ms)`,
       );
     }
   });
