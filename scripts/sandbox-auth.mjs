@@ -56,6 +56,63 @@ function checkAuthStatus(name, workspace) {
   }
 }
 
+// ── Keychain Injection ───────────────────────────────────
+
+/**
+ * Try to inject credentials from the macOS Keychain into the sandbox.
+ * Returns true on success, false on any failure (non-macOS, no keychain entry, etc.).
+ * This lets returning users skip the interactive browser login entirely.
+ */
+function tryKeychainInjection(name) {
+  if (process.platform !== 'darwin') return false;
+
+  console.log('  Trying Keychain credential injection...');
+
+  let raw;
+  try {
+    raw = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
+      stdio: 'pipe',
+      timeout: 10_000,
+    }).toString().trim();
+  } catch {
+    console.log('  No Keychain credentials found (first-time setup).');
+    return false;
+  }
+
+  let creds;
+  try {
+    creds = JSON.parse(raw);
+  } catch {
+    console.log('  Keychain credentials are not valid JSON.');
+    return false;
+  }
+
+  if (creds.claudeAiOauth && typeof creds.claudeAiOauth === 'object') {
+    delete creds.claudeAiOauth.refreshToken;
+  }
+
+  // Atomic write: stage to /tmp then mv to avoid partial reads
+  const atomicWriteCmd = [
+    'cat > /tmp/.creds-staging',
+    'mv /tmp/.creds-staging /home/agent/.claude/.credentials.json',
+    'chmod 600 /home/agent/.claude/.credentials.json',
+  ].join(' && ');
+
+  const result = spawnSync(
+    'docker',
+    ['sandbox', 'exec', '-i', name, 'sh', '-c', atomicWriteCmd],
+    { input: JSON.stringify(creds), stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 },
+  );
+
+  if (result.status !== 0) {
+    console.log('  Credential injection failed.');
+    return false;
+  }
+
+  console.log('  ✓ Credentials injected from Keychain');
+  return true;
+}
+
 // ── Actions ─────────────────────────────────────────────
 
 function createAndAuth(name, workspace) {
@@ -99,6 +156,18 @@ function reauth(name, workspace) {
   }
 }
 
+function reauthOrDie(name, workspace) {
+  reauth(name, workspace);
+  console.log('');
+
+  const status = checkAuthStatus(name, workspace);
+  if (!status.loggedIn) {
+    console.log('  ✗ Still not logged in. Try running `pnpm sandbox` again.');
+    console.log('');
+    process.exit(1);
+  }
+}
+
 // ── Main ────────────────────────────────────────────────
 
 function main() {
@@ -136,18 +205,19 @@ function main() {
 
   if (!status.loggedIn) {
     if (exists) {
-      // Sandbox exists but not logged in — open interactive login
+      // Sandbox exists but not logged in — try Keychain injection first
       console.log('  Sandbox exists but is not logged in.');
       console.log('');
-      reauth(name, workspace);
-      console.log('');
 
-      // Re-check after login
-      const recheck = checkAuthStatus(name, workspace);
-      if (!recheck.loggedIn) {
-        console.log('  ✗ Still not logged in. Try running `pnpm sandbox` again.');
-        console.log('');
-        process.exit(1);
+      const injected = tryKeychainInjection(name);
+      const keychainWorked = injected && checkAuthStatus(name, workspace).loggedIn;
+
+      if (!keychainWorked) {
+        if (injected) {
+          console.log('  Injected credentials did not restore auth. Falling back to browser login.');
+          console.log('');
+        }
+        reauthOrDie(name, workspace);
       }
     } else {
       console.log('  ✗ Login was not completed. Run `pnpm sandbox` again to retry.');

@@ -295,16 +295,18 @@ scripts/
 
 ### 6.1 Add Keychain Injection to sandbox-auth.mjs
 
-- [ ] Add `tryKeychainInjection(name, workspace)` function to `scripts/sandbox-auth.mjs`:
+- [x] Add `tryKeychainInjection(name, workspace)` function to `scripts/sandbox-auth.mjs`:
   1. Run `security find-generic-password -s "Claude Code-credentials" -w` via `execSync`
   2. If Keychain entry exists, `JSON.parse` it, `delete creds.claudeAiOauth?.refreshToken`
   3. Pipe stripped JSON into `docker sandbox exec -i <name>` using the atomic write pattern
   4. Return `true` on success, `false` on any failure
-- [ ] Guard on `process.platform === 'darwin'` — return `false` on non-macOS
-- [ ] In `main()`, after step 2 (sandbox exists check), try injection before interactive login:
+- [x] Guard on `process.platform === 'darwin'` — return `false` on non-macOS
+- [x] In `main()`, after step 2 (sandbox exists check), try injection before interactive login:
   - If sandbox exists but not authed → try `tryKeychainInjection()` → if success, re-check auth → if good, skip interactive login
   - If sandbox doesn't exist → create it, then try injection instead of relying on the interactive session for auth
-- [ ] Keep interactive login as fallback when injection fails or Keychain is empty
+- [x] Keep interactive login as fallback when injection fails or Keychain is empty
+
+> **Notes:** Diverged from plan in two ways: (1) `tryKeychainInjection` takes only `name` (not `workspace`) since `docker sandbox exec -i` doesn't need a workspace path — only the sandbox name. (2) For the "sandbox doesn't exist" case, we keep the existing `createAndAuth()` flow unchanged — `docker sandbox run` is the only creation mechanism and inherently opens an interactive session, so injection only applies to the "exists but not authed" path. Extracted `reauthOrDie(name, workspace)` helper per code review to eliminate duplicated reauth-recheck-exit sequences. Added `.trim()` to keychain output for defensive parsing. All 134 tests pass.
 
 **Acceptance Criteria:**
 - `pnpm sandbox` succeeds without opening a browser when host has valid Keychain credentials
