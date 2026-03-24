@@ -6,9 +6,10 @@ import { threads, messages } from '@repo/db';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
 import type { SpawnFn } from '../services/sandbox.js';
+import { createFakeSpawn, ndjson } from './helpers.js';
 
 // ---------------------------------------------------------------------------
-// Test helpers (same patterns as sandbox.test.ts and threads-routes.test.ts)
+// Test helpers
 // ---------------------------------------------------------------------------
 
 /** Create a fresh in-memory database with the schema applied. */
@@ -35,56 +36,6 @@ function createTestDb(): Database {
   `);
 
   return testDb as unknown as Database;
-}
-
-interface FakeSpawnOptions {
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number;
-  error?: Error;
-  hang?: boolean;
-}
-
-function createFakeSpawn(options: FakeSpawnOptions): SpawnFn {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  return ((_command: string, _args: string[]) => {
-    const child = new EventEmitter();
-    const stdoutEmitter = new EventEmitter();
-    const stderrEmitter = new EventEmitter();
-
-    Object.assign(child, {
-      stdout: stdoutEmitter,
-      stderr: stderrEmitter,
-      kill: () => {
-        process.nextTick(() => child.emit('close', null));
-      },
-    });
-
-    process.nextTick(() => {
-      if (options.error) {
-        child.emit('error', options.error);
-        return;
-      }
-
-      if (options.hang) {
-        return;
-      }
-
-      if (options.stdout)
-        stdoutEmitter.emit('data', Buffer.from(options.stdout));
-      if (options.stderr)
-        stderrEmitter.emit('data', Buffer.from(options.stderr));
-
-      child.emit('close', options.exitCode ?? 0);
-    });
-
-    return child;
-  }) as unknown as SpawnFn;
-}
-
-/** Build multi-line NDJSON stdout from event objects. */
-function ndjson(...events: Record<string, unknown>[]): string {
-  return events.map((e) => JSON.stringify(e)).join('\n') + '\n';
 }
 
 /** Parse a WebSocket message buffer as JSON. */

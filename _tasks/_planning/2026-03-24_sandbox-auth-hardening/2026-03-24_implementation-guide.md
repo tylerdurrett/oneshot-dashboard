@@ -42,11 +42,13 @@ scripts/
 
 ### 1.1 Extract Shared Test Helpers
 
-- [ ] Create `apps/server/src/__tests__/helpers.ts`
-- [ ] Move `FakeSpawnOptions`, `createFakeSpawn`, and `ndjson` helper from `sandbox.test.ts` into the shared file
-- [ ] Add a new `createRoutingSpawn(routes: Record<string, FakeSpawnOptions>)` helper that returns different responses based on the command (needed to mock both `security` and `docker` in the same test)
-- [ ] Update `sandbox.test.ts` and `chat-routes.test.ts` to import from `./helpers.js`
-- [ ] Run `pnpm --filter @repo/server test` — all existing tests still pass
+- [x] Create `apps/server/src/__tests__/helpers.ts`
+- [x] Move `FakeSpawnOptions`, `createFakeSpawn`, and `ndjson` helper from `sandbox.test.ts` into the shared file
+- [x] Add a new `createRoutingSpawn(routes: Record<string, FakeSpawnOptions>)` helper that returns different responses based on the command (needed to mock both `security` and `docker` in the same test)
+- [x] Update `sandbox.test.ts` and `chat-routes.test.ts` to import from `./helpers.js`
+- [x] Run `pnpm --filter @repo/server test` — all existing tests still pass
+
+> **Notes:** Also updated `health.test.ts` to use shared `createFakeSpawn` instead of its own duplicated `createHealthySpawn`/`createUnavailableSpawn` helpers (~50 lines removed). Used `Object.entries` in `createRoutingSpawn` for type safety.
 
 **Acceptance Criteria:**
 - No duplicated `createFakeSpawn` definitions remain in test files

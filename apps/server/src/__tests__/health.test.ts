@@ -1,60 +1,6 @@
-import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import { buildServer } from '../index.js';
-import type { SpawnFn } from '../services/sandbox.js';
-
-/** Create a fake spawn that returns a healthy sandbox response. */
-function createHealthySpawn(): SpawnFn {
-  return (() => {
-    const child = new EventEmitter();
-    const stdoutEmitter = new EventEmitter();
-    const stderrEmitter = new EventEmitter();
-
-    Object.assign(child, {
-      stdout: stdoutEmitter,
-      stderr: stderrEmitter,
-      kill: () => {},
-    });
-
-    process.nextTick(() => {
-      stdoutEmitter.emit(
-        'data',
-        Buffer.from(
-          JSON.stringify({
-            loggedIn: true,
-            authMethod: 'oauth',
-            apiProvider: 'firstParty',
-          }),
-        ),
-      );
-      child.emit('close', 0);
-    });
-
-    return child;
-  }) as unknown as SpawnFn;
-}
-
-/** Create a fake spawn that returns a sandbox-unavailable response. */
-function createUnavailableSpawn(): SpawnFn {
-  return (() => {
-    const child = new EventEmitter();
-    const stdoutEmitter = new EventEmitter();
-    const stderrEmitter = new EventEmitter();
-
-    Object.assign(child, {
-      stdout: stdoutEmitter,
-      stderr: stderrEmitter,
-      kill: () => {},
-    });
-
-    process.nextTick(() => {
-      stderrEmitter.emit('data', Buffer.from('no such container'));
-      child.emit('close', 1);
-    });
-
-    return child;
-  }) as unknown as SpawnFn;
-}
+import { createFakeSpawn } from './helpers.js';
 
 describe('GET /health', () => {
   it('returns status ok with sandbox unknown when probe has not run', async () => {
@@ -74,7 +20,13 @@ describe('GET /health', () => {
   });
 
   it('returns sandbox healthy status after successful probe', async () => {
-    const server = buildServer({ logger: false, spawnFn: createHealthySpawn() });
+    const server = buildServer({
+      logger: false,
+      spawnFn: createFakeSpawn({
+        stdout: JSON.stringify({ loggedIn: true, authMethod: 'oauth', apiProvider: 'firstParty' }),
+        exitCode: 0,
+      }),
+    });
     await server.runSandboxProbe();
 
     const response = await server.inject({
@@ -92,7 +44,7 @@ describe('GET /health', () => {
   it('returns sandbox unavailable status after failed probe', async () => {
     const server = buildServer({
       logger: false,
-      spawnFn: createUnavailableSpawn(),
+      spawnFn: createFakeSpawn({ stderr: 'no such container', exitCode: 1 }),
     });
     await server.runSandboxProbe();
 

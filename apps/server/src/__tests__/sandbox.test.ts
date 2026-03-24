@@ -8,56 +8,7 @@ import {
   type ClaudeResult,
   type SpawnFn,
 } from '../services/sandbox.js';
-
-// ---------------------------------------------------------------------------
-// Fake spawn factory — returns a SpawnFn that produces a controllable child
-// Uses plain EventEmitters for stdout/stderr to avoid Readable buffering.
-// ---------------------------------------------------------------------------
-
-interface FakeSpawnOptions {
-  stdout?: string;
-  stderr?: string;
-  exitCode?: number;
-  /** Simulate a spawn error (e.g., ENOENT) instead of emitting close. */
-  error?: Error;
-  /** If true, never emit close (for timeout tests). */
-  hang?: boolean;
-}
-
-function createFakeSpawn(options: FakeSpawnOptions): SpawnFn {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  return ((_command: string, _args: string[]) => {
-    const child = new EventEmitter();
-    const stdoutEmitter = new EventEmitter();
-    const stderrEmitter = new EventEmitter();
-
-    Object.assign(child, {
-      stdout: stdoutEmitter,
-      stderr: stderrEmitter,
-      kill: () => {
-        process.nextTick(() => child.emit('close', null));
-      },
-    });
-
-    process.nextTick(() => {
-      if (options.error) {
-        child.emit('error', options.error);
-        return;
-      }
-
-      if (options.hang) {
-        return;
-      }
-
-      if (options.stdout) stdoutEmitter.emit('data', Buffer.from(options.stdout));
-      if (options.stderr) stderrEmitter.emit('data', Buffer.from(options.stderr));
-
-      child.emit('close', options.exitCode ?? 0);
-    });
-
-    return child;
-  }) as unknown as SpawnFn;
-}
+import { createFakeSpawn, ndjson } from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -368,11 +319,6 @@ describe('extractTextFromStreamLine', () => {
 // ---------------------------------------------------------------------------
 // invokeClaude
 // ---------------------------------------------------------------------------
-
-/** Helper to build multi-line NDJSON stdout from event objects. */
-function ndjson(...events: Record<string, unknown>[]): string {
-  return events.map((e) => JSON.stringify(e)).join('\n') + '\n';
-}
 
 /** Collect events from an invokeClaude emitter into a promise. */
 function collectEvents(
