@@ -40,6 +40,8 @@ export function TimerGrid() {
     activeBucketId,
     completedBuckets,
     toggleBucket,
+    resetBucketForToday,
+    setRemainingTime,
   } = useTimerState();
 
   // Container measurement via ResizeObserver
@@ -104,6 +106,9 @@ export function TimerGrid() {
             isCompleted={completedBuckets.has(bucket.id)}
             style={style}
             onToggle={() => toggleBucket(bucket.id)}
+            onOpenSettings={() => {}}
+            onResetForToday={() => resetBucketForToday(bucket.id)}
+            onSetRemainingTime={(s) => setRemainingTime(bucket.id, s)}
           />
         );
       })}

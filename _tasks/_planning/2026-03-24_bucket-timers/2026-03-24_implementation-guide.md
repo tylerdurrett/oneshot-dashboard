@@ -258,7 +258,7 @@ apps/web/public/sounds/
 
 ### 3.1 Bucket Context Menu
 
-- [ ] Add context menu to `timer-bucket.tsx`:
+- [x] Add context menu to `timer-bucket.tsx`:
   - **Desktop**: `onContextMenu` handler (right-click) — `preventDefault`, capture position, show menu
   - **Mobile**: long-press detection via `onPointerDown` / `onPointerMove` / `onPointerUp` / `onPointerCancel`:
     - 800ms timeout triggers menu
@@ -273,10 +273,12 @@ apps/web/public/sounds/
   - Menu positioning: 10px below press point, clamped to viewport edges
   - Click-outside-to-close listener
   - `touch-none` class on bucket to prevent browser touch behaviors
-- [ ] Add "Set Remaining Time" inline dialog within the context menu flow:
+  - **Note:** Menu extracted to separate `BucketContextMenu` component (`_components/bucket-context-menu.tsx`) rendered via `createPortal` to escape bucket's `overflow-hidden`. Uses `useLayoutEffect` (not `useEffect`) for viewport clamping to prevent position flash. `onClose` callback stabilized via ref to avoid re-registering document listeners on every parent re-render. Escape key dismissal added for accessibility. Semantic color tokens (`bg-popover`, `text-popover-foreground`, etc.) used instead of hardcoded zinc colors for theme compatibility. `onOpenSettings` wired as a no-op stub — will be connected in Phase 3.2.
+- [x] Add "Set Remaining Time" inline dialog within the context menu flow:
   - Two number inputs: hours and minutes
   - Converts to remaining seconds and calls `onSetRemainingTime`
-- [ ] Add reset confirmation using `ConfirmationDialog` from `@repo/ui`
+- [x] Add reset confirmation using `ConfirmationDialog` from `@repo/ui`
+  - **Note:** `ConfirmationDialog` rendered in `timer-bucket.tsx` (not inside context menu) so the dialog persists after the context menu closes. Uses destructive variant.
 
 **Acceptance Criteria:**
 - Right-click on a bucket (desktop) shows the context menu
@@ -284,7 +286,7 @@ apps/web/public/sounds/
 - Moving finger > 10px cancels the long-press without triggering menu
 - Releasing after a long-press does not also toggle the timer
 - All three menu options work correctly
-- Menu closes when clicking outside
+- Menu closes when clicking outside or pressing Escape
 
 ### 3.2 Bucket Settings Dialog
 
