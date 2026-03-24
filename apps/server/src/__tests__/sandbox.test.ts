@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../config.js';
 import {
   extractTextFromStreamLine,
@@ -330,12 +330,14 @@ function collectEvents(
   result: ClaudeResult | null;
   errors: Error[];
   resumeFailed: boolean;
+  authRecovered: boolean;
 }> {
   return new Promise((resolve) => {
     const texts: string[] = [];
     let result: ClaudeResult | null = null;
     const errors: Error[] = [];
     let resumeFailed = false;
+    let authRecovered = false;
 
     emitter.on('text', (t: string) => texts.push(t));
     emitter.on('result', (r: ClaudeResult) => {
@@ -345,13 +347,20 @@ function collectEvents(
     emitter.on('resume_failed', () => {
       resumeFailed = true;
     });
+    emitter.on('auth_recovery', () => {
+      authRecovered = true;
+    });
     emitter.on('close', () => {
-      resolve({ texts, result, errors, resumeFailed });
+      resolve({ texts, result, errors, resumeFailed, authRecovered });
     });
   });
 }
 
 describe('invokeClaude', () => {
+  beforeEach(() => {
+    resetCircuitBreaker();
+  });
+
   describe('successful streaming', () => {
     it('emits text events for content_block_delta and result at end', async () => {
       const stdout = ndjson(
@@ -666,6 +675,25 @@ describe('invokeClaude', () => {
 // preflightCheck
 // ---------------------------------------------------------------------------
 
+/** SpawnFn that always probes as auth_failed and fails injection (keychain not found). */
+function authFailedNoRecoverySpawn(): SpawnFn {
+  return ((command: string, args: string[]) => {
+    if (args.includes('auth') && args.includes('status')) {
+      return createFakeSpawn({
+        stdout: JSON.stringify({ loggedIn: false }),
+        exitCode: 0,
+      })(command, args);
+    }
+    if (command === 'security') {
+      return createFakeSpawn({
+        stderr: 'The specified item could not be found in the keychain.',
+        exitCode: 44,
+      })(command, args);
+    }
+    return createFakeSpawn({ exitCode: 1 })(command, args);
+  }) as unknown as SpawnFn;
+}
+
 describe('preflightCheck', () => {
   beforeEach(() => {
     resetCircuitBreaker();
@@ -782,5 +810,243 @@ describe('preflightCheck', () => {
     expect(result.status).toBe('auth_failed');
     expect(result.recoveryAttempted).toBe(true);
     expect(result.message).toContain('keychain');
+  });
+
+  describe('circuit breaker', () => {
+    it('allows recovery up to healMaxAttempts, then blocks further attempts', async () => {
+      mockPlatform('darwin');
+      const spawnFn = authFailedNoRecoverySpawn();
+
+      for (let i = 0; i < config.healMaxAttempts; i++) {
+        const result = await preflightCheck(spawnFn);
+        expect(result.ok).toBe(false);
+        expect(result.recoveryAttempted).toBe(true);
+      }
+      const blocked = await preflightCheck(spawnFn);
+      expect(blocked.ok).toBe(false);
+      expect(blocked.recoveryAttempted).toBe(false);
+      expect(blocked.message).toContain('circuit breaker open');
+    });
+
+    it('resetCircuitBreaker clears state so recovery can proceed again', async () => {
+      mockPlatform('darwin');
+      const spawnFn = authFailedNoRecoverySpawn();
+
+      for (let i = 0; i < config.healMaxAttempts; i++) {
+        await preflightCheck(spawnFn);
+      }
+
+      const blocked = await preflightCheck(spawnFn);
+      expect(blocked.message).toContain('circuit breaker open');
+
+      resetCircuitBreaker();
+      const afterReset = await preflightCheck(spawnFn);
+      expect(afterReset.recoveryAttempted).toBe(true);
+    });
+
+    it('prunes old attempts outside healWindowMs (natural reset)', async () => {
+      mockPlatform('darwin');
+      const spawnFn = authFailedNoRecoverySpawn();
+
+      vi.useFakeTimers();
+      try {
+        for (let i = 0; i < config.healMaxAttempts; i++) {
+          await preflightCheck(spawnFn);
+        }
+
+        const blocked = await preflightCheck(spawnFn);
+        expect(blocked.message).toContain('circuit breaker open');
+
+        vi.advanceTimersByTime(config.healWindowMs + 1);
+        const afterWindow = await preflightCheck(spawnFn);
+        expect(afterWindow.recoveryAttempted).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// invokeClaude — auth recovery
+// ---------------------------------------------------------------------------
+
+describe('invokeClaude auth recovery', () => {
+  beforeEach(() => {
+    resetCircuitBreaker();
+  });
+
+  afterEach(() => {
+    restorePlatform();
+  });
+
+  it('recovers from auth error by injecting credentials and retrying once', async () => {
+    mockPlatform('darwin');
+    let claudeCallCount = 0;
+
+    const spawnFn = ((command: string, args: string[]) => {
+      if (command === 'docker' && args.includes('-p')) {
+        claudeCallCount++;
+        if (claudeCallCount === 1) {
+          return createFakeSpawn({
+            stderr: 'Error: oauth token has expired',
+            exitCode: 1,
+          })(command, args);
+        }
+        return createFakeSpawn({
+          stdout: ndjson(
+            { type: 'content_block_delta', delta: { type: 'text_delta', text: 'recovered' } },
+            { type: 'result', result: 'recovered response', session_id: 'new-sid' },
+          ),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'security') {
+        return createFakeSpawn({
+          stdout: JSON.stringify({
+            claudeAiOauth: {
+              accessToken: 'fresh-token',
+              expiresAt: Date.now() + 7_200_000,
+              refreshToken: 'rt-secret',
+            },
+          }),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'docker' && args.includes('-i')) {
+        return createFakeSpawn({ exitCode: 0 })(command, args);
+      }
+
+      return createFakeSpawn({ exitCode: 0 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const emitter = invokeClaude({
+      prompt: 'test',
+      spawnFn,
+      inactivityTimeoutMs: 5000,
+    });
+    const events = await collectEvents(emitter);
+
+    expect(events.authRecovered).toBe(true);
+    expect(events.errors).toHaveLength(0);
+    expect(events.result).toEqual({ result: 'recovered response', sessionId: 'new-sid' });
+    expect(claudeCallCount).toBe(2);
+  });
+
+  it('emits original auth error when credential injection fails', async () => {
+    mockPlatform('darwin');
+
+    const spawnFn = ((command: string, args: string[]) => {
+      if (command === 'docker' && args.includes('-p')) {
+        return createFakeSpawn({
+          stderr: 'Error: oauth token has expired',
+          exitCode: 1,
+        })(command, args);
+      }
+
+      if (command === 'security') {
+        return createFakeSpawn({
+          stderr: 'The specified item could not be found in the keychain.',
+          exitCode: 44,
+        })(command, args);
+      }
+
+      return createFakeSpawn({ exitCode: 1 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const emitter = invokeClaude({
+      prompt: 'test',
+      spawnFn,
+      inactivityTimeoutMs: 5000,
+    });
+    const events = await collectEvents(emitter);
+
+    expect(events.authRecovered).toBe(false);
+    expect(events.errors).toHaveLength(1);
+    expect(events.errors[0]!.message).toContain('authentication failed');
+  });
+
+  it('does not attempt recovery when circuit breaker is open', async () => {
+    mockPlatform('darwin');
+
+    for (let i = 0; i < config.healMaxAttempts; i++) {
+      await preflightCheck(authFailedNoRecoverySpawn());
+    }
+
+    // Now invokeClaude with an auth error — circuit is open, no recovery
+    let securitySpawned = false;
+    const spawnFn = ((command: string, args: string[]) => {
+      if (command === 'docker' && args.includes('-p')) {
+        return createFakeSpawn({
+          stderr: 'Error: not logged in',
+          exitCode: 1,
+        })(command, args);
+      }
+      if (command === 'security') {
+        securitySpawned = true;
+        return createFakeSpawn({ exitCode: 0 })(command, args);
+      }
+      return createFakeSpawn({ exitCode: 1 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const emitter = invokeClaude({
+      prompt: 'test',
+      spawnFn,
+      inactivityTimeoutMs: 5000,
+    });
+    const events = await collectEvents(emitter);
+
+    expect(events.authRecovered).toBe(false);
+    expect(events.errors).toHaveLength(1);
+    expect(events.errors[0]!.message).toContain('authentication failed');
+    expect(securitySpawned).toBe(false);
+  });
+
+  it('does not retry more than once per invocation', async () => {
+    mockPlatform('darwin');
+    let claudeCallCount = 0;
+
+    const spawnFn = ((command: string, args: string[]) => {
+      if (command === 'docker' && args.includes('-p')) {
+        claudeCallCount++;
+        return createFakeSpawn({
+          stderr: 'Error: oauth token has expired',
+          exitCode: 1,
+        })(command, args);
+      }
+
+      if (command === 'security') {
+        return createFakeSpawn({
+          stdout: JSON.stringify({
+            claudeAiOauth: {
+              accessToken: 'fresh-token',
+              expiresAt: Date.now() + 7_200_000,
+              refreshToken: 'rt-secret',
+            },
+          }),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'docker' && args.includes('-i')) {
+        return createFakeSpawn({ exitCode: 0 })(command, args);
+      }
+
+      return createFakeSpawn({ exitCode: 0 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const emitter = invokeClaude({
+      prompt: 'test',
+      spawnFn,
+      inactivityTimeoutMs: 5000,
+    });
+    const events = await collectEvents(emitter);
+
+    expect(events.authRecovered).toBe(true);
+    expect(events.errors).toHaveLength(1);
+    expect(events.errors[0]!.message).toContain('authentication failed');
+    expect(claudeCallCount).toBe(2);
   });
 });

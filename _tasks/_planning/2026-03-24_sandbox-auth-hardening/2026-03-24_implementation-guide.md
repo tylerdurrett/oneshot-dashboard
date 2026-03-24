@@ -237,11 +237,13 @@ scripts/
 
 ### 4.3 Circuit Breaker Tests
 
-- [ ] Unit tests for `isCircuitOpen`, `recordHealAttempt`, `resetCircuitBreaker` in `sandbox.test.ts`
-- [ ] Test `preflightCheck` with open circuit breaker (skips recovery, returns fast)
-- [ ] Test `invokeClaude` auth error → recovery → retry flow
-- [ ] Test `invokeClaude` auth error with open circuit breaker → no recovery, error emitted
-- [ ] Run `pnpm --filter @repo/server test`
+- [x] Unit tests for `isCircuitOpen`, `recordHealAttempt`, `resetCircuitBreaker` in `sandbox.test.ts`
+- [x] Test `preflightCheck` with open circuit breaker (skips recovery, returns fast)
+- [x] Test `invokeClaude` auth error → recovery → retry flow
+- [x] Test `invokeClaude` auth error with open circuit breaker → no recovery, error emitted
+- [x] Run `pnpm --filter @repo/server test`
+
+> **Notes:** Since `isCircuitOpen` and `recordHealAttempt` are intentionally unexported (internal implementation details), they are tested indirectly through `preflightCheck` and `invokeClaude` — the public APIs that exercise them. Three circuit breaker tests cover: filling the breaker to capacity and verifying it blocks, `resetCircuitBreaker()` clearing state, and natural reset via time window pruning (using `vi.useFakeTimers()`). Four `invokeClaude` auth recovery tests cover: successful recovery with retry, failed injection emitting original error, open circuit breaker blocking recovery, and the retry-once guard preventing infinite loops. Extracted `authFailedNoRecoverySpawn()` to module scope for reuse across both test suites. Added `resetCircuitBreaker()` to the original `invokeClaude` describe block's `beforeEach` for test isolation. Extended `collectEvents` with `authRecovered` field. 7 new tests, all 129 pass.
 
 **Acceptance Criteria:**
 - Circuit breaker logic fully tested at unit and integration levels
