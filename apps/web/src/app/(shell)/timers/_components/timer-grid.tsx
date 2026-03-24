@@ -157,7 +157,11 @@ export function TimerGrid() {
     observer.observe(el);
 
     return () => observer.disconnect();
-  }, []);
+    // Re-run after hydration: the container div isn't in the DOM until
+    // isHydrated is true (the pre-hydration guard returns null), so the
+    // ref is null on the initial mount. Without this dependency the
+    // ResizeObserver never attaches and size stays 0×0.
+  }, [isHydrated]);
 
   // Compute treemap layout (recomputes when buckets tick or container resizes)
   const innerWidth = Math.max(0, size.width - CONTAINER_PADDING * 2);
