@@ -33,11 +33,13 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Map buckets to treemap input items using remaining seconds as the value. */
+/** Map buckets to treemap input items using configured duration as the value.
+ *  Using totalMinutes (not remaining time) keeps the layout stable — buckets
+ *  won't swap positions as their timers tick down. */
 function bucketsToItems(buckets: TimeBucket[]): TreemapItem[] {
   return buckets.map((b) => ({
     id: b.id,
-    value: Math.max(1, b.totalMinutes * 60 - b.elapsedSeconds),
+    value: Math.max(1, b.totalMinutes),
   }));
 }
 
