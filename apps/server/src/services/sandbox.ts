@@ -33,6 +33,32 @@ const DEFAULT_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 /** Interval for checking inactivity (5 seconds). */
 const INACTIVITY_CHECK_INTERVAL_MS = 5_000;
 
+// ---------------------------------------------------------------------------
+// Circuit Breaker — prevents heal-flapping when the sandbox can't stabilize.
+// Limits recovery to healMaxAttempts per healWindowMs, then fails fast.
+// ---------------------------------------------------------------------------
+
+const circuitBreaker = {
+  attempts: [] as number[],
+};
+
+/** Prune stale attempts and check if recovery should be blocked. */
+function isCircuitOpen(): boolean {
+  const cutoff = Date.now() - config.healWindowMs;
+  circuitBreaker.attempts = circuitBreaker.attempts.filter((t) => t > cutoff);
+  return circuitBreaker.attempts.length >= config.healMaxAttempts;
+}
+
+/** Record a recovery attempt (call after every injection, success or failure). */
+function recordHealAttempt(): void {
+  circuitBreaker.attempts.push(Date.now());
+}
+
+/** Clear circuit breaker state. Exported for test isolation. */
+export function resetCircuitBreaker(): void {
+  circuitBreaker.attempts = [];
+}
+
 /** Shape of the JSON returned by `claude auth status --json`. */
 interface AuthStatusResponse {
   loggedIn?: boolean;
@@ -230,7 +256,18 @@ export async function preflightCheck(
 
   // Only auth_failed warrants recovery — unavailable means infrastructure is missing,
   // not fixable by credential injection.
+  if (isCircuitOpen()) {
+    return {
+      ok: false,
+      status: 'auth_failed',
+      message: 'Auth recovery circuit breaker open — too many recent failures. Try again later.',
+      recoveryAttempted: false,
+    };
+  }
+
   const injection = await refreshAndInjectCredentials(spawnFn);
+  recordHealAttempt();
+
   if (!injection.ok) {
     return {
       ok: false,

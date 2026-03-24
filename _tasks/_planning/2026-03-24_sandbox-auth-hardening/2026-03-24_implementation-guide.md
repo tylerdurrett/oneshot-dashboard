@@ -202,13 +202,15 @@ scripts/
 
 ### 4.1 Circuit Breaker Implementation
 
-- [ ] Add circuit breaker state and functions to `apps/server/src/services/sandbox.ts`:
+- [x] Add circuit breaker state and functions to `apps/server/src/services/sandbox.ts`:
   - Module-level `circuitBreaker: { attempts: { timestamp: number }[] }`
   - `isCircuitOpen()` — prunes old attempts outside `config.healWindowMs`, returns true if `>= config.healMaxAttempts`
   - `recordHealAttempt()` — pushes current timestamp
   - `resetCircuitBreaker()` — exported for testing
-- [ ] Integrate into `preflightCheck`: before attempting recovery, check `isCircuitOpen()`. If open, skip recovery and return `{ ok: false, message: "Auth recovery circuit breaker open — too many recent failures. Try again later." }`
-- [ ] Call `recordHealAttempt()` after each recovery attempt (success or failure)
+- [x] Integrate into `preflightCheck`: before attempting recovery, check `isCircuitOpen()`. If open, skip recovery and return `{ ok: false, message: "Auth recovery circuit breaker open — too many recent failures. Try again later." }`
+- [x] Call `recordHealAttempt()` after each recovery attempt (success or failure)
+
+> **Notes:** Implementation follows plan exactly. `isCircuitOpen()` prunes stale attempts inline via `filter()` before checking the count — no separate pruning step needed. `recordHealAttempt()` is called after `refreshAndInjectCredentials()` regardless of its result, so both successful and failed injections count toward the breaker limit. All 122 existing tests pass unchanged — the breaker is closed by default so existing preflight recovery tests are unaffected.
 
 **Acceptance Criteria:**
 - Circuit breaker allows first 3 recovery attempts within the window
