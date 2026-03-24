@@ -360,11 +360,14 @@ apps/web/public/sounds/
 
 ### 4.2 Completion Sound
 
-- [ ] Add a short audio chime file to `apps/web/public/sounds/timer-complete.mp3` (a brief, pleasant chime)
-- [ ] Play the sound when a bucket completes:
-  - Create an `Audio` instance in the hook or component
-  - Call `.play()` when a bucket enters the completed set
-  - Handle the case where audio autoplay is blocked (catch the promise rejection silently)
+- [x] Add a short audio chime file to `apps/web/public/sounds/timer-complete.mp3` (a brief, pleasant chime)
+  - **Note:** Diverged from plan — used Web Audio API (`_lib/sounds.ts`) to synthesize a two-note ascending chime (C6→E6) instead of an mp3 file. No external audio file needed, smaller bundle, and works immediately without sourcing/licensing an asset. The `apps/web/public/` directory was never created.
+- [x] Play the sound when a bucket completes:
+  - Uses Web Audio API `OscillatorNode` + `GainNode` with exponential decay (not `Audio` element)
+  - Call `playCompletionChime()` in `timer-bucket.tsx` when `isCompleted` transitions false→true (alongside the animation trigger)
+  - Module-level `AudioContext` singleton is lazily created and reused across calls
+  - Handles autoplay policy (resumes suspended context) and missing API (try/catch silently ignores errors)
+  - 6 unit tests in `__tests__/sounds.test.ts` covering oscillator creation, gain routing, context resume, unavailable API, rejected resume, and timing
 
 **Acceptance Criteria:**
 - A chime plays when any timer reaches zero

@@ -8,6 +8,7 @@ import { cn } from '@repo/ui';
 import { ConfirmationDialog } from '@repo/ui/components/confirmation-dialog';
 
 import { BUCKET_COLORS, formatTime, type TimeBucket } from '../_lib/timer-types';
+import { playCompletionChime } from '../_lib/sounds';
 import { BucketContextMenu } from './bucket-context-menu';
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,7 @@ export function TimerBucket({
       for (const t of animationTimersRef.current) clearTimeout(t);
 
       setAnimPhase('success');
+      playCompletionChime();
 
       const exitTimer = setTimeout(() => {
         setAnimPhase('exiting');
