@@ -77,13 +77,15 @@ scripts/
 
 ### 2.1 Core Credential Functions
 
-- [ ] Create `apps/server/src/services/credentials.ts`
-- [ ] Implement types: `CredentialPhase` (`'keychain' | 'docker-exec' | 'parse'`), `CredentialInjectionResult` (ok/fail discriminated union), `HostTokenStatus`
-- [ ] Implement `readKeychainCredentials(spawnFn?)` — guards on `process.platform === 'darwin'`, spawns `security find-generic-password -s "Claude Code-credentials" -w`, parses JSON, returns result type. Timeout from `config.keychainTimeoutMs`. Extract platform check to `isMacOS()` function for testability.
-- [ ] Implement `stripRefreshToken(credentials)` — pure function, deep clones, deletes `claudeAiOauth.refreshToken`, returns stripped copy
-- [ ] Implement `getHostTokenExpiresAt(credentials)` — pure function, returns `claudeAiOauth.expiresAt` as epoch ms or null
-- [ ] Implement `injectCredentials(credentialsJson, spawnFn?)` — spawns `docker sandbox exec -i <name> sh -c 'cat > /tmp/.creds-staging && mv /tmp/.creds-staging /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json'`, pipes JSON to stdin. Uses `stdio: ['pipe', 'pipe', 'pipe']`. Timeout from `config.injectTimeoutMs`.
-- [ ] Export the `SpawnFn` type re-used from `sandbox.ts` (or use a shared type)
+- [x] Create `apps/server/src/services/credentials.ts`
+- [x] Implement types: `CredentialPhase` (`'keychain' | 'docker-exec' | 'parse'`), `CredentialInjectionResult` (ok/fail discriminated union), `HostTokenStatus`
+- [x] Implement `readKeychainCredentials(spawnFn?)` — guards on `process.platform === 'darwin'`, spawns `security find-generic-password -s "Claude Code-credentials" -w`, parses JSON, returns result type. Timeout from `config.keychainTimeoutMs`. Extract platform check to `isMacOS()` function for testability.
+- [x] Implement `stripRefreshToken(credentials)` — pure function, deep clones, deletes `claudeAiOauth.refreshToken`, returns stripped copy
+- [x] Implement `getHostTokenExpiresAt(credentials)` — pure function, returns `claudeAiOauth.expiresAt` as epoch ms or null
+- [x] Implement `injectCredentials(credentialsJson, spawnFn?)` — spawns `docker sandbox exec -i <name> sh -c 'cat > /tmp/.creds-staging && mv /tmp/.creds-staging /home/agent/.claude/.credentials.json && chmod 600 /home/agent/.claude/.credentials.json'`, pipes JSON to stdin. Uses `stdio: ['pipe', 'pipe', 'pipe']`. Timeout from `config.injectTimeoutMs`.
+- [x] Export the `SpawnFn` type re-used from `sandbox.ts` (or use a shared type)
+
+> **Notes:** Used `structuredClone` instead of `JSON.parse(JSON.stringify(...))` for deep cloning in `stripRefreshToken`. `injectCredentials` returns `{ ok: true, credentials: null }` on success rather than re-parsing its own string input — the caller (pipeline in 2.2) already has the parsed credentials from the keychain read step. Removed unnecessary "what" comments per code review; kept "why" comments. All 88 existing tests pass.
 
 **Acceptance Criteria:**
 - `readKeychainCredentials` returns `{ ok: false, phase: 'keychain' }` on non-macOS
