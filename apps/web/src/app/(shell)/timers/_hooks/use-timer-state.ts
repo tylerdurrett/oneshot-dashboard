@@ -126,6 +126,7 @@ export function useTimerState(): UseTimerStateReturn {
     const now = new Date();
     return serverBuckets.map((sb) => serverBucketToTimeBucket(sb, now));
     // tick forces recalculation of live elapsed each second
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverBuckets, tick]);
 
   // Derive todaysBuckets from serverBuckets (stable reference between ticks)
@@ -135,6 +136,7 @@ export function useTimerState(): UseTimerStateReturn {
     return serverBuckets
       .filter((sb) => isBucketActiveToday(sb))
       .map((sb) => serverBucketToTimeBucket(sb, now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverBuckets, tick]);
 
   // Completion detection — when tick causes a bucket to reach its total,
@@ -174,7 +176,7 @@ export function useTimerState(): UseTimerStateReturn {
       setCompletedBuckets(next);
     }
     // Intentionally excludes completedBuckets from deps to avoid infinite loop.
-  }, [allBuckets, todayQuery.isSuccess]);
+  }, [allBuckets, todayQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // SSE integration — useTimerSSE stores handlers in a ref, so useCallback
   // wrappers are unnecessary (handler identity doesn't trigger reconnection).

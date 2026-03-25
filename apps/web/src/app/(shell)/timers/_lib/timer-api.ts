@@ -70,7 +70,12 @@ export interface UpdateBucketInput {
 // Base URL
 // ---------------------------------------------------------------------------
 
-export { getServerHttpUrl as getBaseUrl } from '@/lib/server-url';
+import { getServerHttpUrl } from '@/lib/server-url';
+
+// IMPORTANT: Do NOT change this to `export { getServerHttpUrl as getBaseUrl }`.
+// A re-export like that does NOT create a local binding, so all the fetch
+// functions below would fail with "getBaseUrl is not defined" at runtime.
+export const getBaseUrl = getServerHttpUrl;
 
 // ---------------------------------------------------------------------------
 // API functions

@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "next dev -p $(node ../../scripts/get-port.mjs)",
+    "dev": "next dev -H 0.0.0.0 -p $(node ../../scripts/get-port.mjs)",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",

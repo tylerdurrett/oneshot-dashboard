@@ -34,11 +34,13 @@ export function buildServer(opts?: BuildServerOptions) {
   let lastCredentialSweep: string | null = null;
   const credentialInjectionAvailable = isMacOS();
 
-  // Allow CORS from any host on the web app port (supports Tailscale / LAN access)
+  // Allow CORS from any host on the web app port (supports Tailscale / LAN access).
+  // Explicitly reflect the request origin string so the Access-Control-Allow-Origin
+  // header matches the caller, avoiding mismatches with non-localhost origins.
   server.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (isAllowedOrigin(origin)) return cb(null, true);
+      if (isAllowedOrigin(origin)) return cb(null, origin);
       cb(new Error('CORS: origin not allowed'), false);
     },
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
