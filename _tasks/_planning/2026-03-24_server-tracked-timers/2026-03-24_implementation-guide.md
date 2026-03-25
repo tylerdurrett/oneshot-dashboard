@@ -100,19 +100,20 @@ apps/web/src/app/(shell)/timers/
 
 ### 2.1 Bucket CRUD Service
 
-- [ ] Create `apps/server/src/services/timer-bucket.ts` with:
+- [x] Create `apps/server/src/services/timer-bucket.ts` with:
   - `listBuckets(database?)` — returns all buckets ordered by `sortOrder` asc
   - `getBucket(id, database?)` — returns single bucket or undefined
   - `createBucket({ name, totalMinutes, colorIndex, daysOfWeek, sortOrder? }, database?)` — generates UUID, inserts, returns created bucket
   - `updateBucket(id, updates, database?)` — partial update (name, totalMinutes, colorIndex, daysOfWeek, sortOrder), sets `updatedAt`, returns updated bucket or undefined if not found
   - `deleteBucket(id, database?)` — deletes all daily progress rows for this bucket first (no CASCADE, matches existing pattern), then deletes the bucket. Returns boolean
   - `daysOfWeek` stored as JSON string in DB, parsed/serialized in service layer — callers work with `number[]`
-- [ ] Write tests in `apps/server/src/__tests__/timer-bucket.test.ts`:
+- [x] Write tests in `apps/server/src/__tests__/timer-bucket.test.ts`:
   - CRUD operations work correctly
   - `deleteBucket` cascades to daily progress rows
   - `updateBucket` returns undefined for nonexistent ID
   - `daysOfWeek` round-trips correctly (array → JSON string → array)
   - `listBuckets` returns sorted by `sortOrder`
+  - *Note: Added to existing test file (17 new tests). Also exports TimerBucketRow, CreateBucketInput, UpdateBucketInput types. Uses Drizzle's `$inferSelect` for type-safe parseBucket. updateBucket uses `Partial<TimerBucketDbRow>` instead of `Record<string, unknown>` for type safety. createBucket auto-computes sortOrder via `max()` when not provided. 159 total tests pass.*
 
 **Acceptance Criteria:**
 - All CRUD operations work with in-memory test database
