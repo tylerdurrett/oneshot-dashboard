@@ -87,9 +87,9 @@ $PLAN_FILE
 
 Our goal is to implement the plan using standard best practices and clean, maintainable, well-documented code following the established codebase patterns. Please implement this next unfinished section of the phase. ONLY ONE SECTION.
 
-As much as possible, perform your own testing and acceptance criteria validation, unless manual user testing is required.
+Perform your own testing and acceptance criteria validation, unless manual user testing is absolutely required.
 
-Always run the code quality review after you finish implementation.
+Always run the code reviews after you finish implementation.
 
 IMPORTANT: WHEN YOU FINISH THE SECTION: Please update the implementation doc by checking off all completed tasks and adding notes where anything might have diverged from the original plan. Then commit the feature.
 
