@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, MoreVertical, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, MoreVertical, Plus } from 'lucide-react';
 import {
   Button,
   ConfirmationDialog,

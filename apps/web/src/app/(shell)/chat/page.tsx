@@ -26,7 +26,6 @@ import { useChatSocketContext } from './chat-socket-context';
 import { useDeleteThread, useThreads, threadKeys } from './use-threads';
 import { createThread } from './api';
 import { ThreadSelector } from './thread-selector';
-import type { ChatMessage } from './use-chat-socket';
 
 function ScrollOnStream({ isStreaming }: { isStreaming: boolean }) {
   const { scrollToBottom } = useStickToBottomContext();

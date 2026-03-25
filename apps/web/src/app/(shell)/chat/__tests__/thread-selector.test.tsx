@@ -30,7 +30,7 @@ vi.mock('@repo/ui', () => {
         {children}
       </button>
     ),
-    DropdownMenu: ({ children, open, onOpenChange }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => (
+    DropdownMenu: ({ children, open }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => (
       <div data-testid="dropdown-menu" data-open={open}>{children}</div>
     ),
     DropdownMenuTrigger: ({

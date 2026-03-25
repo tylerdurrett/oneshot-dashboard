@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-import { playCompletionChime } from '../_lib/sounds';
-
 // ---------------------------------------------------------------------------
 // Mock AudioContext
 // ---------------------------------------------------------------------------
