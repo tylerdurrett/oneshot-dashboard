@@ -113,16 +113,18 @@ apps/web/
 
 ### 1.5 Set up React Router with placeholder routes
 
-- [ ] Create `apps/web/src/router.tsx` with route definitions for all 7 routes
-- [ ] Add root redirect: `/` navigates to `/timers`
-- [ ] Add placeholder components for each route (just `<div>Route name</div>`)
-- [ ] Wrap shell routes in a layout route that renders `<AppShell>`
-- [ ] Write a smoke test: router config renders without errors
+- [x] Create `apps/web/src/router.tsx` with route definitions for all 7 routes
+- [x] Add root redirect: `/` navigates to `/timers`
+- [x] Add placeholder components for each route (just `<div>Route name</div>`)
+- [x] Wrap shell routes in a layout route that renders `<AppShell>`
+- [x] Write a smoke test: router config renders without errors
+
+> **Notes (1.5):** Shell routes use a `PassthroughLayout` (`<Outlet />`) instead of `<AppShell>` — AppShell still imports `next/link` and `next/navigation` which no longer exist. The real AppShell integration happens in Phase 2.1. Placeholder components use a factory function `placeholder(name)` to avoid repetition. The `getRouter()` lazy singleton pattern defers `createBrowserRouter` to runtime to avoid jsdom `AbortSignal` incompatibility in tests. The redirect test exercises the loader directly to verify the `/timers` target (status 302 + Location header). Video route is intentionally standalone with no layout wrapper, matching the existing Next.js structure.
 
 **Acceptance Criteria:**
-- Navigating to `/timers`, `/chat`, `/chat/test-id`, `/prototype`, `/prototype/chat`, `/video` each shows the correct placeholder
-- `/` redirects to `/timers`
-- Shell routes show the sidebar/bottom nav via AppShell layout
+- Navigating to `/timers`, `/chat`, `/chat/test-id`, `/prototype`, `/prototype/chat`, `/video` each shows the correct placeholder ✅
+- `/` redirects to `/timers` ✅
+- Shell routes show the sidebar/bottom nav via AppShell layout ⚠️ Deferred to Phase 2.1 (AppShell uses next/link)
 
 ### 1.6 Update monorepo scripts and Turbo config
 
