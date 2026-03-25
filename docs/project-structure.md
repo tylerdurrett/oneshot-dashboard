@@ -36,7 +36,7 @@ your-project/
 
 This is where you spend most of your time. It's a [Next.js 15](https://nextjs.org/) app using the App Router.
 
-- **`src/app/`** — Your pages and layouts (file-based routing)
+- **`src/app/`** — Your pages and layouts (file-based routing, including browser tab titles via route metadata)
 - **`src/app/globals.css`** — Global styles and Tailwind theme
 - **`src/__tests__/`** — Tests for your app
 

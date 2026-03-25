@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import { Providers } from '@/components/providers';
+import { appMetadata } from './route-metadata';
 import './globals.css';
 
 const geistSans = Geist({
@@ -13,10 +14,7 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
-  title: 'One Shot',
-  description: 'A monorepo starter kit for agentic development',
-};
+export const metadata: Metadata = appMetadata;
 
 export const viewport: Viewport = {
   viewportFit: 'cover',
