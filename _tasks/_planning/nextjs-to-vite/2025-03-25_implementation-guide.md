@@ -95,19 +95,21 @@ apps/web/
 
 ### 1.4 Create HTML entry point and React mount
 
-- [ ] Create `apps/web/index.html` with `<html lang="en" class="dark">`, `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`, `<div id="root">`, font preloads for Geist, and `<script type="module" src="/src/main.tsx">`
-- [ ] Create `apps/web/src/main.tsx` that renders `<RouterProvider>` inside `<Providers>`
-- [ ] Create `apps/web/src/vite-env.d.ts` with `/// <reference types="vite/client" />`
-- [ ] Import `globals.css` in `main.tsx`
-- [ ] Delete `apps/web/src/app/page.tsx` (root redirect — imports `next/navigation` which no longer exists; redirect moves to router config)
-- [ ] Delete `apps/web/src/__tests__/page.test.tsx` (tested the Next.js redirect)
+- [x] Create `apps/web/index.html` with `<html lang="en" class="dark">`, `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`, `<div id="root">`, font preloads for Geist, and `<script type="module" src="/src/main.tsx">`
+- [x] Create `apps/web/src/main.tsx` that renders `<RouterProvider>` inside `<Providers>`
+- [x] Create `apps/web/src/vite-env.d.ts` with `/// <reference types="vite/client" />`
+- [x] Import `globals.css` in `main.tsx`
+- [x] Delete `apps/web/src/app/page.tsx` (root redirect — imports `next/navigation` which no longer exists; redirect moves to router config)
+- [x] Delete `apps/web/src/__tests__/page.test.tsx` (tested the Next.js redirect)
+
+> **Notes (1.4):** Font preloads for Geist are deferred to Phase 2.3 (font loading setup) since `next/font/google` is still referenced in `layout.tsx`. The `main.tsx` renders `<Providers>` with an empty placeholder div instead of `<RouterProvider>` — the router mount is Phase 1.5. The `<body>` tag in `index.html` includes the layout classes (`bg-background text-foreground antialiased`) so they apply immediately without waiting for React hydration.
 
 **Acceptance Criteria:**
-- `pnpm --filter @repo/web vite dev` starts without errors
-- Browser shows a blank page with no console errors
-- Tailwind styles are loaded (dark background visible)
-- `<html>` has `lang="en"` and `class="dark"`
-- Viewport meta tag includes `viewport-fit=cover` (was previously set via Next.js `Viewport` export)
+- `pnpm --filter @repo/web vite dev` starts without errors ✅
+- Browser shows a blank page with no console errors ✅
+- Tailwind styles are loaded (dark background visible) ✅
+- `<html>` has `lang="en"` and `class="dark"` ✅
+- Viewport meta tag includes `viewport-fit=cover` (was previously set via Next.js `Viewport` export) ✅
 
 ### 1.5 Set up React Router with placeholder routes
 
@@ -328,14 +330,18 @@ apps/web/
 - All 7 routes work as expected
 - No lint errors
 
-### 5.3 Update documentation
+### 5.3 Update documentation and scripts
 
+- [ ] Update `docs/project-structure.md`: change "Next.js 15 app using the App Router" to describe Vite + React Router
+- [ ] Update `docs/persistent-service.md`: change "Next.js web app" references to "Vite web app"
 - [ ] Update `docs/ui-conventions.md` if it references Next.js
+- [ ] Update `scripts/install-launchd.sh` comment (line 9-10): change "Next.js web app" to "Vite web app"
 - [ ] Update any README references to Next.js
 - [ ] Update `AGENTS.md` if it references Next.js conventions
 
 **Acceptance Criteria:**
-- No documentation references Next.js as the frontend framework
+- No documentation or script comments reference Next.js as the frontend framework
+- `grep -ri "next.js\|nextjs\|next js" docs/ scripts/ AGENTS.md` returns zero results (excluding migration plan files)
 - Vite-specific conventions are documented where relevant
 
 ---
