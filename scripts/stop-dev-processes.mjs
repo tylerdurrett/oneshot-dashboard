@@ -96,7 +96,31 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Must match LAUNCHD_LABEL in scripts/launchd-common.sh
+const launchdLabel = 'com.tdogmini.oneshot-dashboard';
+
+function isLaunchdManaged() {
+  try {
+    execFileSync('launchctl', ['print', `gui/${process.getuid()}/${launchdLabel}`], {
+      stdio: 'ignore',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
+  // Warn if launchd is managing the service — killing processes will just
+  // cause launchd to restart them immediately.
+  if (isLaunchdManaged()) {
+    console.log(
+      'Warning: oneshot-dashboard is managed by launchd.\n' +
+      'Killing processes will cause launchd to restart them immediately.\n' +
+      'Use `pnpm launchd:uninstall` to stop the persistent service.\n',
+    );
+  }
+
   const configPath = path.join(root, 'project.config.json');
   const devPort = readDevPortFromConfig(configPath);
   const [webPort, studioPort, serverPort] = getTargetPorts(devPort);

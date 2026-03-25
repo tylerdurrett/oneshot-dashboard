@@ -18,7 +18,11 @@
     "prego": "node scripts/check-setup.mjs && node scripts/ensure-sandbox.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "new-video": "node scripts/new-video.mjs",
     "sandbox": "node scripts/sandbox-auth.mjs",
-    "db:restore": "node scripts/restore-db.mjs"
+    "db:restore": "node scripts/restore-db.mjs",
+    "launchd:install": "bash scripts/install-launchd.sh",
+    "launchd:uninstall": "bash scripts/uninstall-launchd.sh",
+    "launchd:status": "bash scripts/launchd-status.sh",
+    "launchd:logs": "bash scripts/launchd-logs.sh"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

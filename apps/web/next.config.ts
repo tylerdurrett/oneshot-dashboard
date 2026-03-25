@@ -13,6 +13,7 @@ function getServerPort(): number {
 }
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   transpilePackages: ['@repo/ui', '@repo/db', '@repo/video'],
   env: {
     NEXT_PUBLIC_SERVER_PORT: String(getServerPort()),
