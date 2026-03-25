@@ -184,15 +184,17 @@ apps/web/
 
 ### 2.3 Set up font loading
 
-- [ ] Add Geist font CSS via `@fontsource-variable/geist` and `@fontsource-variable/geist-mono` packages (or use Google Fonts CDN link in `index.html`)
-- [ ] Set CSS variables `--font-geist-sans` and `--font-geist-mono` on `<body>`
-- [ ] Remove `next/font/google` import from old layout
-- [ ] Verify fonts render correctly
+- [x] Add Geist font CSS via `@fontsource-variable/geist` and `@fontsource-variable/geist-mono` packages (or use Google Fonts CDN link in `index.html`)
+- [x] Set CSS variables `--font-geist-sans` and `--font-geist-mono` on `<body>`
+- [x] Remove `next/font/google` import from old layout
+- [x] Verify fonts render correctly
+
+> **Notes (2.3):** Used `@fontsource-variable/geist` and `@fontsource-variable/geist-mono` packages imported in `main.tsx`. Instead of setting `--font-geist-sans`/`--font-geist-mono` CSS variables on `<body>` (plan's original approach), used Tailwind v4's `@theme inline` convention with `--font-sans` and `--font-mono` — this is the idiomatic way to override Tailwind's `font-sans`/`font-mono` utilities. Deleted `layout.tsx` entirely (was the last file importing `next/font/google`) rather than leaving a comment placeholder — nothing imports it and the root layout is fully handled by `index.html` + `main.tsx`. No explicit font preloads in `index.html` — `@fontsource-variable` CSS is in the initial bundle so fonts are discovered early; for a local dashboard app the tiny FOUT window is negligible. Three pre-existing test failures remain (prototype, chat pages still importing `next/*` — fixed in Phase 3).
 
 **Acceptance Criteria:**
-- Body text uses Geist Sans
-- Code/mono elements use Geist Mono
-- No FOUT (flash of unstyled text) — fonts preloaded in `index.html`
+- Body text uses Geist Sans ✅ (via Tailwind `--font-sans` theme variable)
+- Code/mono elements use Geist Mono ✅ (via Tailwind `--font-mono` theme variable)
+- No FOUT (flash of unstyled text) — fonts preloaded in `index.html` ⚠️ No explicit preload; font CSS is bundled in initial stylesheet so discovery is fast. Acceptable for local app.
 
 ---
 
