@@ -6,37 +6,31 @@ import { defineConfig } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** Read the web port from project.config.json (convention: never hardcode ports). */
-function getWebPort(): number {
+/** Read project.config.json once and derive both ports (convention: never hardcode ports). */
+function getProjectPorts(): { webPort: number; serverPort: number } {
   try {
     const configPath = path.resolve(__dirname, '../../project.config.json');
     const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    return config.port ?? 4900;
+    const basePort = config.port ?? 4900;
+    return {
+      webPort: basePort,
+      serverPort: config.serverPort ?? basePort + 2,
+    };
   } catch {
-    return 4900;
+    return { webPort: 4900, serverPort: 4902 };
   }
 }
 
-/** Read the server (Fastify) port so we can expose it as VITE_SERVER_PORT. */
-function getServerPort(): number {
-  try {
-    const configPath = path.resolve(__dirname, '../../project.config.json');
-    const config = JSON.parse(readFileSync(configPath, 'utf-8'));
-    return config.serverPort ?? (config.port ? config.port + 2 : 4902);
-  } catch {
-    return 4902;
-  }
-}
+const { webPort, serverPort } = getProjectPorts();
 
 export default defineConfig({
   plugins: [react()],
 
   envPrefix: 'VITE_',
 
-  // Inject server port so it's available via import.meta.env.VITE_SERVER_PORT
-  // even before .env files are updated (section 1.3 will do that).
+  // Inject server port so it's available via import.meta.env.VITE_SERVER_PORT.
   define: {
-    'import.meta.env.VITE_SERVER_PORT': JSON.stringify(String(getServerPort())),
+    'import.meta.env.VITE_SERVER_PORT': JSON.stringify(String(serverPort)),
   },
 
   resolve: {
@@ -47,7 +41,7 @@ export default defineConfig({
   },
 
   server: {
-    port: getWebPort(),
+    port: webPort,
     host: true, // LAN / Tailscale access (equivalent to Next.js -H 0.0.0.0)
   },
 });
