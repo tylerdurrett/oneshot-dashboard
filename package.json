@@ -15,7 +15,7 @@
     "studio": "turbo run studio",
     "go": "turbo run dev studio",
     "stop": "node scripts/stop-dev-processes.mjs",
-    "prego": "node scripts/check-setup.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
+    "prego": "node scripts/check-setup.mjs && node scripts/ensure-sandbox.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "new-video": "node scripts/new-video.mjs",
     "sandbox": "node scripts/sandbox-auth.mjs",
     "db:restore": "node scripts/restore-db.mjs"
