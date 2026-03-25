@@ -1,9 +1,6 @@
-'use client';
-
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, useLocation } from 'react-router';
 import { Clock, Menu, MessageSquare, Plus } from 'lucide-react';
 import { cn } from '@repo/ui';
 
@@ -52,7 +49,7 @@ const OFFSET_BELOW = 10;
 function NavLink({ item, isMobile, isActive }: { item: NavItem; isMobile: boolean; isActive: boolean }) {
   return (
     <Link
-      href={item.href}
+      to={item.href}
       data-active={isActive || undefined}
       className={cn(
         'flex flex-col items-center justify-center gap-1 transition-colors',
@@ -203,7 +200,7 @@ function NavLinkWithContextMenu({
   return (
     <>
       <Link
-        href={item.href}
+        to={item.href}
         data-active={isActive || undefined}
         onContextMenu={handleContextMenu}
         onPointerDown={handlePointerDown}
@@ -351,7 +348,7 @@ function renderNavItem(item: NavItem, isMobile: boolean, isActive: boolean) {
 // ---------------------------------------------------------------------------
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
 
   return (
     <div className="h-dvh flex flex-col md:flex-row bg-background overflow-hidden">

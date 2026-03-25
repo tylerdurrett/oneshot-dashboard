@@ -1,39 +1,35 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-
-let mockPathname = '/timers';
-
-vi.mock('next/navigation', () => ({
-  usePathname: () => mockPathname,
-}));
-
-vi.mock('next/link', () => ({
-  default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [key: string]: unknown }) => (
-    <a href={href} {...props}>{children}</a>
-  ),
-}));
+import { afterEach, describe, expect, it } from 'vitest';
+import { MemoryRouter } from 'react-router';
 
 import { AppShell } from '../app-shell';
 
+function renderWithRouter(pathname: string, children: React.ReactNode = <div />) {
+  return render(
+    <MemoryRouter initialEntries={[pathname]}>
+      <AppShell>{children}</AppShell>
+    </MemoryRouter>,
+  );
+}
+
 afterEach(() => {
   cleanup();
-  mockPathname = '/timers';
 });
 
 describe('AppShell', () => {
   it('renders children in the main content area', () => {
-    render(<AppShell><div data-testid="child">Content</div></AppShell>);
+    renderWithRouter('/timers', <div data-testid="child">Content</div>);
     expect(screen.getByTestId('child')).toBeDefined();
   });
 
   it('renders two navigation landmarks (desktop sidebar + mobile bottom)', () => {
-    render(<AppShell><div /></AppShell>);
+    renderWithRouter('/timers');
     expect(screen.getByRole('navigation', { name: 'Sidebar navigation' })).toBeDefined();
     expect(screen.getByRole('navigation', { name: 'Bottom navigation' })).toBeDefined();
   });
 
   it('renders Timers and Chat nav links', () => {
-    render(<AppShell><div /></AppShell>);
+    renderWithRouter('/timers');
     const timerLinks = screen.getAllByText('Timers');
     const chatLinks = screen.getAllByText('Chat');
     // Two of each — one desktop, one mobile
@@ -42,14 +38,13 @@ describe('AppShell', () => {
   });
 
   it('renders More as a button (not a link)', () => {
-    render(<AppShell><div /></AppShell>);
+    renderWithRouter('/timers');
     const moreButtons = screen.getAllByRole('button', { name: 'More options' });
     expect(moreButtons).toHaveLength(2);
   });
 
   it('highlights Timers when pathname is /timers', () => {
-    mockPathname = '/timers';
-    render(<AppShell><div /></AppShell>);
+    renderWithRouter('/timers');
     const timerLinks = screen.getAllByText('Timers');
     const parentLink = timerLinks[0]!.closest('a');
     expect(parentLink).toBeDefined();
@@ -57,8 +52,7 @@ describe('AppShell', () => {
   });
 
   it('highlights Chat for nested chat routes (prefix match)', () => {
-    mockPathname = '/chat/thread-123';
-    render(<AppShell><div /></AppShell>);
+    renderWithRouter('/chat/thread-123');
     const chatLinks = screen.getAllByText('Chat');
     const parentLink = chatLinks[0]!.closest('a');
     expect(parentLink).toBeDefined();
@@ -66,8 +60,7 @@ describe('AppShell', () => {
   });
 
   it('does not highlight Timers when on chat page', () => {
-    mockPathname = '/chat';
-    render(<AppShell><div /></AppShell>);
+    renderWithRouter('/chat');
     const timerLinks = screen.getAllByText('Timers');
     const parentLink = timerLinks[0]!.closest('a');
     expect(parentLink).toBeDefined();

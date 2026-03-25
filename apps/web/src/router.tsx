@@ -1,13 +1,17 @@
 import { createBrowserRouter, Outlet, redirect } from 'react-router';
 
+import { AppShell } from '@/components/app-shell';
+
 // ---------------------------------------------------------------------------
-// Temporary layout — passes through child routes via <Outlet />.
-// The real AppShell / ChatProviders integration happens in Phase 2.1 once
-// next/link and next/navigation imports are replaced with React Router.
+// Shell layout — wraps routes in the AppShell (sidebar + bottom nav).
 // ---------------------------------------------------------------------------
 
-function PassthroughLayout() {
-  return <Outlet />;
+function ShellLayout() {
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  );
 }
 
 function PrototypeLayout() {
@@ -34,11 +38,10 @@ export const routes = [
     loader: () => redirect('/timers'),
   },
   {
-    element: <PassthroughLayout />,
+    element: <ShellLayout />,
     children: [
       { path: 'timers', element: placeholder('Timers')() },
       {
-        element: <PassthroughLayout />,
         children: [
           { path: 'chat', element: placeholder('Chat')() },
           { path: 'chat/:threadId', element: placeholder('Chat Thread')() },

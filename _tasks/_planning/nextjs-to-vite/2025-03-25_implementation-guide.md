@@ -150,19 +150,21 @@ apps/web/
 
 ### 2.1 Migrate AppShell component
 
-- [ ] Replace `import Link from 'next/link'` with `import { Link } from 'react-router'`
-- [ ] Replace `usePathname()` from `next/navigation` with `useLocation().pathname` from `react-router`
-- [ ] Update `Link` usage: `href` prop → `to` prop
-- [ ] Remove `'use client'` directive
-- [ ] Update `components/__tests__/app-shell.test.tsx`: remove `vi.mock('next/navigation')` and `vi.mock('next/link')`, wrap renders in `<MemoryRouter initialEntries={[path]}>` instead
-- [ ] Verify nav highlighting works on all routes
+- [x] Replace `import Link from 'next/link'` with `import { Link } from 'react-router'`
+- [x] Replace `usePathname()` from `next/navigation` with `useLocation().pathname` from `react-router`
+- [x] Update `Link` usage: `href` prop → `to` prop
+- [x] Remove `'use client'` directive
+- [x] Update `components/__tests__/app-shell.test.tsx`: remove `vi.mock('next/navigation')` and `vi.mock('next/link')`, wrap renders in `<MemoryRouter initialEntries={[path]}>` instead
+- [x] Verify nav highlighting works on all routes
+
+> **Notes (2.1):** Also wired the real `<AppShell>` into `router.tsx` — replaced the `PassthroughLayout` with a `ShellLayout` that wraps `<AppShell><Outlet /></AppShell>`. Updated `router.test.tsx` to use `getAllByText` for "Timers" and "Chat" placeholders since those labels now also appear in the AppShell nav. The chat sub-layout no longer uses `PassthroughLayout` — it uses a pathless route with just `children` (React Router renders children directly when no `element` is specified). Three pre-existing test suite failures remain (prototype, chat pages still importing `next/*` — fixed in Phase 3).
 
 **Acceptance Criteria:**
-- Sidebar and bottom nav render correctly
-- Active route is highlighted
-- Clicking nav items navigates to the correct route
-- Context menu on Timers nav item still works
-- AppShell tests pass with React Router mocking approach
+- Sidebar and bottom nav render correctly ✅
+- Active route is highlighted ✅
+- Clicking nav items navigates to the correct route ✅
+- Context menu on Timers nav item still works ✅
+- AppShell tests pass with React Router mocking approach ✅ (7/7 pass)
 
 ### 2.2 Create React error boundary component
 
