@@ -287,14 +287,16 @@ apps/web/
 
 ### 4.1 Update vitest config to extend Vite config
 
-- [ ] Update `apps/web/vitest.config.ts` to import and extend `vite.config.ts` so path aliases, plugins, and env handling are shared (avoids duplication and drift)
-- [ ] Remove manually duplicated `esbuild.jsx` and `resolve.alias` from vitest config
-- [ ] Run `pnpm --filter @repo/web test` to verify all tests still pass
+- [x] Update `apps/web/vitest.config.ts` to import and extend `vite.config.ts` so path aliases, plugins, and env handling are shared (avoids duplication and drift)
+- [x] Remove manually duplicated `esbuild.jsx` and `resolve.alias` from vitest config
+- [x] Run `pnpm --filter @repo/web test` to verify all tests still pass
+
+> **Notes (4.1):** Used Vitest's `mergeConfig` utility to extend the vite config cleanly. The `esbuild.jsx: 'automatic'` setting was redundant since `@vitejs/plugin-react` (inherited from vite.config) handles JSX transformation. The `resolve.alias` and `__dirname` calculation were exact duplicates. All 230 tests pass across 19 test files.
 
 **Acceptance Criteria:**
-- `vitest.config.ts` extends `vite.config.ts`
-- No duplicated alias or plugin config between the two files
-- All tests pass
+- `vitest.config.ts` extends `vite.config.ts` ✅
+- No duplicated alias or plugin config between the two files ✅
+- All tests pass ✅ (230/230)
 
 ### 4.2 Update TypeScript config
 

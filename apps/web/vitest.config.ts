@@ -1,20 +1,11 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vitest/config';
+import { defineConfig, mergeConfig } from 'vitest/config';
+import viteConfig from './vite.config';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-export default defineConfig({
-  esbuild: {
-    jsx: 'automatic',
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@repo/ui': path.resolve(__dirname, '../../packages/ui/src'),
+export default mergeConfig(
+  viteConfig,
+  defineConfig({
+    test: {
+      environment: 'jsdom',
     },
-  },
-  test: {
-    environment: 'jsdom',
-  },
-});
+  }),
+);
