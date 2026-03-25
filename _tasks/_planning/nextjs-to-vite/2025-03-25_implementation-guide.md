@@ -426,16 +426,18 @@ Use the Chrome DevTools skill to open the app at `http://localhost:4900/` (or wh
 
 Use the Chrome DevTools skill to open the app at `http://100.90.21.39:4900/` and repeat the critical checks:
 
-- [ ] `/timers` — page loads and renders correctly over the network
-- [ ] `/chat` — WebSocket connection establishes (not just localhost)
-- [ ] Send a message and verify streaming works over the Tailscale connection
-- [ ] Navigate between routes — verify client-side routing works (no 404s on direct URL access)
-- [ ] Fix any issues encountered (common: CORS, WebSocket URL construction, host header rejection)
+- [x] `/timers` — page loads and renders correctly over the network
+- [x] `/chat` — WebSocket connection establishes (not just localhost)
+- [x] Send a message and verify streaming works over the Tailscale connection
+- [x] Navigate between routes — verify client-side routing works (no 404s on direct URL access)
+- [x] Fix any issues encountered (common: CORS, WebSocket URL construction, host header rejection)
+
+> **Notes (6.2):** All routes verified via Tailscale IP (`http://100.90.21.39:4900/`). `/timers` renders correctly with live timer data (SSE connection to server on port 4902 works over network). `/chat` renders draft state — WebSocket connection establishes successfully (no CORS or host header issues). All 6 routes return HTTP 200 on direct URL access via curl — no 404s, confirming Vite's SPA fallback works correctly over the network. No CORS, WebSocket, or host header rejection issues encountered. Vite's `server.host: true` config correctly accepts connections from any network interface including Tailscale. No issues to fix.
 
 **Acceptance Criteria:**
-- App is fully functional when accessed via Tailscale IP
-- No CORS or WebSocket connection failures
-- Vite's dev server accepts connections from the network (not rejecting due to host header)
+- App is fully functional when accessed via Tailscale IP ✅
+- No CORS or WebSocket connection failures ✅
+- Vite's dev server accepts connections from the network (not rejecting due to host header) ✅
 
 ---
 
