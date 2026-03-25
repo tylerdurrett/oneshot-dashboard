@@ -1,7 +1,31 @@
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { timerBuckets, timerDailyProgress } from '@repo/db';
+import { createBucket } from '../services/timer-bucket.js';
 import type { Database } from '../services/thread.js';
+
+/** Create a test bucket with sensible defaults. */
+export async function seedBucket(
+  db: Database,
+  overrides: {
+    name?: string;
+    totalMinutes?: number;
+    colorIndex?: number;
+    daysOfWeek?: number[];
+    sortOrder?: number;
+  } = {},
+) {
+  return createBucket(
+    {
+      name: overrides.name ?? 'Test Bucket',
+      totalMinutes: overrides.totalMinutes ?? 60,
+      colorIndex: overrides.colorIndex ?? 0,
+      daysOfWeek: overrides.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6],
+      sortOrder: overrides.sortOrder,
+    },
+    db,
+  );
+}
 
 /** Create a fresh in-memory database with the timer schema applied.
  *  Shared across timer service tests to avoid duplicating DDL. */

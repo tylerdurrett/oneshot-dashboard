@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { timerDailyProgress } from '@repo/db';
 import type { Database } from '../services/thread.js';
-import { createBucket } from '../services/timer-bucket.js';
 import {
   getResetDate,
   getTodayState,
@@ -11,24 +10,7 @@ import {
   setRemainingTime,
   stopAllRunningTimers,
 } from '../services/timer-progress.js';
-import { createTimerTestDb } from './timer-test-helpers.js';
-
-/** Helper: create a test bucket with sensible defaults. */
-async function seedBucket(
-  db: Database,
-  overrides: { name?: string; totalMinutes?: number; colorIndex?: number; daysOfWeek?: number[]; sortOrder?: number } = {},
-) {
-  return createBucket(
-    {
-      name: overrides.name ?? 'Test Bucket',
-      totalMinutes: overrides.totalMinutes ?? 60,
-      colorIndex: overrides.colorIndex ?? 0,
-      daysOfWeek: overrides.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6],
-      sortOrder: overrides.sortOrder,
-    },
-    db,
-  );
-}
+import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
 
 // ---------------------------------------------------------------------------
 // getResetDate

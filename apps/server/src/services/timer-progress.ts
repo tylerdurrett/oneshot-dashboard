@@ -44,10 +44,10 @@ export interface StopTimerResult {
 // ---------------------------------------------------------------------------
 
 /** Hour at which the daily reset boundary occurs. */
-const RESET_HOUR = 3;
+export const RESET_HOUR = 3;
 
 /** Compute whole seconds elapsed since an ISO timestamp. */
-function elapsedSince(startedAt: string, now: Date): number {
+export function elapsedSince(startedAt: string, now: Date): number {
   return Math.floor((now.getTime() - new Date(startedAt).getTime()) / 1000);
 }
 

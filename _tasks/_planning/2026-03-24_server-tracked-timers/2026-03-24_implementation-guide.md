@@ -166,7 +166,7 @@ apps/web/src/app/(shell)/timers/
 
 ### 2.3 Timer Scheduler
 
-- [ ] Create `apps/server/src/services/timer-scheduler.ts` with a `TimerScheduler` class:
+- [x] Create `apps/server/src/services/timer-scheduler.ts` with a `TimerScheduler` class:
   - Constructor accepts: `database`, `onTimerCompleted` callback, `onDailyReset` callback
   - `completionJobs: Map<string, NodeJS.Timeout>` — maps `bucketId` to scheduled timeout
   - `resetJob: NodeJS.Timeout | null` — the next 3AM reset job
@@ -178,7 +178,7 @@ apps/web/src/app/(shell)/timers/
   - `cancelCompletion(bucketId)` — clear timeout, remove from map
   - `scheduleNextReset()` — compute ms until next 3AM, schedule `setTimeout`. On fire: call `stopAllRunningTimers()`, invoke `onDailyReset()` callback, then call `scheduleNextReset()` again for the following day
   - `destroy()` — clear all timeouts (completion jobs + reset job). Called on server shutdown via `onClose` hook
-- [ ] Write tests in `apps/server/src/__tests__/timer-scheduler.test.ts`:
+- [x] Write tests in `apps/server/src/__tests__/timer-scheduler.test.ts`:
   - `init()` recovers stale timers from previous dates
   - `init()` schedules completion for currently running timers
   - `init()` auto-completes overdue timers
@@ -187,6 +187,7 @@ apps/web/src/app/(shell)/timers/
   - `scheduleNextReset` computes correct time until 3AM
   - `destroy()` cleans up all timeouts
   - Scheduling a new completion for the same bucket cancels the previous one
+  - *Note: 15 tests covering all scheduler behaviors using Vitest fake timers. Added `destroyed` flag with guards after each `await` to prevent post-destroy callback execution. Added try/catch in setTimeout callbacks to prevent unhandled promise rejections. Exported `elapsedSince` and `RESET_HOUR` from timer-progress.ts to avoid duplication. Extracted shared `seedBucket()` helper to timer-test-helpers.ts. 203 total tests pass.*
 
 **Acceptance Criteria:**
 - Server restart with a running timer resumes tracking correctly
