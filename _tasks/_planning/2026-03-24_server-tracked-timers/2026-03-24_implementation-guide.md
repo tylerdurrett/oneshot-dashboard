@@ -327,7 +327,7 @@ apps/web/src/app/(shell)/timers/
 
 ### 4.2 SSE Hook
 
-- [ ] Create `apps/web/src/app/(shell)/timers/_hooks/use-timer-sse.ts`:
+- [x] Create `apps/web/src/app/(shell)/timers/_hooks/use-timer-sse.ts`:
   - `useTimerSSE(handlers)` hook:
     - Connects to `${getBaseUrl()}/timers/events` via `EventSource`
     - Accepts callback handlers: `onTimerCompleted(bucketId)`, `onTimerStarted(data)`, `onTimerStopped(data)`, `onTimerReset(data)`, `onTimerUpdated(data)`, `onDailyReset()`
@@ -335,6 +335,7 @@ apps/web/src/app/(shell)/timers/
     - Cleans up on unmount
     - Uses refs for handlers to avoid reconnecting when callbacks change
   - Export `SSE_EVENTS` constants matching server event names
+  - *Note: Reuses `getBaseUrl()` from `timer-api.ts` (exported it) instead of duplicating the port-lookup logic. Added `safeParse()` helper with try/catch around JSON.parse to match the defensive pattern used in `use-chat-socket.ts`. Exports typed data interfaces (`TimerStartedData`, `TimerStoppedData`, etc.) for use by consumers. All 222 existing web tests pass.*
 
 **Acceptance Criteria:**
 - Hook connects to SSE endpoint on mount
