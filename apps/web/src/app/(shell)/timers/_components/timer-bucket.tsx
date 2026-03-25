@@ -186,6 +186,10 @@ export function TimerBucket({
         return;
       }
 
+      // Only toggle on primary button (left-click / touch tap).
+      // Right-click (button 2) opens context menu and should not toggle.
+      if (e.button !== 0) return;
+
       onToggle();
     },
     [onToggle],
