@@ -19,16 +19,6 @@ export interface TimeBucket {
   daysOfWeek: number[];
 }
 
-/** Persisted state for the entire timer system. */
-export interface TimerState {
-  buckets: TimeBucket[];
-  activeBucketId: string | null;
-  /** ISO timestamp of last tick (for elapsed-time recovery on reload). */
-  lastActiveTime: string | null;
-  /** YYYY-MM-DD of the last daily reset (3 AM-adjusted). */
-  lastResetDate: string;
-}
-
 // ---------------------------------------------------------------------------
 // Color system
 // ---------------------------------------------------------------------------
@@ -51,53 +41,6 @@ export const BUCKET_COLORS: BucketColor[] = [
   { vibrant: 'var(--bucket-9)', muted: 'var(--bucket-9-muted)' },
   { vibrant: 'var(--bucket-10)', muted: 'var(--bucket-10-muted)' },
 ];
-
-// ---------------------------------------------------------------------------
-// Default buckets
-// ---------------------------------------------------------------------------
-
-const MON_FRI = [1, 2, 3, 4, 5]; // Monday through Friday
-
-export const DEFAULT_BUCKETS: TimeBucket[] = [
-  {
-    id: 'default-1',
-    name: 'School Project',
-    totalMinutes: 180,
-    elapsedSeconds: 0,
-    colorIndex: 0, // Blue
-    daysOfWeek: MON_FRI,
-  },
-  {
-    id: 'default-2',
-    name: 'Business Project',
-    totalMinutes: 180,
-    elapsedSeconds: 0,
-    colorIndex: 1, // Teal
-    daysOfWeek: MON_FRI,
-  },
-  {
-    id: 'default-3',
-    name: 'Life Maintenance',
-    totalMinutes: 60,
-    elapsedSeconds: 0,
-    colorIndex: 2, // Orange
-    daysOfWeek: MON_FRI,
-  },
-  {
-    id: 'default-4',
-    name: 'Exercise',
-    totalMinutes: 60,
-    elapsedSeconds: 0,
-    colorIndex: 3, // Pink
-    daysOfWeek: MON_FRI,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// Persistence
-// ---------------------------------------------------------------------------
-
-export const STORAGE_KEY = 'time-buckets-state';
 
 /** Custom event name used to trigger the "add bucket" flow from outside the
  *  timers page (e.g. from the app shell nav context menu). */
@@ -138,21 +81,7 @@ export function formatTime(seconds: number): string {
 }
 
 /**
- * Return today's date as `YYYY-MM-DD`, treating times before 3 AM as the
- * previous calendar day. This lets the daily reset happen at 3 AM instead
- * of midnight.
- */
-export function getResetDate(now: Date = new Date()): string {
-  const adjusted = adjustForResetBoundary(now);
-  const year = adjusted.getFullYear();
-  const month = String(adjusted.getMonth() + 1).padStart(2, '0');
-  const day = String(adjusted.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
  * Check whether a bucket is scheduled for today (3 AM-adjusted).
- * Uses the same 3 AM boundary as `getResetDate`.
  */
 export function isBucketActiveToday(
   bucket: TimeBucket,

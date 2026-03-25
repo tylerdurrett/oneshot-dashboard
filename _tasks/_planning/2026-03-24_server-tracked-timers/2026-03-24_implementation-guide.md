@@ -313,12 +313,12 @@ apps/web/src/app/(shell)/timers/
     - `setTimerTime(bucketId, remainingSeconds)` → `POST /timers/buckets/:id/set-time`
   - Error handling: throw on non-OK status (matching `chat/api.ts` pattern)
   - *Note: Also exports `BucketResponse` (for CRUD ops), `CreateBucketInput`, and `UpdateBucketInput` types. Response types mirror server shapes exactly — `StopTimerResponse` matches the route's transformed output (no `changed` field). All 222 existing web tests pass.*
-- [ ] Update `timer-types.ts`:
+- [x] Update `timer-types.ts`:
   - Keep: `TimeBucket` interface, `BucketColor`, `BUCKET_COLORS`, `formatTime()`, `isBucketActiveToday()`, `generateBucketId()`, `ADD_BUCKET_EVENT`
   - Remove: `TimerState` interface, `STORAGE_KEY`, `DEFAULT_BUCKETS` (defaults now live on the server)
   - Remove: `getResetDate()` (server is now source of truth for dates — client receives date in API response)
   - Keep `RESET_HOUR` and `adjustForResetBoundary` only if `isBucketActiveToday` still needs them for client-side display filtering. If the server's `GET /timers/today` already returns only today's state, these can be removed too. Decision: keep them — the client receives ALL buckets and filters locally for display, since it needs `allBuckets` for the settings dialog
-  - *Note: Deferred to Phase 4.4/4.5 — `TimerState`, `STORAGE_KEY`, `DEFAULT_BUCKETS`, and `getResetDate()` are still imported by the current `use-timer-state.ts`. Removing them now would break compilation. They will be removed when `use-timer-state.ts` is rewritten (4.4) and the migration cleanup runs (4.5).*
+  - *Note: Completed in Phase 4.5. Removed `TimerState`, `STORAGE_KEY`, `DEFAULT_BUCKETS`, and `getResetDate()`. Kept `RESET_HOUR` and `adjustForResetBoundary` (private, used by `isBucketActiveToday`). Updated stale JSDoc reference. Corresponding tests removed from `timer-types.test.ts`.*
 
 **Acceptance Criteria:**
 - All API functions work against the running server
@@ -405,16 +405,20 @@ apps/web/src/app/(shell)/timers/
 
 ### 4.5 localStorage Migration & Cleanup
 
-- [ ] Add one-time migration logic to `timer-grid.tsx` (or a dedicated migration utility):
+- [x] Add one-time migration logic to `timer-grid.tsx` (or a dedicated migration utility):
   - On mount, check if `localStorage.getItem('time-buckets-state')` exists
   - If so, parse it and POST each bucket to `POST /timers/buckets` (skip if a bucket with the same name already exists on the server, to handle partial migrations)
   - For each bucket, if it has `elapsedSeconds > 0` for today, also call `setTimerTime` to set progress
   - On success, remove the localStorage key
   - Wrap in try/catch — if migration fails, leave localStorage intact (user can retry next load)
-- [ ] Remove from `timer-types.ts`: `STORAGE_KEY` constant, `DEFAULT_BUCKETS` array
-- [ ] Remove from `use-timer-state.ts`: `loadState()` function, all localStorage read/write logic
-- [ ] Remove `loadState` tests from test file
-- [ ] Update `timer-grid.tsx`: remove any direct localStorage references
+  - *Note: Created dedicated `_lib/migrate-local-storage.ts` utility with `migrateLocalStorageToServer()`. Uses frozen `LegacyBucket`/`LegacyTimerState` interfaces to parse old localStorage format safely. Wired into `timer-grid.tsx` via `useEffect` on mount; invalidates TanStack Query cache on success. Partial migration recovery: existing buckets (by name) still get `setTimerTime` called for elapsed progress, handling the case where a prior attempt created the bucket but failed on the time-set call. Migration failures are logged via `console.warn` for visibility. 8 tests covering: no-op, full migration, skip-by-name with elapsed retry, elapsed progress, corrupt data, empty buckets, partial failure mid-loop, and API failure. 227 total web tests pass.*
+- [x] Remove from `timer-types.ts`: `STORAGE_KEY` constant, `DEFAULT_BUCKETS` array
+- [x] Remove from `use-timer-state.ts`: `loadState()` function, all localStorage read/write logic
+  - *Note: Already removed in Phase 4.4 — `use-timer-state.ts` had no remaining localStorage logic.*
+- [x] Remove `loadState` tests from test file
+  - *Note: Already removed in Phase 4.4 — no `loadState` tests existed in the rewritten test file.*
+- [x] Update `timer-grid.tsx`: remove any direct localStorage references
+  - *Note: No direct localStorage references existed — only the new migration `useEffect` was added.*
 
 **Acceptance Criteria:**
 - Existing localStorage data is migrated to the server on first load after upgrade

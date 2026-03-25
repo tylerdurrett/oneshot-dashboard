@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatTime,
-  getResetDate,
   isBucketActiveToday,
   generateBucketId,
   BUCKET_COLORS,
-  DEFAULT_BUCKETS,
-  STORAGE_KEY,
   type TimeBucket,
 } from '../_lib/timer-types';
 
@@ -50,48 +47,6 @@ describe('formatTime', () => {
 
   it('floors fractional seconds', () => {
     expect(formatTime(59.9)).toBe('0:59');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// getResetDate
-// ---------------------------------------------------------------------------
-
-describe('getResetDate', () => {
-  it('returns todays date when time is after 3 AM', () => {
-    // March 24, 2026 at 10:00 AM
-    const date = new Date(2026, 2, 24, 10, 0, 0);
-    expect(getResetDate(date)).toBe('2026-03-24');
-  });
-
-  it('returns previous day when time is before 3 AM', () => {
-    // March 24, 2026 at 2:59 AM → treated as March 23
-    const date = new Date(2026, 2, 24, 2, 59, 0);
-    expect(getResetDate(date)).toBe('2026-03-23');
-  });
-
-  it('returns today at exactly 3:00 AM', () => {
-    // March 24, 2026 at 3:00 AM → treated as March 24
-    const date = new Date(2026, 2, 24, 3, 0, 0);
-    expect(getResetDate(date)).toBe('2026-03-24');
-  });
-
-  it('returns previous day at midnight', () => {
-    // March 24, 2026 at 0:00 → treated as March 23
-    const date = new Date(2026, 2, 24, 0, 0, 0);
-    expect(getResetDate(date)).toBe('2026-03-23');
-  });
-
-  it('handles month boundary (before 3 AM on the 1st)', () => {
-    // April 1, 2026 at 1:00 AM → treated as March 31
-    const date = new Date(2026, 3, 1, 1, 0, 0);
-    expect(getResetDate(date)).toBe('2026-03-31');
-  });
-
-  it('handles year boundary (before 3 AM on Jan 1)', () => {
-    // January 1, 2027 at 2:00 AM → treated as December 31, 2026
-    const date = new Date(2027, 0, 1, 2, 0, 0);
-    expect(getResetDate(date)).toBe('2026-12-31');
   });
 });
 
@@ -192,26 +147,3 @@ describe('BUCKET_COLORS', () => {
   });
 });
 
-describe('DEFAULT_BUCKETS', () => {
-  it('has 4 default buckets', () => {
-    expect(DEFAULT_BUCKETS).toHaveLength(4);
-  });
-
-  it('all default buckets are Mon–Fri', () => {
-    for (const bucket of DEFAULT_BUCKETS) {
-      expect(bucket.daysOfWeek).toEqual([1, 2, 3, 4, 5]);
-    }
-  });
-
-  it('all default buckets start with 0 elapsed seconds', () => {
-    for (const bucket of DEFAULT_BUCKETS) {
-      expect(bucket.elapsedSeconds).toBe(0);
-    }
-  });
-});
-
-describe('STORAGE_KEY', () => {
-  it('is the expected string', () => {
-    expect(STORAGE_KEY).toBe('time-buckets-state');
-  });
-});

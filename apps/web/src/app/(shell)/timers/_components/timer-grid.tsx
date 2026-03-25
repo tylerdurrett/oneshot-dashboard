@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Clock, Plus } from 'lucide-react';
 
 import { Button } from '@repo/ui';
@@ -12,6 +13,8 @@ import {
   type TimeBucket,
 } from '../_lib/timer-types';
 import { squarify, type TreemapItem } from '../_lib/treemap';
+import { migrateLocalStorageToServer } from '../_lib/migrate-local-storage';
+import { timerKeys } from '../_hooks/use-timer-queries';
 import { useTimerState } from '../_hooks/use-timer-state';
 import { BucketSettingsDialog } from './bucket-settings-dialog';
 import { TimerBucket } from './timer-bucket';
@@ -58,6 +61,7 @@ function nextAvailableColorIndex(buckets: TimeBucket[]): number {
 // ---------------------------------------------------------------------------
 
 export function TimerGrid() {
+  const queryClient = useQueryClient();
   const {
     isHydrated,
     allBuckets,
@@ -71,6 +75,22 @@ export function TimerGrid() {
     resetBucketForToday,
     setRemainingTime,
   } = useTimerState();
+
+  // One-time migration: move old localStorage timer data to the server.
+  // Runs once on mount. On success, invalidates queries so new data appears.
+  useEffect(() => {
+    migrateLocalStorageToServer()
+      .then((migrated) => {
+        if (migrated) {
+          queryClient.invalidateQueries({ queryKey: timerKeys.today });
+          queryClient.invalidateQueries({ queryKey: timerKeys.buckets });
+        }
+      })
+      .catch((err) => {
+        // Non-fatal — localStorage is preserved for retry on next load
+        console.warn('[timer-migration] failed, will retry:', err);
+      });
+  }, [queryClient]);
 
   // Selected bucket for settings dialog
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
