@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import {
@@ -8,17 +8,23 @@ import {
   getConnectedClientCount,
   _resetSSEClients,
   SSE_EVENTS,
+  type TimerSchedulerLike,
 } from '../routes/timers.js';
+import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
+import type { Database } from '../services/thread.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a minimal Fastify server with just the timer routes registered. */
-function buildTestServer() {
+/** Build a minimal Fastify server with timer routes registered. */
+function buildTimerTestServer(
+  database?: Database,
+  scheduler?: TimerSchedulerLike,
+) {
   const server = Fastify({ logger: false });
   server.register(cors, { origin: true });
-  server.register(timerRoutes, {});
+  server.register(timerRoutes, { database, scheduler });
   return server;
 }
 
@@ -63,12 +69,12 @@ async function waitFor(
 // ---------------------------------------------------------------------------
 
 describe('SSE infrastructure', () => {
-  let server: ReturnType<typeof buildTestServer>;
+  let server: ReturnType<typeof buildTimerTestServer>;
   let port: number;
 
   beforeEach(async () => {
     _resetSSEClients();
-    server = buildTestServer();
+    server = buildTimerTestServer();
     const address = await server.listen({ port: 0, host: '127.0.0.1' });
     port = Number(new URL(address).port);
   });
@@ -195,6 +201,219 @@ describe('SSE infrastructure', () => {
       expect(SSE_EVENTS.TIMER_RESET).toBe('timer-reset');
       expect(SSE_EVENTS.TIMER_UPDATED).toBe('timer-updated');
       expect(SSE_EVENTS.DAILY_RESET).toBe('daily-reset');
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bucket CRUD route tests
+// ---------------------------------------------------------------------------
+
+describe('Bucket CRUD routes', () => {
+  let testDb: Database;
+  let server: ReturnType<typeof buildTimerTestServer>;
+
+  beforeEach(() => {
+    testDb = createTimerTestDb();
+    server = buildTimerTestServer(testDb);
+  });
+
+  afterEach(async () => {
+    await server.close();
+  });
+
+  describe('GET /timers/buckets', () => {
+    it('returns an empty array when no buckets exist', async () => {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/timers/buckets',
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ buckets: [] });
+    });
+
+    it('returns buckets sorted by sortOrder', async () => {
+      await seedBucket(testDb, { name: 'Second', sortOrder: 1 });
+      await seedBucket(testDb, { name: 'First', sortOrder: 0 });
+
+      const response = await server.inject({
+        method: 'GET',
+        url: '/timers/buckets',
+      });
+
+      const body = response.json();
+      expect(body.buckets).toHaveLength(2);
+      expect(body.buckets[0].name).toBe('First');
+      expect(body.buckets[1].name).toBe('Second');
+    });
+
+    it('returns daysOfWeek as number array', async () => {
+      await seedBucket(testDb, { daysOfWeek: [1, 3, 5] });
+
+      const response = await server.inject({
+        method: 'GET',
+        url: '/timers/buckets',
+      });
+
+      const body = response.json();
+      expect(body.buckets[0].daysOfWeek).toEqual([1, 3, 5]);
+    });
+  });
+
+  describe('POST /timers/buckets', () => {
+    it('creates a bucket and returns 201', async () => {
+      const response = await server.inject({
+        method: 'POST',
+        url: '/timers/buckets',
+        payload: {
+          name: 'Study',
+          totalMinutes: 120,
+          colorIndex: 2,
+          daysOfWeek: [1, 2, 3, 4, 5],
+        },
+      });
+
+      expect(response.statusCode).toBe(201);
+      const body = response.json();
+      expect(body.bucket.name).toBe('Study');
+      expect(body.bucket.totalMinutes).toBe(120);
+      expect(body.bucket.colorIndex).toBe(2);
+      expect(body.bucket.daysOfWeek).toEqual([1, 2, 3, 4, 5]);
+      expect(body.bucket.id).toBeDefined();
+    });
+
+    it('created bucket appears in list', async () => {
+      await server.inject({
+        method: 'POST',
+        url: '/timers/buckets',
+        payload: {
+          name: 'Reading',
+          totalMinutes: 30,
+          colorIndex: 0,
+          daysOfWeek: [0, 6],
+        },
+      });
+
+      const listRes = await server.inject({
+        method: 'GET',
+        url: '/timers/buckets',
+      });
+
+      expect(listRes.json().buckets).toHaveLength(1);
+      expect(listRes.json().buckets[0].name).toBe('Reading');
+    });
+  });
+
+  describe('PATCH /timers/buckets/:id', () => {
+    it('updates a bucket and returns the updated bucket', async () => {
+      const bucket = await seedBucket(testDb, { name: 'Old Name' });
+
+      const response = await server.inject({
+        method: 'PATCH',
+        url: `/timers/buckets/${bucket.id}`,
+        payload: { name: 'New Name', totalMinutes: 90 },
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json();
+      expect(body.bucket.name).toBe('New Name');
+      expect(body.bucket.totalMinutes).toBe(90);
+    });
+
+    it('returns 404 for nonexistent bucket', async () => {
+      const response = await server.inject({
+        method: 'PATCH',
+        url: '/timers/buckets/nonexistent',
+        payload: { name: 'Nope' },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: 'Bucket not found' });
+    });
+
+    it('partial update only changes specified fields', async () => {
+      const bucket = await seedBucket(testDb, {
+        name: 'Keep This',
+        totalMinutes: 60,
+        colorIndex: 1,
+      });
+
+      const response = await server.inject({
+        method: 'PATCH',
+        url: `/timers/buckets/${bucket.id}`,
+        payload: { colorIndex: 3 },
+      });
+
+      const body = response.json();
+      expect(body.bucket.name).toBe('Keep This');
+      expect(body.bucket.totalMinutes).toBe(60);
+      expect(body.bucket.colorIndex).toBe(3);
+    });
+  });
+
+  describe('DELETE /timers/buckets/:id', () => {
+    it('deletes a bucket and returns success', async () => {
+      const bucket = await seedBucket(testDb);
+
+      const response = await server.inject({
+        method: 'DELETE',
+        url: `/timers/buckets/${bucket.id}`,
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ success: true });
+
+      // Verify it's gone
+      const listRes = await server.inject({
+        method: 'GET',
+        url: '/timers/buckets',
+      });
+      expect(listRes.json().buckets).toHaveLength(0);
+    });
+
+    it('returns 404 for nonexistent bucket', async () => {
+      const response = await server.inject({
+        method: 'DELETE',
+        url: '/timers/buckets/nonexistent',
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: 'Bucket not found' });
+    });
+
+    it('cancels scheduled completion job on delete', async () => {
+      const mockScheduler: TimerSchedulerLike = {
+        cancelCompletion: vi.fn(),
+      };
+      // Scheduler tests need their own server instance with the mock injected
+      const schedulerServer = buildTimerTestServer(testDb, mockScheduler);
+      const bucket = await seedBucket(testDb);
+
+      await schedulerServer.inject({
+        method: 'DELETE',
+        url: `/timers/buckets/${bucket.id}`,
+      });
+
+      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+
+      await schedulerServer.close();
+    });
+
+    it('does not call scheduler.cancelCompletion on 404', async () => {
+      const mockScheduler: TimerSchedulerLike = {
+        cancelCompletion: vi.fn(),
+      };
+      const schedulerServer = buildTimerTestServer(testDb, mockScheduler);
+
+      await schedulerServer.inject({
+        method: 'DELETE',
+        url: '/timers/buckets/nonexistent',
+      });
+
+      expect(mockScheduler.cancelCompletion).not.toHaveBeenCalled();
+
+      await schedulerServer.close();
     });
   });
 });

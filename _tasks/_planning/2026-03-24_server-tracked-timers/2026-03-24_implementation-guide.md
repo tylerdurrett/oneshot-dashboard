@@ -226,12 +226,13 @@ apps/web/src/app/(shell)/timers/
 
 ### 3.2 Bucket CRUD Routes
 
-- [ ] Add to `apps/server/src/routes/timers.ts`:
+- [x] Add to `apps/server/src/routes/timers.ts`:
   - `GET /timers/buckets` — returns `{ buckets }` via `listBuckets()`
   - `POST /timers/buckets` — accepts `{ name, totalMinutes, colorIndex, daysOfWeek }`, returns `{ bucket }` with 201
   - `PATCH /timers/buckets/:id` — accepts partial update body, returns `{ bucket }` or 404
   - `DELETE /timers/buckets/:id` — returns `{ success: true }` or 404. Also cancels any scheduled completion job for this bucket
-- [ ] Write route tests using Fastify `inject()` (matching existing `threads.test.ts` pattern)
+- [x] Write route tests using Fastify `inject()` (matching existing `threads.test.ts` pattern)
+  - *Note: 12 tests covering all CRUD operations, 404 cases, partial updates, daysOfWeek serialization, and scheduler interaction via mock. Added `TimerSchedulerLike` minimal interface so routes don't depend on full `TimerScheduler` class. Tests use shared `buildTimerTestServer()` helper with `beforeEach`/`afterEach` lifecycle. 223 total tests pass.*
 
 **Acceptance Criteria:**
 - All CRUD operations return correct status codes and response shapes

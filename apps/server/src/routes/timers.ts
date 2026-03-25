@@ -1,13 +1,27 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerResponse } from 'node:http';
 import type { Database } from '../services/thread.js';
+import {
+  listBuckets,
+  createBucket,
+  updateBucket,
+  deleteBucket,
+  type CreateBucketInput,
+  type UpdateBucketInput,
+} from '../services/timer-bucket.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+/** Minimal interface for the scheduler — routes only need cancelCompletion. */
+export interface TimerSchedulerLike {
+  cancelCompletion(bucketId: string): void;
+}
+
 export interface TimerRoutesOptions {
   database?: Database;
+  scheduler?: TimerSchedulerLike;
 }
 
 /** SSE event names broadcast by the timer system. */
@@ -91,8 +105,10 @@ function removeClient(clientId: string): void {
 /** Fastify plugin that registers timer routes (SSE + REST). */
 export async function timerRoutes(
   server: FastifyInstance,
-  _opts: TimerRoutesOptions,
+  opts: TimerRoutesOptions,
 ) {
+  const db = opts.database;
+  const scheduler = opts.scheduler;
   /**
    * SSE endpoint — clients connect here to receive real-time timer events.
    * Sends an initial `:ok` comment as a connection confirmation.
@@ -128,4 +144,50 @@ export async function timerRoutes(
     // Prevent Fastify from sending its own response — we're streaming
     reply.hijack();
   });
+
+  // -------------------------------------------------------------------------
+  // Bucket CRUD routes
+  // -------------------------------------------------------------------------
+
+  server.get('/timers/buckets', async () => {
+    const buckets = await listBuckets(db);
+    return { buckets };
+  });
+
+  server.post<{ Body: CreateBucketInput }>(
+    '/timers/buckets',
+    async (request, reply) => {
+      const { name, totalMinutes, colorIndex, daysOfWeek } = request.body;
+      const bucket = await createBucket(
+        { name, totalMinutes, colorIndex, daysOfWeek },
+        db,
+      );
+      return reply.status(201).send({ bucket });
+    },
+  );
+
+  server.patch<{ Params: { id: string }; Body: UpdateBucketInput }>(
+    '/timers/buckets/:id',
+    async (request, reply) => {
+      const { id } = request.params;
+      const bucket = await updateBucket(id, request.body, db);
+      if (!bucket) {
+        return reply.status(404).send({ error: 'Bucket not found' });
+      }
+      return { bucket };
+    },
+  );
+
+  server.delete<{ Params: { id: string } }>(
+    '/timers/buckets/:id',
+    async (request, reply) => {
+      const { id } = request.params;
+      const deleted = await deleteBucket(id, db);
+      if (!deleted) {
+        return reply.status(404).send({ error: 'Bucket not found' });
+      }
+      scheduler?.cancelCompletion(id);
+      return reply.status(200).send({ success: true });
+    },
+  );
 }
