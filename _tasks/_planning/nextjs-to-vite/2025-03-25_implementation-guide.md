@@ -74,19 +74,36 @@ apps/web/
 - Path aliases resolve `@/*` and `@repo/ui/*`
 - Port is read from `project.config.json`, not hardcoded
 
-### 1.3 Create HTML entry point and React mount
+### 1.3 Migrate environment variables (must happen before any page works)
 
-- [ ] Create `apps/web/index.html` with `<div id="root">`, font preloads for Geist, and `<script type="module" src="/src/main.tsx">`
+- [ ] Rename `NEXT_PUBLIC_SERVER_PORT` → `VITE_SERVER_PORT` in `.env` and `.env.example`
+- [ ] Update `apps/web/src/lib/server-url.ts`: change `process.env.NEXT_PUBLIC_SERVER_PORT` → `import.meta.env.VITE_SERVER_PORT` (Vite does not inject `process.env` in browser builds — without this, all API calls and WebSocket connections will fail)
+- [ ] Update all other source code references to use `import.meta.env.VITE_SERVER_PORT`
+- [ ] Update `chat/__tests__/api.test.ts`: change `vi.stubEnv('NEXT_PUBLIC_SERVER_PORT', ...)` → `vi.stubEnv('VITE_SERVER_PORT', ...)` and replace `delete process.env.NEXT_PUBLIC_SERVER_PORT` with `vi.unstubAllEnvs()` (cannot `delete` from `import.meta.env`)
+- [ ] Ensure `vite.config.ts` (from 1.2) injects server port from `project.config.json` via `define` or env var
+
+**Acceptance Criteria:**
+- `server-url.ts` reads port from `import.meta.env.VITE_SERVER_PORT`
+- No references to `NEXT_PUBLIC_*` remain in the codebase
+- API tests pass with updated env var name and cleanup pattern
+
+### 1.4 Create HTML entry point and React mount
+
+- [ ] Create `apps/web/index.html` with `<html lang="en" class="dark">`, `<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">`, `<div id="root">`, font preloads for Geist, and `<script type="module" src="/src/main.tsx">`
 - [ ] Create `apps/web/src/main.tsx` that renders `<RouterProvider>` inside `<Providers>`
 - [ ] Create `apps/web/src/vite-env.d.ts` with `/// <reference types="vite/client" />`
 - [ ] Import `globals.css` in `main.tsx`
+- [ ] Delete `apps/web/src/app/page.tsx` (root redirect — imports `next/navigation` which no longer exists; redirect moves to router config)
+- [ ] Delete `apps/web/src/__tests__/page.test.tsx` (tested the Next.js redirect)
 
 **Acceptance Criteria:**
 - `pnpm --filter @repo/web vite dev` starts without errors
 - Browser shows a blank page with no console errors
 - Tailwind styles are loaded (dark background visible)
+- `<html>` has `lang="en"` and `class="dark"`
+- Viewport meta tag includes `viewport-fit=cover` (was previously set via Next.js `Viewport` export)
 
-### 1.4 Set up React Router with placeholder routes
+### 1.5 Set up React Router with placeholder routes
 
 - [ ] Create `apps/web/src/router.tsx` with route definitions for all 7 routes
 - [ ] Add root redirect: `/` navigates to `/timers`
@@ -99,7 +116,7 @@ apps/web/
 - `/` redirects to `/timers`
 - Shell routes show the sidebar/bottom nav via AppShell layout
 
-### 1.5 Update monorepo scripts and Turbo config
+### 1.6 Update monorepo scripts and Turbo config
 
 - [ ] Update `apps/web/package.json` scripts: `dev` → `vite dev`, `build` → `vite build`, `preview` → `vite preview`
 - [ ] Update `turbo.json`: change build output from `.next/**` to `dist/**`
@@ -188,7 +205,7 @@ apps/web/
 ### 3.2 Migrate Chat pages
 
 - [ ] Migrate `/chat` (draft mode page): replace `useRouter` from `next/navigation` with `useNavigate` from `react-router`
-- [ ] Migrate `/chat/:threadId`: replace `useParams` and `useRouter` with React Router equivalents
+- [ ] Migrate `/chat/:threadId`: replace `useParams` and `useRouter` with React Router equivalents. **Note:** React Router's `useParams()` returns `string | undefined` (not `string`), so add a non-null assertion or runtime guard for `params.threadId`
 - [ ] Update `router.push()` calls to `navigate()` and `router.replace()` to `navigate(path, { replace: true })`
 - [ ] Remove `'use client'` directives
 - [ ] Keep chat providers (WebSocket context, QueryClient) in the route layout
@@ -207,38 +224,36 @@ apps/web/
 
 ### 3.3 Migrate Prototype and Video pages
 
-- [ ] Migrate `/prototype`: replace `next/link` with React Router `Link`
+- [ ] Migrate `/prototype`: replace `next/link` with React Router `Link` (`href` → `to` prop)
 - [ ] Migrate `/prototype/chat`: remove any Next.js imports
 - [ ] Migrate `/video`: no Next.js imports to change (already pure React)
 - [ ] Remove `'use client'` directives where present
+- [ ] Update `__tests__/prototype-index.test.tsx`: wrap renders in `<MemoryRouter>` (React Router's `<Link>` requires router context)
 
 **Acceptance Criteria:**
 - `/prototype` lists prototypes with working links
 - `/prototype/chat` renders the fullscreen chat prototype
 - `/video` renders the Remotion player
+- Prototype index test passes
 
 ---
 
-## Phase 4: Update Environment Variables and Config
+## Phase 4: Update Config and Test Infrastructure
 
-**Purpose:** Align env var conventions with Vite and clean up remaining Next.js config artifacts.
+**Purpose:** Clean up remaining Next.js config artifacts and align tooling with Vite.
 
-**Rationale:** Env vars are used at runtime by API calls and WebSocket connections. Getting them wrong would break data fetching, so we handle this as a focused phase after pages are migrated and manually testable.
+**Rationale:** With all pages migrated and env vars already handled (Phase 1.3), this phase focuses on TypeScript, ESLint, Shadcn, and test config alignment.
 
-### 4.1 Migrate environment variables
+### 4.1 Update vitest config to extend Vite config
 
-- [ ] Rename `NEXT_PUBLIC_SERVER_PORT` → `VITE_SERVER_PORT` in `.env` and `.env.example`
-- [ ] Update `apps/web/src/lib/server-url.ts`: change `process.env.NEXT_PUBLIC_SERVER_PORT` → `import.meta.env.VITE_SERVER_PORT`
-- [ ] Update all other source code references to use `import.meta.env.VITE_SERVER_PORT`
-- [ ] Update `chat/__tests__/api.test.ts`: change `vi.stubEnv('NEXT_PUBLIC_SERVER_PORT', ...)` → `vi.stubEnv('VITE_SERVER_PORT', ...)`
-- [ ] Update `vite.config.ts` to inject server port from `project.config.json` as a define or env var
-- [ ] Verify API calls and WebSocket connections use the correct port
+- [ ] Update `apps/web/vitest.config.ts` to import and extend `vite.config.ts` so path aliases, plugins, and env handling are shared (avoids duplication and drift)
+- [ ] Remove manually duplicated `esbuild.jsx` and `resolve.alias` from vitest config
+- [ ] Run `pnpm --filter @repo/web test` to verify all tests still pass
 
 **Acceptance Criteria:**
-- Chat and timer API calls connect to the correct server port
-- WebSocket connections establish successfully
-- No references to `NEXT_PUBLIC_*` remain in the codebase
-- API tests pass with updated env var name
+- `vitest.config.ts` extends `vite.config.ts`
+- No duplicated alias or plugin config between the two files
+- All tests pass
 
 ### 4.2 Update TypeScript config
 
@@ -279,11 +294,9 @@ apps/web/
 - [ ] Delete `apps/web/next-env.d.ts` (if not already removed)
 - [ ] Delete `apps/web/.next/` directory
 - [ ] Remove all remaining `'use client'` directives across `apps/web/src/` (20 files total)
-- [ ] Remove the old `apps/web/src/app/page.tsx` (root redirect — now handled in router)
-- [ ] Delete `apps/web/src/__tests__/page.test.tsx` (tests the Next.js redirect — replaced by router smoke test in 1.4)
-- [ ] Remove old layout files that are now just components imported by the router
+- [ ] Remove old layout files that are now just components imported by the router (root `layout.tsx` moved to `root-layout.tsx` or inlined in `main.tsx`)
 - [ ] Search for any remaining `from 'next` imports and remove them
-- [ ] Update `.gitignore`: remove `.next/` and `out/` entries, add `dist/` under a Vite section if not already present
+- [ ] Update `.gitignore`: remove `.next/`, `out/`, and `# Next.js` comment, add `dist/` under a Vite section if not already present
 - [ ] Update `turbo.json`: ensure build outputs only reference `dist/**`, not `.next/**`
 
 **Acceptance Criteria:**
@@ -324,11 +337,11 @@ apps/web/
 ## Dependency Graph
 
 ```
-Phase 1 (Scaffold Vite)
-  1.1 → 1.2 → 1.3 → 1.4 → 1.5
-                       |
-Phase 2 (Shell + Nav)  |
-  2.1 ─────────────────┘
+Phase 1 (Scaffold Vite + Env Vars)
+  1.1 → 1.2 → 1.3 → 1.4 → 1.5 → 1.6
+                              |
+Phase 2 (Shell + Nav)         |
+  2.1 ────────────────────────┘
   2.1 → 2.2
   2.1 → 2.3
          |
