@@ -2,6 +2,7 @@ import { createBrowserRouter, Outlet, redirect } from 'react-router';
 
 import { AppShell } from '@/components/app-shell';
 import { RouteErrorBoundary } from '@/components/error-boundary';
+import TimersPage from '@/app/(shell)/timers/page';
 
 // ---------------------------------------------------------------------------
 // Shell layout — wraps routes in the AppShell (sidebar + bottom nav).
@@ -41,7 +42,7 @@ export const routes = [
   {
     element: <ShellLayout />,
     children: [
-      { path: 'timers', element: placeholder('Timers')() },
+      { path: 'timers', element: <TimersPage /> },
       {
         errorElement: <RouteErrorBoundary />,
         children: [
