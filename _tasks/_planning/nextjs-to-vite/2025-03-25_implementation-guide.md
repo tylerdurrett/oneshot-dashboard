@@ -66,10 +66,12 @@ apps/web/
 
 ### 1.2 Create Vite config
 
-- [ ] Create `apps/web/vite.config.ts` with React plugin, path aliases (`@/*`, `@repo/ui/*`), and env variable handling
-- [ ] Set dev server to read port from `project.config.json` (same as current Next.js setup)
-- [ ] Configure `server.host: true` for network access (equivalent to Next.js `-H 0.0.0.0`)
-- [ ] Add `envPrefix: 'VITE_'` and define `VITE_SERVER_PORT` (replacing `NEXT_PUBLIC_SERVER_PORT`)
+- [x] Create `apps/web/vite.config.ts` with React plugin, path aliases (`@/*`, `@repo/ui/*`), and env variable handling
+- [x] Set dev server to read port from `project.config.json` (same as current Next.js setup)
+- [x] Configure `server.host: true` for network access (equivalent to Next.js `-H 0.0.0.0`)
+- [x] Add `envPrefix: 'VITE_'` and define `VITE_SERVER_PORT` (replacing `NEXT_PUBLIC_SERVER_PORT`)
+
+> **Notes (1.2):** `VITE_SERVER_PORT` is injected via Vite's `define` option (reading from `project.config.json` at build time) so it works immediately, before `.env` files are updated in section 1.3. Alias for `@repo/ui` points to directory (not glob) to match the vitest.config.ts convention.
 
 **Acceptance Criteria:**
 - `vite.config.ts` exists and exports a valid config
