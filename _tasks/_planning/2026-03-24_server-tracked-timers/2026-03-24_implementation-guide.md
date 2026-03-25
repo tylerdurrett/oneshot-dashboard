@@ -122,7 +122,7 @@ apps/web/src/app/(shell)/timers/
 
 ### 2.2 Daily Progress Service
 
-- [ ] Create `apps/server/src/services/timer-progress.ts` with:
+- [x] Create `apps/server/src/services/timer-progress.ts` with:
   - `getResetDate(now?)` — returns `YYYY-MM-DD` with 3AM boundary adjustment (replicated from client-side `timer-types.ts` since server is now source of truth for dates)
   - `getTodayState(database?)` — returns all buckets with today's progress merged in:
     - Queries all buckets + left-joins today's progress rows
@@ -144,7 +144,7 @@ apps/web/src/app/(shell)/timers/
   - `resetProgress(bucketId, database?)` — set `elapsedSeconds = 0`, clear `startedAt` and `completedAt` for today's row
   - `setRemainingTime(bucketId, remainingSeconds, database?)` — compute `elapsedSeconds = totalMinutes * 60 - remainingSeconds`, update today's row, handle completion if remaining is 0
   - `stopAllRunningTimers(date, database?)` — find all progress rows with `startedAt IS NOT NULL` for the given date, accumulate elapsed for each, clear all `startedAt`. Used by the 3AM reset job. Returns list of stopped bucket IDs
-- [ ] Write tests in `apps/server/src/__tests__/timer-progress.test.ts`:
+- [x] Write tests in `apps/server/src/__tests__/timer-progress.test.ts`:
   - `getResetDate` matches 3AM boundary behavior (before/after 3AM)
   - `getTodayState` returns merged bucket + progress data
   - `getTodayState` auto-completes overdue running timers
@@ -155,6 +155,7 @@ apps/web/src/app/(shell)/timers/
   - `resetProgress` zeros out and clears completion
   - `setRemainingTime` sets correct elapsed and detects completion at 0
   - `stopAllRunningTimers` stops all active timers for a given date
+  - *Note: 29 tests covering all service functions. All functions accept injectable `now: Date` parameter for deterministic testing. Extracted shared `createTimerTestDb()` to `timer-test-helpers.ts` (also used by timer-bucket tests). Extracted `elapsedSince()` private helper to consolidate 5 repeated elapsed-time computations. Exports `TodayBucketState`, `TodayStateResult`, `StartTimerResult`, `StopTimerResult` types. 188 total tests pass.*
 
 **Acceptance Criteria:**
 - Starting a timer when another is running stops the previous one atomically
