@@ -3,6 +3,9 @@ import { createBrowserRouter, Outlet, redirect } from 'react-router';
 import { AppShell } from '@/components/app-shell';
 import { RouteErrorBoundary } from '@/components/error-boundary';
 import TimersPage from '@/app/(shell)/timers/page';
+import ChatIndexPage from '@/app/(shell)/chat/page';
+import ThreadPage from '@/app/(shell)/chat/[threadId]/page';
+import ChatLayout from '@/app/(shell)/chat/layout';
 
 // ---------------------------------------------------------------------------
 // Shell layout — wraps routes in the AppShell (sidebar + bottom nav).
@@ -25,7 +28,7 @@ function PrototypeLayout() {
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder page components — replaced with real pages in Phase 3.
+// Placeholder for routes not yet migrated (Phase 3.3).
 // ---------------------------------------------------------------------------
 
 const placeholder = (name: string) => () => <div>{name}</div>;
@@ -44,10 +47,11 @@ export const routes = [
     children: [
       { path: 'timers', element: <TimersPage /> },
       {
+        element: <ChatLayout />,
         errorElement: <RouteErrorBoundary />,
         children: [
-          { path: 'chat', element: placeholder('Chat')() },
-          { path: 'chat/:threadId', element: placeholder('Chat Thread')() },
+          { path: 'chat', element: <ChatIndexPage /> },
+          { path: 'chat/:threadId', element: <ThreadPage /> },
         ],
       },
     ],

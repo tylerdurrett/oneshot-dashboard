@@ -1,8 +1,8 @@
-'use client';
-
 import { useCallback, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDocumentTitle } from '@/hooks/use-document-title';
+import { CHAT_TITLE } from '@/app/route-metadata';
 import { Plus } from 'lucide-react';
 import {
   Button,
@@ -10,7 +10,7 @@ import {
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-  useStickToBottomContext,
+
   Message,
   MessageContent,
   MessageResponse,
@@ -23,28 +23,17 @@ import {
 } from '@repo/ui';
 import { ChatErrorBanner } from '../chat-error-banner';
 import { useChatSocketContext } from '../chat-socket-context';
+import { ScrollOnStream } from '../scroll-on-stream';
 import { useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
 import { ThreadSelector } from '../thread-selector';
 import type { ChatMessage } from '../use-chat-socket';
 
-function ScrollOnStream({ isStreaming }: { isStreaming: boolean }) {
-  const { scrollToBottom } = useStickToBottomContext();
-  const prevRef = useRef(false);
-
-  useEffect(() => {
-    if (isStreaming && !prevRef.current) {
-      scrollToBottom();
-    }
-    prevRef.current = isStreaming;
-  }, [isStreaming, scrollToBottom]);
-
-  return null;
-}
-
 export default function ThreadPage() {
-  const params = useParams<{ threadId: string }>();
-  const router = useRouter();
-  const threadId = params.threadId;
+  // React Router's useParams returns string | undefined; threadId is always
+  // present because the route definition requires it (chat/:threadId).
+  const { threadId } = useParams() as { threadId: string };
+  const navigate = useNavigate();
+  useDocumentTitle(CHAT_TITLE);
 
   const { messages, sendMessage, setMessages, isStreaming, error, clearError, connectionStatus } =
     useChatSocketContext();
@@ -114,9 +103,9 @@ export default function ThreadPage() {
   const handleSelectThread = useCallback(
     (newThreadId: string) => {
       if (newThreadId === threadId) return;
-      router.push(`/chat/${newThreadId}`);
+      navigate(`/chat/${newThreadId}`);
     },
-    [threadId, router],
+    [threadId, navigate],
   );
 
   const handleDeleteThread = useCallback(
@@ -126,20 +115,20 @@ export default function ThreadPage() {
           // If we deleted the active thread, clear messages and redirect to draft mode
           if (deletedThreadId === threadId) {
             setMessages([]);
-            router.push('/chat');
+            navigate('/chat');
           }
         },
       });
     },
-    [deleteThreadMutation, threadId, router, setMessages],
+    [deleteThreadMutation, threadId, navigate, setMessages],
   );
 
   // Navigate to /chat for a new draft conversation — no thread is created
   // until the user sends their first message (lazy thread creation).
   const handleNewThread = useCallback(() => {
     setMessages([]);
-    router.push('/chat');
-  }, [router, setMessages]);
+    navigate('/chat');
+  }, [navigate, setMessages]);
 
   // ---------------------------------------------------------------------------
   // Submit handler
@@ -165,7 +154,7 @@ export default function ThreadPage() {
         <p className="text-sm text-muted-foreground">
           This conversation doesn&apos;t exist or may have been deleted.
         </p>
-        <Button onClick={() => router.push('/chat')}>
+        <Button onClick={() => navigate('/chat')}>
           Start a new conversation
         </Button>
       </div>

@@ -1,8 +1,8 @@
-'use client';
-
-import { useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { useDocumentTitle } from '@/hooks/use-document-title';
+import { CHAT_TITLE } from '@/app/route-metadata';
 import { Plus } from 'lucide-react';
 import {
   Button,
@@ -10,7 +10,7 @@ import {
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-  useStickToBottomContext,
+
   Message,
   MessageContent,
   MessageResponse,
@@ -23,23 +23,10 @@ import {
 } from '@repo/ui';
 import { ChatErrorBanner } from './chat-error-banner';
 import { useChatSocketContext } from './chat-socket-context';
+import { ScrollOnStream } from './scroll-on-stream';
 import { useDeleteThread, useThreads, threadKeys } from './use-threads';
 import { createThread } from './api';
 import { ThreadSelector } from './thread-selector';
-
-function ScrollOnStream({ isStreaming }: { isStreaming: boolean }) {
-  const { scrollToBottom } = useStickToBottomContext();
-  const prevRef = useRef(false);
-
-  useEffect(() => {
-    if (isStreaming && !prevRef.current) {
-      scrollToBottom();
-    }
-    prevRef.current = isStreaming;
-  }, [isStreaming, scrollToBottom]);
-
-  return null;
-}
 
 /**
  * Bare /chat route — renders the chat UI in "draft" mode with no thread.
@@ -47,8 +34,9 @@ function ScrollOnStream({ isStreaming }: { isStreaming: boolean }) {
  * This prevents empty conversations from cluttering the thread list.
  */
 export default function ChatIndexPage() {
-  const router = useRouter();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useDocumentTitle(CHAT_TITLE);
 
   const { messages, sendMessage, isStreaming, error, setError, clearError, connectionStatus } =
     useChatSocketContext();
@@ -63,9 +51,9 @@ export default function ChatIndexPage() {
 
   const handleSelectThread = useCallback(
     (threadId: string) => {
-      router.push(`/chat/${threadId}`);
+      navigate(`/chat/${threadId}`);
     },
-    [router],
+    [navigate],
   );
 
   const handleDeleteThread = useCallback(
@@ -97,7 +85,7 @@ export default function ChatIndexPage() {
         const thread = await createThread();
         queryClient.invalidateQueries({ queryKey: threadKeys.all });
         sendMessage(thread.id, text);
-        router.replace(`/chat/${thread.id}`);
+        navigate(`/chat/${thread.id}`, { replace: true });
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'Failed to send message';
@@ -110,7 +98,7 @@ export default function ChatIndexPage() {
         creatingRef.current = false;
       }
     },
-    [sendMessage, setError, router, queryClient, connectionStatus],
+    [sendMessage, setError, navigate, queryClient, connectionStatus],
   );
 
   // ---------------------------------------------------------------------------

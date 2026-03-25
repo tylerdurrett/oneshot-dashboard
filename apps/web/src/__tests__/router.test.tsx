@@ -1,11 +1,25 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { routes } from '../router';
 
-// Stub EventSource for jsdom — real page components (TimerGrid) use SSE.
+// Stub the ChatSocketProvider's context — real chat pages consume it.
+vi.mock('../app/(shell)/chat/chat-socket-context', () => ({
+  useChatSocketContext: () => ({
+    sendMessage: vi.fn(),
+    messages: [],
+    setMessages: vi.fn(),
+    isStreaming: false,
+    error: null,
+    clearError: vi.fn(),
+    connectionStatus: 'connected',
+  }),
+  ChatSocketProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Stub browser APIs missing in jsdom — real page components use SSE and ResizeObserver.
 beforeAll(() => {
   if (!globalThis.EventSource) {
     globalThis.EventSource = class {
@@ -13,6 +27,13 @@ beforeAll(() => {
       addEventListener() {}
       removeEventListener() {}
     } as unknown as typeof EventSource;
+  }
+  if (!globalThis.ResizeObserver) {
+    globalThis.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
   }
 });
 
@@ -59,16 +80,16 @@ describe('router', () => {
     expect(matches.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('renders /chat placeholder', () => {
+  it('renders /chat page', () => {
     renderRoute('/chat');
-    // "Chat" also appears in the AppShell nav — check for the placeholder div
-    const matches = screen.getAllByText('Chat');
-    expect(matches.length).toBeGreaterThanOrEqual(1);
+    // Real ChatIndexPage renders with prompt input and empty state
+    expect(screen.getByText('What can I help you with?')).toBeDefined();
   });
 
-  it('renders /chat/:threadId placeholder', () => {
+  it('renders /chat/:threadId page', () => {
     renderRoute('/chat/test-thread');
-    expect(screen.getByText('Chat Thread')).toBeDefined();
+    // Real ThreadPage renders with prompt input
+    expect(screen.getByPlaceholderText('Type a message...')).toBeDefined();
   });
 
   it('renders /prototype placeholder', () => {

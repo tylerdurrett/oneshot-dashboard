@@ -1,7 +1,10 @@
+import { Outlet } from 'react-router';
 import { ChatProviders } from './chat-providers';
 
-export default function ChatLayout({ children }: { children: React.ReactNode }) {
+export default function ChatLayout() {
   return (
-    <ChatProviders>{children}</ChatProviders>
+    <ChatProviders>
+      <Outlet />
+    </ChatProviders>
   );
 }

@@ -22,14 +22,17 @@ vi.mock('../../chat-socket-context', () => ({
   useChatSocketContext: () => hookReturn,
 }));
 
-// Mock next/navigation
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
+// Mock react-router
+const mockNavigate = vi.fn();
 let mockThreadId = 'thread-1';
 
-vi.mock('next/navigation', () => ({
+vi.mock('react-router', () => ({
   useParams: () => ({ threadId: mockThreadId }),
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useNavigate: () => mockNavigate,
+}));
+
+vi.mock('@/hooks/use-document-title', () => ({
+  useDocumentTitle: vi.fn(),
 }));
 
 // Mock TanStack Query hooks
@@ -178,8 +181,7 @@ describe('ThreadPage', () => {
     mockOnSelectThread.mockReset();
     mockOnNewThread.mockReset();
     mockOnDeleteThread.mockReset();
-    mockPush.mockReset();
-    mockReplace.mockReset();
+    mockNavigate.mockReset();
     mockThreadsList = [...defaultThreadsList];
     threadMessagesMap = {};
     threadMessagesError = {};
@@ -247,13 +249,13 @@ describe('ThreadPage', () => {
   it('navigates to new URL when switching threads via ThreadSelector', () => {
     render(<ThreadPage />);
     mockOnSelectThread('thread-2');
-    expect(mockPush).toHaveBeenCalledWith('/chat/thread-2');
+    expect(mockNavigate).toHaveBeenCalledWith('/chat/thread-2');
   });
 
   it('does not navigate when selecting the already-active thread', () => {
     render(<ThreadPage />);
     mockOnSelectThread('thread-1');
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('navigates to /chat (draft mode) when onNewThread is called', () => {
@@ -262,14 +264,14 @@ describe('ThreadPage', () => {
 
     // Lazy thread creation: navigates to /chat without creating a DB record.
     // The thread is only created when the user sends their first message.
-    expect(mockPush).toHaveBeenCalledWith('/chat');
+    expect(mockNavigate).toHaveBeenCalledWith('/chat');
   });
 
   it('navigates to /chat (draft mode) when clicking the standalone "+" button', () => {
     render(<ThreadPage />);
     fireEvent.click(screen.getByTestId('new-thread-btn'));
 
-    expect(mockPush).toHaveBeenCalledWith('/chat');
+    expect(mockNavigate).toHaveBeenCalledWith('/chat');
   });
 
   it('renders the standalone new thread button in the title bar', () => {
@@ -508,7 +510,7 @@ describe('ThreadPage', () => {
       threadMessagesError['thread-1'] = new Error('Failed to fetch messages: 404');
       render(<ThreadPage />);
       fireEvent.click(screen.getByText('Start a new conversation'));
-      expect(mockPush).toHaveBeenCalledWith('/chat');
+      expect(mockNavigate).toHaveBeenCalledWith('/chat');
     });
 
     it('does not render chat UI when thread not found', () => {

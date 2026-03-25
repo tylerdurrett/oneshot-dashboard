@@ -22,11 +22,14 @@ vi.mock('../chat-socket-context', () => ({
   useChatSocketContext: () => hookReturn,
 }));
 
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
+const mockNavigate = vi.fn();
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+vi.mock('react-router', () => ({
+  useNavigate: () => mockNavigate,
+}));
+
+vi.mock('@/hooks/use-document-title', () => ({
+  useDocumentTitle: vi.fn(),
 }));
 
 const mockCreateThread = vi.fn();
@@ -153,8 +156,7 @@ describe('ChatIndexPage (draft mode — lazy thread creation)', () => {
   beforeEach(() => {
     hookReturn = { ...defaultReturn, sendMessage: vi.fn() };
     mockCreateThread.mockReset();
-    mockPush.mockReset();
-    mockReplace.mockReset();
+    mockNavigate.mockReset();
     mockInvalidateQueries.mockReset();
     mockDeleteMutate.mockReset();
     mockOnSelectThread.mockReset();
@@ -203,7 +205,7 @@ describe('ChatIndexPage (draft mode — lazy thread creation)', () => {
   it('navigates to thread URL when selecting a thread from selector', () => {
     render(<ChatIndexPage />);
     mockOnSelectThread('thread-1');
-    expect(mockPush).toHaveBeenCalledWith('/chat/thread-1');
+    expect(mockNavigate).toHaveBeenCalledWith('/chat/thread-1');
   });
 
   // -------------------------------------------------------------------------
@@ -226,7 +228,7 @@ describe('ChatIndexPage (draft mode — lazy thread creation)', () => {
     expect(mockCreateThread).toHaveBeenCalledTimes(1);
     expect(mockInvalidateQueries).toHaveBeenCalledWith({ queryKey: ['threads'] });
     expect(sendMessage).toHaveBeenCalledWith('new-thread-123', 'Hello agent');
-    expect(mockReplace).toHaveBeenCalledWith('/chat/new-thread-123');
+    expect(mockNavigate).toHaveBeenCalledWith('/chat/new-thread-123', { replace: true });
   });
 
   it('does not create thread for whitespace-only input', async () => {
