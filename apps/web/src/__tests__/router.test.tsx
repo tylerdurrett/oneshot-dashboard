@@ -92,18 +92,19 @@ describe('router', () => {
     expect(screen.getByPlaceholderText('Type a message...')).toBeDefined();
   });
 
-  it('renders /prototype placeholder', () => {
+  it('renders /prototype page', () => {
     renderRoute('/prototype');
-    expect(screen.getByText('Prototype')).toBeDefined();
+    expect(screen.getByText('Prototypes')).toBeDefined();
+    expect(screen.getByText('Fullscreen Chat')).toBeDefined();
   });
 
-  it('renders /prototype/chat placeholder', () => {
+  it('renders /prototype/chat page', () => {
     renderRoute('/prototype/chat');
-    expect(screen.getByText('Prototype Chat')).toBeDefined();
+    expect(screen.getByPlaceholderText('Type a message...')).toBeDefined();
   });
 
-  it('renders /video placeholder', () => {
+  it('renders /video page', () => {
     renderRoute('/video');
-    expect(screen.getByText('Video')).toBeDefined();
+    expect(screen.getByText('Video Demo')).toBeDefined();
   });
 });

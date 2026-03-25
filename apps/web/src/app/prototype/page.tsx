@@ -1,7 +1,7 @@
-import Link from 'next/link';
+import { Link } from 'react-router';
 
 const prototypes = [
-  { href: '/prototype/chat', title: 'Fullscreen Chat', description: 'A fullscreen chat UI with mock messages exercising the AI Elements components.' },
+  { to: '/prototype/chat', title: 'Fullscreen Chat', description: 'A fullscreen chat UI with mock messages exercising the AI Elements components.' },
 ];
 
 export default function PrototypeIndex() {
@@ -16,9 +16,9 @@ export default function PrototypeIndex() {
 
       <ul className="mt-10 w-full max-w-2xl space-y-3">
         {prototypes.map((proto) => (
-          <li key={proto.href}>
+          <li key={proto.to}>
             <Link
-              href={proto.href}
+              to={proto.to}
               className="block rounded-lg border border-border p-4 transition-colors hover:bg-accent"
             >
               <span className="font-medium">{proto.title}</span>

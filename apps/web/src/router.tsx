@@ -6,6 +6,9 @@ import TimersPage from '@/app/(shell)/timers/page';
 import ChatIndexPage from '@/app/(shell)/chat/page';
 import ThreadPage from '@/app/(shell)/chat/[threadId]/page';
 import ChatLayout from '@/app/(shell)/chat/layout';
+import PrototypeIndex from '@/app/prototype/page';
+import ChatPrototype from '@/app/prototype/chat/page';
+import VideoPage from '@/app/video/page';
 
 // ---------------------------------------------------------------------------
 // Shell layout — wraps routes in the AppShell (sidebar + bottom nav).
@@ -26,12 +29,6 @@ function PrototypeLayout() {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Placeholder for routes not yet migrated (Phase 3.3).
-// ---------------------------------------------------------------------------
-
-const placeholder = (name: string) => () => <div>{name}</div>;
 
 // ---------------------------------------------------------------------------
 // Route definitions — exported separately for testing.
@@ -59,14 +56,14 @@ export const routes = [
   {
     element: <PrototypeLayout />,
     children: [
-      { path: 'prototype', element: placeholder('Prototype')() },
-      { path: 'prototype/chat', element: placeholder('Prototype Chat')() },
+      { path: 'prototype', element: <PrototypeIndex /> },
+      { path: 'prototype/chat', element: <ChatPrototype /> },
     ],
   },
   {
     // Standalone route — video page has no shell or layout wrapper
     path: 'video',
-    element: placeholder('Video')(),
+    element: <VideoPage />,
   },
 ];
 

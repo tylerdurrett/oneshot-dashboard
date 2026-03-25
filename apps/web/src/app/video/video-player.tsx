@@ -1,5 +1,3 @@
-'use client';
-
 import { Player } from '@remotion/player';
 import { HelloWorld, compositions } from '@repo/video';
 

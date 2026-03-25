@@ -263,17 +263,19 @@ apps/web/
 
 ### 3.3 Migrate Prototype and Video pages
 
-- [ ] Migrate `/prototype`: replace `next/link` with React Router `Link` (`href` → `to` prop)
-- [ ] Migrate `/prototype/chat`: remove any Next.js imports
-- [ ] Migrate `/video`: no Next.js imports to change (already pure React)
-- [ ] Remove `'use client'` directives where present
-- [ ] Update `__tests__/prototype-index.test.tsx`: wrap renders in `<MemoryRouter>` (React Router's `<Link>` requires router context)
+- [x] Migrate `/prototype`: replace `next/link` with React Router `Link` (`href` → `to` prop)
+- [x] Migrate `/prototype/chat`: remove any Next.js imports
+- [x] Migrate `/video`: no Next.js imports to change (already pure React)
+- [x] Remove `'use client'` directives where present
+- [x] Update `__tests__/prototype-index.test.tsx`: wrap renders in `<MemoryRouter>` (React Router's `<Link>` requires router context)
+
+> **Notes (3.3):** `prototype/page.tsx` migrated from `next/link` to `react-router` `Link` with `to` prop. Removed `'use client'` from `prototype/chat/page.tsx` and `video/video-player.tsx`. Router updated to use real components instead of placeholders — removed the `placeholder()` factory function entirely. Prototype index test uses a local `renderPrototypeIndex()` helper (matching the `renderWithRouter` pattern in `app-shell.test.tsx`). Removed a redundant test ("renders the Fullscreen Chat link") that was fully subsumed by the link assertion test. Router test assertions updated to match real page content. All 230 tests pass across 19 test files. No `next` imports remain anywhere in `apps/web/src/`.
 
 **Acceptance Criteria:**
-- `/prototype` lists prototypes with working links
-- `/prototype/chat` renders the fullscreen chat prototype
-- `/video` renders the Remotion player
-- Prototype index test passes
+- `/prototype` lists prototypes with working links ✅
+- `/prototype/chat` renders the fullscreen chat prototype ✅
+- `/video` renders the Remotion player ✅
+- Prototype index test passes ✅ (2/2 pass)
 
 ---
 
