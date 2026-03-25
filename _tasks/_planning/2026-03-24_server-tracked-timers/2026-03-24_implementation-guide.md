@@ -241,21 +241,22 @@ apps/web/src/app/(shell)/timers/
 
 ### 3.3 Timer Control Routes
 
-- [ ] Add to `apps/server/src/routes/timers.ts`:
+- [x] Add to `apps/server/src/routes/timers.ts`:
   - `GET /timers/today` — returns `{ date, buckets }` via `getTodayState()`. Each bucket includes `elapsedSeconds`, `startedAt`, `completedAt`. For running timers, client uses `startedAt` to compute live elapsed locally
   - `POST /timers/buckets/:id/start` — calls `startTimer()`, schedules completion job, broadcasts `timer-started` SSE event. Returns `{ bucketId, startedAt, stoppedBucketId? }`
   - `POST /timers/buckets/:id/stop` — calls `stopTimer()`, cancels completion job, broadcasts `timer-stopped` SSE event. If completion detected, also broadcasts `timer-completed`. Returns `{ elapsedSeconds, completedAt }`
   - `POST /timers/buckets/:id/reset` — calls `resetProgress()`, cancels completion job, broadcasts `timer-reset` SSE event. Returns `{ success: true }`
   - `POST /timers/buckets/:id/set-time` — accepts `{ remainingSeconds }`, calls `setRemainingTime()`, reschedules completion if timer is running, broadcasts `timer-updated` SSE event. Returns `{ elapsedSeconds, completedAt }`
-- [ ] Wire up scheduler callbacks to broadcast:
+- [x] Wire up scheduler callbacks to broadcast:
   - `onTimerCompleted(bucketId)` → broadcasts `{ event: 'timer-completed', data: { bucketId } }`
   - `onDailyReset()` → broadcasts `{ event: 'daily-reset' }`
-- [ ] Write route tests:
+- [x] Write route tests:
   - Start/stop cycle accumulates elapsed correctly
   - Starting a timer when another is running stops the previous
   - Stop detects completion and returns `completedAt`
   - Reset clears elapsed and completion
   - SSE events are broadcast on state changes (verify via test SSE client or mock)
+  - *Note: 23 new tests across 5 describe blocks (today state, start, stop, reset, set-time) plus 3 SSE broadcast integration tests. `TimerSchedulerLike` interface extended with `scheduleCompletion()`. `computeCompletionMs()` placed in `timer-progress.ts` service layer (not routes) to respect abstraction boundaries. Start and set-time routes validate bucket existence with `getBucket()` upfront rather than catching service errors. SSE integration tests use `server.listen(0)` + raw `http.request()` for real streaming verification. 246 total tests pass.*
 
 **Acceptance Criteria:**
 - `GET /timers/today` returns all buckets with merged progress for today

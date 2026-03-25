@@ -344,6 +344,48 @@ export async function setRemainingTime(
 }
 
 /**
+ * Compute the absolute timestamp (ms) when a running timer will complete.
+ * Returns null if the bucket doesn't exist, there's no progress row, or
+ * the timer is not currently running.
+ *
+ * Used by routes to schedule completion jobs after starting a timer or
+ * adjusting remaining time.
+ */
+export async function computeCompletionMs(
+  bucketId: string,
+  database: Database = defaultDb,
+  now: Date = new Date(),
+): Promise<number | null> {
+  const date = getResetDate(now);
+
+  const bucketRows = await database
+    .select()
+    .from(timerBuckets)
+    .where(eq(timerBuckets.id, bucketId));
+
+  if (bucketRows.length === 0) return null;
+
+  const rows = await database
+    .select()
+    .from(timerDailyProgress)
+    .where(
+      and(
+        eq(timerDailyProgress.bucketId, bucketId),
+        eq(timerDailyProgress.date, date),
+      ),
+    );
+
+  if (rows.length === 0 || !rows[0]!.startedAt) return null;
+
+  const totalSeconds = bucketRows[0]!.totalMinutes * 60;
+  const remainingSeconds = totalSeconds - rows[0]!.elapsedSeconds;
+
+  // Timer completes at startedAt + remaining seconds (since startedAt marks
+  // the beginning of the current segment and elapsedSeconds is accumulated)
+  return new Date(rows[0]!.startedAt).getTime() + remainingSeconds * 1000;
+}
+
+/**
  * Stop all running timers for a given date. Accumulates elapsed for each.
  * Used by the 3AM reset job.
  */

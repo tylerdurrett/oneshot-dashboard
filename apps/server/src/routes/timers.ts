@@ -6,16 +6,27 @@ import {
   createBucket,
   updateBucket,
   deleteBucket,
+  getBucket,
   type CreateBucketInput,
   type UpdateBucketInput,
 } from '../services/timer-bucket.js';
+import {
+  getTodayState,
+  startTimer,
+  stopTimer,
+  resetProgress,
+  setRemainingTime,
+  computeCompletionMs,
+} from '../services/timer-progress.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Minimal interface for the scheduler — routes only need cancelCompletion. */
+/** Minimal interface so routes can schedule/cancel completion jobs
+ *  without depending on the full TimerScheduler class. */
 export interface TimerSchedulerLike {
+  scheduleCompletion(bucketId: string, completesAtMs: number): void;
   cancelCompletion(bucketId: string): void;
 }
 
@@ -188,6 +199,122 @@ export async function timerRoutes(
       }
       scheduler?.cancelCompletion(id);
       return reply.status(200).send({ success: true });
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Timer control routes
+  // -------------------------------------------------------------------------
+
+  /** Returns all buckets with today's merged progress. */
+  server.get('/timers/today', async () => {
+    return getTodayState(db);
+  });
+
+  /** Start a timer. Enforces single-active: stops any other running timer. */
+  server.post<{ Params: { id: string } }>(
+    '/timers/buckets/:id/start',
+    async (request, reply) => {
+      const { id } = request.params;
+
+      const bucket = await getBucket(id, db);
+      if (!bucket) {
+        return reply.status(404).send({ error: 'Bucket not found' });
+      }
+
+      const now = new Date();
+      const result = await startTimer(id, db, now);
+
+      // Cancel completion for the previously-running timer (if any)
+      if (result.stoppedBucketId) {
+        scheduler?.cancelCompletion(result.stoppedBucketId);
+        broadcast(SSE_EVENTS.TIMER_STOPPED, {
+          bucketId: result.stoppedBucketId,
+        });
+      }
+
+      // Schedule completion for the newly-started timer
+      const completesAtMs = await computeCompletionMs(id, db, now);
+      if (completesAtMs) {
+        scheduler?.scheduleCompletion(id, completesAtMs);
+      }
+
+      broadcast(SSE_EVENTS.TIMER_STARTED, {
+        bucketId: result.bucketId,
+        startedAt: result.startedAt,
+      });
+
+      return result;
+    },
+  );
+
+  /** Stop a running timer. Accumulates elapsed and detects completion. */
+  server.post<{ Params: { id: string } }>(
+    '/timers/buckets/:id/stop',
+    async (request) => {
+      const { id } = request.params;
+      const result = await stopTimer(id, db);
+
+      if (result.changed) {
+        scheduler?.cancelCompletion(id);
+        broadcast(SSE_EVENTS.TIMER_STOPPED, { bucketId: id });
+
+        if (result.completedAt) {
+          broadcast(SSE_EVENTS.TIMER_COMPLETED, { bucketId: id });
+        }
+      }
+
+      return {
+        elapsedSeconds: result.elapsedSeconds ?? 0,
+        completedAt: result.completedAt ?? null,
+      };
+    },
+  );
+
+  /** Reset a bucket's progress for today — zero elapsed, clear completion. */
+  server.post<{ Params: { id: string } }>(
+    '/timers/buckets/:id/reset',
+    async (request) => {
+      const { id } = request.params;
+      await resetProgress(id, db);
+      scheduler?.cancelCompletion(id);
+      broadcast(SSE_EVENTS.TIMER_RESET, { bucketId: id });
+      return { success: true };
+    },
+  );
+
+  /** Set remaining time for a bucket. Reschedules completion if running. */
+  server.post<{ Params: { id: string }; Body: { remainingSeconds: number } }>(
+    '/timers/buckets/:id/set-time',
+    async (request, reply) => {
+      const { id } = request.params;
+      const { remainingSeconds } = request.body;
+
+      const bucket = await getBucket(id, db);
+      if (!bucket) {
+        return reply.status(404).send({ error: 'Bucket not found' });
+      }
+
+      const result = await setRemainingTime(id, remainingSeconds, db);
+
+      // Reschedule completion if the timer is currently running
+      const completesAtMs = await computeCompletionMs(id, db);
+      if (completesAtMs) {
+        scheduler?.scheduleCompletion(id, completesAtMs);
+      } else {
+        scheduler?.cancelCompletion(id);
+      }
+
+      broadcast(SSE_EVENTS.TIMER_UPDATED, {
+        bucketId: id,
+        elapsedSeconds: result.elapsedSeconds,
+        completedAt: result.completedAt,
+      });
+
+      return {
+        elapsedSeconds: result.elapsedSeconds,
+        completedAt: result.completedAt,
+      };
     },
   );
 }

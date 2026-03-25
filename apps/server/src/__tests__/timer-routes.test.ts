@@ -2,6 +2,7 @@ import http from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import { timerDailyProgress } from '@repo/db';
 import {
   timerRoutes,
   broadcast,
@@ -11,6 +12,7 @@ import {
   type TimerSchedulerLike,
 } from '../routes/timers.js';
 import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
+import { getResetDate } from '../services/timer-progress.js';
 import type { Database } from '../services/thread.js';
 
 // ---------------------------------------------------------------------------
@@ -383,9 +385,7 @@ describe('Bucket CRUD routes', () => {
     });
 
     it('cancels scheduled completion job on delete', async () => {
-      const mockScheduler: TimerSchedulerLike = {
-        cancelCompletion: vi.fn(),
-      };
+      const mockScheduler = createMockScheduler();
       // Scheduler tests need their own server instance with the mock injected
       const schedulerServer = buildTimerTestServer(testDb, mockScheduler);
       const bucket = await seedBucket(testDb);
@@ -401,9 +401,7 @@ describe('Bucket CRUD routes', () => {
     });
 
     it('does not call scheduler.cancelCompletion on 404', async () => {
-      const mockScheduler: TimerSchedulerLike = {
-        cancelCompletion: vi.fn(),
-      };
+      const mockScheduler = createMockScheduler();
       const schedulerServer = buildTimerTestServer(testDb, mockScheduler);
 
       await schedulerServer.inject({
@@ -415,5 +413,540 @@ describe('Bucket CRUD routes', () => {
 
       await schedulerServer.close();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Timer control route tests
+// ---------------------------------------------------------------------------
+
+/** Helper: create a mock scheduler with both methods as vi.fn(). */
+function createMockScheduler(): TimerSchedulerLike & {
+  scheduleCompletion: ReturnType<typeof vi.fn>;
+  cancelCompletion: ReturnType<typeof vi.fn>;
+} {
+  return {
+    scheduleCompletion: vi.fn(),
+    cancelCompletion: vi.fn(),
+  };
+}
+
+/** Helper: insert a progress row directly for test setup. */
+async function insertProgress(
+  db: Database,
+  bucketId: string,
+  overrides: {
+    date?: string;
+    elapsedSeconds?: number;
+    startedAt?: string | null;
+    completedAt?: string | null;
+  } = {},
+) {
+  await db.insert(timerDailyProgress).values({
+    id: crypto.randomUUID(),
+    bucketId,
+    date: overrides.date ?? getResetDate(),
+    elapsedSeconds: overrides.elapsedSeconds ?? 0,
+    startedAt: overrides.startedAt ?? null,
+    completedAt: overrides.completedAt ?? null,
+  });
+}
+
+describe('Timer control routes', () => {
+  let testDb: Database;
+  let server: ReturnType<typeof buildTimerTestServer>;
+  let mockScheduler: ReturnType<typeof createMockScheduler>;
+
+  beforeEach(() => {
+    testDb = createTimerTestDb();
+    mockScheduler = createMockScheduler();
+    server = buildTimerTestServer(testDb, mockScheduler);
+  });
+
+  afterEach(async () => {
+    await server.close();
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /timers/today
+  // -------------------------------------------------------------------------
+
+  describe('GET /timers/today', () => {
+    it('returns all buckets with merged progress for today', async () => {
+      const bucketA = await seedBucket(testDb, { name: 'A', totalMinutes: 60 });
+      const bucketB = await seedBucket(testDb, { name: 'B', totalMinutes: 120 });
+      await insertProgress(testDb, bucketA.id, { elapsedSeconds: 300 });
+
+      const res = await server.inject({ method: 'GET', url: '/timers/today' });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.date).toBe(getResetDate());
+      expect(body.buckets).toHaveLength(2);
+
+      const a = body.buckets.find((b: { id: string }) => b.id === bucketA.id);
+      const b = body.buckets.find((b: { id: string }) => b.id === bucketB.id);
+      expect(a.elapsedSeconds).toBe(300);
+      expect(a.startedAt).toBeNull();
+      expect(b.elapsedSeconds).toBe(0);
+    });
+
+    it('returns empty buckets array when no buckets exist', async () => {
+      const res = await server.inject({ method: 'GET', url: '/timers/today' });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().buckets).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /timers/buckets/:id/start
+  // -------------------------------------------------------------------------
+
+  describe('POST /timers/buckets/:id/start', () => {
+    it('starts a timer and returns result', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.bucketId).toBe(bucket.id);
+      expect(body.startedAt).toBeDefined();
+      expect(body.stoppedBucketId).toBeNull();
+    });
+
+    it('returns 404 for nonexistent bucket', async () => {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/timers/buckets/nonexistent/start',
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ error: 'Bucket not found' });
+    });
+
+    it('stops the previously running timer', async () => {
+      const bucketA = await seedBucket(testDb, { name: 'A', totalMinutes: 60 });
+      const bucketB = await seedBucket(testDb, { name: 'B', totalMinutes: 60 });
+
+      // Start A
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucketA.id}/start`,
+      });
+
+      // Start B — should stop A
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucketB.id}/start`,
+      });
+
+      const body = res.json();
+      expect(body.stoppedBucketId).toBe(bucketA.id);
+    });
+
+    it('calls scheduler.scheduleCompletion', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      expect(mockScheduler.scheduleCompletion).toHaveBeenCalledWith(
+        bucket.id,
+        expect.any(Number),
+      );
+
+      // Completion should be ~60 minutes from now
+      const completesAtMs = mockScheduler.scheduleCompletion.mock.calls[0]![1] as number;
+      const expectedMs = Date.now() + 60 * 60 * 1000;
+      expect(completesAtMs).toBeGreaterThan(expectedMs - 5000);
+      expect(completesAtMs).toBeLessThan(expectedMs + 5000);
+    });
+
+    it('cancels completion for previously running timer', async () => {
+      const bucketA = await seedBucket(testDb, { name: 'A' });
+      const bucketB = await seedBucket(testDb, { name: 'B' });
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucketA.id}/start`,
+      });
+
+      mockScheduler.cancelCompletion.mockClear();
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucketB.id}/start`,
+      });
+
+      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucketA.id);
+    });
+
+    it('schedules correct completion time when bucket has prior elapsed', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+      // Pre-insert 300 seconds of prior progress
+      await insertProgress(testDb, bucket.id, { elapsedSeconds: 300 });
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      const completesAtMs = mockScheduler.scheduleCompletion.mock.calls[0]![1] as number;
+      // Remaining: 3600 - 300 = 3300 seconds
+      const expectedMs = Date.now() + 3300 * 1000;
+      expect(completesAtMs).toBeGreaterThan(expectedMs - 5000);
+      expect(completesAtMs).toBeLessThan(expectedMs + 5000);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /timers/buckets/:id/stop
+  // -------------------------------------------------------------------------
+
+  describe('POST /timers/buckets/:id/stop', () => {
+    it('stops a running timer and returns elapsed', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/stop`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.elapsedSeconds).toBeGreaterThanOrEqual(0);
+      expect(body.completedAt).toBeNull();
+    });
+
+    it('returns defaults when timer is not running', async () => {
+      const bucket = await seedBucket(testDb);
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/stop`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ elapsedSeconds: 0, completedAt: null });
+    });
+
+    it('detects completion when elapsed exceeds total', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 1 });
+      // Pre-insert a progress row with 59s elapsed and startedAt 2s ago
+      const twoSecondsAgo = new Date(Date.now() - 2000).toISOString();
+      await insertProgress(testDb, bucket.id, {
+        elapsedSeconds: 59,
+        startedAt: twoSecondsAgo,
+      });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/stop`,
+      });
+
+      const body = res.json();
+      // 59 + ~2 = ~61, which exceeds 60 seconds
+      expect(body.elapsedSeconds).toBeGreaterThanOrEqual(60);
+      expect(body.completedAt).not.toBeNull();
+    });
+
+    it('cancels scheduled completion on stop', async () => {
+      const bucket = await seedBucket(testDb);
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      mockScheduler.cancelCompletion.mockClear();
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/stop`,
+      });
+
+      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+    });
+
+    it('does not cancel completion when timer was not running', async () => {
+      const bucket = await seedBucket(testDb);
+
+      mockScheduler.cancelCompletion.mockClear();
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/stop`,
+      });
+
+      expect(mockScheduler.cancelCompletion).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /timers/buckets/:id/reset
+  // -------------------------------------------------------------------------
+
+  describe('POST /timers/buckets/:id/reset', () => {
+    it('resets progress and returns success', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/reset`,
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ success: true });
+
+      // Verify progress is zeroed via GET /timers/today
+      const todayRes = await server.inject({
+        method: 'GET',
+        url: '/timers/today',
+      });
+      const b = todayRes.json().buckets.find(
+        (x: { id: string }) => x.id === bucket.id,
+      );
+      expect(b.elapsedSeconds).toBe(0);
+      expect(b.startedAt).toBeNull();
+      expect(b.completedAt).toBeNull();
+    });
+
+    it('cancels completion job on reset', async () => {
+      const bucket = await seedBucket(testDb);
+
+      mockScheduler.cancelCompletion.mockClear();
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/reset`,
+      });
+
+      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /timers/buckets/:id/set-time
+  // -------------------------------------------------------------------------
+
+  describe('POST /timers/buckets/:id/set-time', () => {
+    it('sets remaining time correctly', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/set-time`,
+        payload: { remainingSeconds: 1800 },
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      // elapsed = 3600 - 1800 = 1800
+      expect(body.elapsedSeconds).toBe(1800);
+      expect(body.completedAt).toBeNull();
+    });
+
+    it('detects completion when remaining is 0', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+
+      const res = await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/set-time`,
+        payload: { remainingSeconds: 0 },
+      });
+
+      const body = res.json();
+      expect(body.elapsedSeconds).toBe(3600);
+      expect(body.completedAt).not.toBeNull();
+    });
+
+    it('returns 404 for nonexistent bucket', async () => {
+      const res = await server.inject({
+        method: 'POST',
+        url: '/timers/buckets/nonexistent/set-time',
+        payload: { remainingSeconds: 100 },
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ error: 'Bucket not found' });
+    });
+
+    it('reschedules completion if timer is running', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+      // Start the timer first so it's running
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/start`,
+      });
+
+      mockScheduler.scheduleCompletion.mockClear();
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/set-time`,
+        payload: { remainingSeconds: 900 },
+      });
+
+      // Should reschedule completion for the still-running timer
+      expect(mockScheduler.scheduleCompletion).toHaveBeenCalledWith(
+        bucket.id,
+        expect.any(Number),
+      );
+    });
+
+    it('cancels completion if timer is not running after set-time', async () => {
+      const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+      // Don't start the timer — just set time on a non-running bucket
+      await insertProgress(testDb, bucket.id, { elapsedSeconds: 100 });
+
+      mockScheduler.cancelCompletion.mockClear();
+
+      await server.inject({
+        method: 'POST',
+        url: `/timers/buckets/${bucket.id}/set-time`,
+        payload: { remainingSeconds: 500 },
+      });
+
+      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SSE broadcast integration tests (routes → SSE clients)
+// ---------------------------------------------------------------------------
+
+describe('Timer control SSE broadcasts', () => {
+  let testDb: Database;
+  let server: ReturnType<typeof buildTimerTestServer>;
+  let port: number;
+
+  beforeEach(async () => {
+    _resetSSEClients();
+    testDb = createTimerTestDb();
+    server = buildTimerTestServer(testDb);
+    const address = await server.listen({ port: 0, host: '127.0.0.1' });
+    port = Number(new URL(address).port);
+  });
+
+  afterEach(async () => {
+    await server.close();
+  });
+
+  /** POST to a route via raw http.request (needed when server.listen is used). */
+  function httpPost(
+    path: string,
+    body?: Record<string, unknown>,
+  ): Promise<{ statusCode: number; body: string }> {
+    return new Promise((resolve, reject) => {
+      const payload = JSON.stringify(body ?? {});
+      const req = http.request(
+        {
+          hostname: '127.0.0.1',
+          port,
+          path,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload),
+          },
+        },
+        (res) => {
+          let data = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => (data += chunk));
+          res.on('end', () =>
+            resolve({ statusCode: res.statusCode ?? 0, body: data }),
+          );
+        },
+      );
+      req.on('error', reject);
+      req.end(payload);
+    });
+  }
+
+  it('broadcasts timer-started event when a timer is started', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const client = await connectSSE(port);
+
+    try {
+      await waitFor(() => getConnectedClientCount() === 1);
+
+      await httpPost(`/timers/buckets/${bucket.id}/start`);
+
+      await waitFor(() => {
+        const all = client.chunks.join('');
+        return all.includes('event: timer-started');
+      });
+
+      const all = client.chunks.join('');
+      expect(all).toContain('event: timer-started');
+      expect(all).toContain(`"bucketId":"${bucket.id}"`);
+    } finally {
+      client.destroy();
+    }
+  });
+
+  it('broadcasts timer-stopped event when a timer is stopped', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const client = await connectSSE(port);
+
+    try {
+      await waitFor(() => getConnectedClientCount() === 1);
+
+      await httpPost(`/timers/buckets/${bucket.id}/start`);
+      await httpPost(`/timers/buckets/${bucket.id}/stop`);
+
+      await waitFor(() => {
+        const all = client.chunks.join('');
+        return all.includes('event: timer-stopped');
+      });
+
+      const all = client.chunks.join('');
+      expect(all).toContain('event: timer-stopped');
+    } finally {
+      client.destroy();
+    }
+  });
+
+  it('broadcasts timer-stopped for previous timer when starting another', async () => {
+    const bucketA = await seedBucket(testDb, { name: 'A', totalMinutes: 60 });
+    const bucketB = await seedBucket(testDb, { name: 'B', totalMinutes: 60 });
+    const client = await connectSSE(port);
+
+    try {
+      await waitFor(() => getConnectedClientCount() === 1);
+
+      await httpPost(`/timers/buckets/${bucketA.id}/start`);
+      await httpPost(`/timers/buckets/${bucketB.id}/start`);
+
+      await waitFor(() => {
+        const all = client.chunks.join('');
+        // Should have timer-stopped for A and timer-started for B
+        return (
+          all.includes('event: timer-stopped') &&
+          all.includes(`"bucketId":"${bucketA.id}"`)
+        );
+      });
+
+      const all = client.chunks.join('');
+      expect(all).toContain('event: timer-stopped');
+      expect(all).toContain(`"bucketId":"${bucketA.id}"`);
+    } finally {
+      client.destroy();
+    }
   });
 });
