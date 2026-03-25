@@ -77,12 +77,13 @@ apps/web/src/app/(shell)/timers/
 
 ### 1.2 Seed Default Buckets
 
-- [ ] Create a seed function in the timer bucket service (or a standalone seed utility) that inserts the 4 default buckets (School Project 3h, Business Project 3h, Life Maintenance 1h, Exercise 1h) if no buckets exist
+- [x] Create a seed function in the timer bucket service (or a standalone seed utility) that inserts the 4 default buckets (School Project 3h, Business Project 3h, Life Maintenance 1h, Exercise 1h) if no buckets exist
   - Match the current `DEFAULT_BUCKETS` from `timer-types.ts` (names, durations, color indices, Mon-Fri)
   - Use `crypto.randomUUID()` for IDs (not the old `default-1` etc.)
   - Assign `sortOrder` 0-3
-- [ ] Call the seed function during server startup (after migration, before scheduler init) — only seeds if the `timerBuckets` table is empty
-- [ ] Write a test that verifies seeding creates 4 buckets and is idempotent (second call is a no-op)
+- [x] Call the seed function during server startup (after migration, before scheduler init) — only seeds if the `timerBuckets` table is empty
+- [x] Write a test that verifies seeding creates 4 buckets and is idempotent (second call is a no-op)
+  - *Note: 7 tests covering: seed count, names/durations/colors, daysOfWeek JSON format, sortOrder, UUID generation, idempotency, and pre-existing buckets. Emptiness check uses `LIMIT 1` for efficiency.*
 
 **Acceptance Criteria:**
 - Fresh database gets 4 default buckets on server start

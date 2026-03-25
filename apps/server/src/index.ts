@@ -14,6 +14,7 @@ import {
   type SpawnFn,
 } from './services/sandbox.js';
 import type { Database } from './services/thread.js';
+import { seedDefaultBuckets } from './services/timer-bucket.js';
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -134,6 +135,16 @@ if (!process.env.VITEST) {
     server.log.warn(
       `Failed to enable WAL mode (current: ${journalMode}): ${err}`,
     );
+  }
+
+  // Seed default timer buckets before starting (idempotent — no-op if buckets exist)
+  try {
+    const didSeed = await seedDefaultBuckets();
+    if (didSeed) {
+      server.log.info('Seeded default timer buckets');
+    }
+  } catch (err) {
+    server.log.warn(`Failed to seed default timer buckets: ${err}`);
   }
 
   server.listen({ port: config.port, host: '127.0.0.1' }, async (err) => {
