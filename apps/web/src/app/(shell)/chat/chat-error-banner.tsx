@@ -1,5 +1,3 @@
-'use client';
-
 interface ChatErrorBannerProps {
   error: string;
   onDismiss: () => void;

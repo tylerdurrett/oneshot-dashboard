@@ -337,22 +337,24 @@ apps/web/
 
 ### 5.1 Remove Next.js artifacts
 
-- [ ] Delete `apps/web/next.config.ts`
-- [ ] Delete `apps/web/next-env.d.ts` (if not already removed)
-- [ ] Delete `apps/web/.next/` directory
-- [ ] Remove all remaining `'use client'` directives across `apps/web/src/` (20 files total)
-- [ ] Remove old layout files that are now just components imported by the router (root `layout.tsx` moved to `root-layout.tsx` or inlined in `main.tsx`)
-- [ ] Search for any remaining `from 'next` imports and remove them
-- [ ] Update `.gitignore`: remove `.next/`, `out/`, and `# Next.js` comment, add `dist/` under a Vite section if not already present
-- [ ] Update `turbo.json`: ensure build outputs only reference `dist/**`, not `.next/**`
+- [x] Delete `apps/web/next.config.ts`
+- [x] Delete `apps/web/next-env.d.ts` (if not already removed)
+- [x] Delete `apps/web/.next/` directory
+- [x] Remove all remaining `'use client'` directives across `apps/web/src/` (20 files total)
+- [x] Remove old layout files that are now just components imported by the router (root `layout.tsx` moved to `root-layout.tsx` or inlined in `main.tsx`)
+- [x] Search for any remaining `from 'next` imports and remove them
+- [x] Update `.gitignore`: remove `.next/`, `out/`, and `# Next.js` comment, add `dist/` under a Vite section if not already present
+- [x] Update `turbo.json`: ensure build outputs only reference `dist/**`, not `.next/**`
+
+> **Notes (5.1):** `next-env.d.ts` was already removed in Phase 1.1 — confirmed absent. Root `layout.tsx` was already deleted in Phase 2.3. Found 14 files (not 20) with `'use client'` directives — the others were already cleaned in earlier phases. Deleted 2 orphaned layout files: `(shell)/layout.tsx` and `prototype/layout.tsx` — their logic was already duplicated inline in `router.tsx` (`ShellLayout` and `PrototypeLayout`). `chat/layout.tsx` is actively imported by the router and was kept. No `from 'next` imports remained (all cleaned in Phase 3). `turbo.json` was already clean — only referenced `dist/**`. `.gitignore` updated: replaced `# Next.js` / `.next/` / `out/` with `# Vite` / `dist/`. ESLint config updated: removed `.next/**` from ignores. All 230 tests pass, build succeeds.
 
 **Acceptance Criteria:**
-- `grep -r "from 'next" apps/web/src/` returns zero results
-- `grep -r "'use client'" apps/web/src/` returns zero results
-- No `next.config.ts`, `next-env.d.ts`, or `.next/` directory exists
-- `apps/web/package.json` has no `next` dependency
-- `.gitignore` has no Next.js-specific entries
-- `turbo.json` has no `.next/**` in outputs
+- `grep -r "from 'next" apps/web/src/` returns zero results ✅
+- `grep -r "'use client'" apps/web/src/` returns zero results ✅
+- No `next.config.ts`, `next-env.d.ts`, or `.next/` directory exists ✅
+- `apps/web/package.json` has no `next` dependency ✅
+- `.gitignore` has no Next.js-specific entries ✅
+- `turbo.json` has no `.next/**` in outputs ✅
 
 ### 5.2 Run full test suite
 

@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef } from 'react';
 
 import { getBaseUrl } from '../_lib/timer-api';

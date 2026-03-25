@@ -34,9 +34,8 @@ yarn-error.log*
 # Turborepo
 .turbo/
 
-# Next.js
-.next/
-out/
+# Vite
+dist/
 
 # Environment variables — .env is committed (safe defaults), .env.local is not (secrets)
 .env.local

@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import { ChevronDown, MoreVertical, Plus } from 'lucide-react';
 import {
