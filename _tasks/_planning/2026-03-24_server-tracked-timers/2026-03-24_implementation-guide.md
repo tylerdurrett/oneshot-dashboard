@@ -345,14 +345,14 @@ apps/web/src/app/(shell)/timers/
 
 ### 4.3 TanStack Query Hooks
 
-- [ ] Create query key structure in `timer-api.ts` (or a separate `use-timers.ts`):
+- [x] Create query key structure in `timer-api.ts` (or a separate `use-timers.ts`):
   ```
   timerKeys = {
     today: ['timers', 'today'] as const,
     buckets: ['timers', 'buckets'] as const,
   }
   ```
-- [ ] Create hooks (matching `use-threads.ts` pattern):
+- [x] Create hooks (matching `use-threads.ts` pattern):
   - `useTodayState()` — `useQuery` wrapping `fetchTodayState()`
   - `useStartTimer()` — `useMutation`, invalidates `timerKeys.today` on success
   - `useStopTimer()` — `useMutation`, invalidates `timerKeys.today` on success
@@ -361,6 +361,7 @@ apps/web/src/app/(shell)/timers/
   - `useDeleteBucket()` — `useMutation`, invalidates both keys
   - `useResetTimer()` — `useMutation`, invalidates `timerKeys.today`
   - `useSetTimerTime()` — `useMutation`, invalidates `timerKeys.today`
+  - *Note: Created as `_hooks/use-timer-queries.ts` (separate from `use-timer-state.ts` to keep the old hook functional during migration). Also added `useBuckets()` query hook for bucket list fetching. All mutation wrappers use arrow functions (not direct references) because TanStack Query passes extra args to `mutationFn`. Re-exports API types for consumer convenience (matching `use-threads.ts` pattern). 15 tests covering all hooks: queries, mutations, cache invalidation, error handling, and key structure. 237 total web tests pass.*
 
 **Acceptance Criteria:**
 - All hooks follow the existing TanStack Query patterns in the codebase
