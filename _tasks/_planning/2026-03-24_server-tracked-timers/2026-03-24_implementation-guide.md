@@ -48,7 +48,7 @@ apps/web/src/app/(shell)/timers/
 
 ### 1.1 Timer Schema
 
-- [ ] Add `timerBuckets` table to `packages/db/src/schema.ts`:
+- [x] Add `timerBuckets` table to `packages/db/src/schema.ts`:
   - `id: text('id').primaryKey()` — UUID, matches existing convention
   - `name: text('name').notNull()`
   - `totalMinutes: integer('total_minutes').notNull()`
@@ -57,7 +57,7 @@ apps/web/src/app/(shell)/timers/
   - `sortOrder: integer('sort_order').notNull().default(0)`
   - `createdAt: integer('created_at').notNull().$defaultFn(() => Date.now())`
   - `updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now())`
-- [ ] Add `timerDailyProgress` table to `packages/db/src/schema.ts`:
+- [x] Add `timerDailyProgress` table to `packages/db/src/schema.ts`:
   - `id: text('id').primaryKey()` — UUID
   - `bucketId: text('bucket_id').notNull().references(() => timerBuckets.id)`
   - `date: text('date').notNull()` — `YYYY-MM-DD`, 3AM-adjusted
@@ -65,8 +65,9 @@ apps/web/src/app/(shell)/timers/
   - `startedAt: text('started_at')` — ISO timestamp if currently running, null if paused
   - `completedAt: text('completed_at')` — ISO timestamp if timer finished, null otherwise
   - Add unique constraint on `(bucketId, date)` to prevent duplicate rows
-- [ ] Run `pnpm --filter @repo/db db:generate && pnpm --filter @repo/db db:migrate`
-- [ ] Verify migration was generated and tables exist (check with a quick query in tests)
+- [x] Run `pnpm --filter @repo/db db:generate && pnpm --filter @repo/db db:migrate`
+- [x] Verify migration was generated and tables exist (check with a quick query in tests)
+  - *Note: Verified via schema column tests (33 tests pass). Migration file `0001_lyrical_cyclops.sql` generated with both tables, FK, and unique index.*
 
 **Acceptance Criteria:**
 - Both tables exist in the SQLite database after migration

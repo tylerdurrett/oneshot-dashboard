@@ -16,6 +16,14 @@ describe('schema module', () => {
   it('exports messages table', () => {
     expect(schema.messages).toBeDefined();
   });
+
+  it('exports timerBuckets table', () => {
+    expect(schema.timerBuckets).toBeDefined();
+  });
+
+  it('exports timerDailyProgress table', () => {
+    expect(schema.timerDailyProgress).toBeDefined();
+  });
 });
 
 describe('threads table', () => {
@@ -73,6 +81,86 @@ describe('messages table', () => {
   it('has createdAt column as non-null integer', () => {
     expect(columns.createdAt.dataType).toBe('number');
     expect(columns.createdAt.notNull).toBe(true);
+  });
+});
+
+describe('timerBuckets table', () => {
+  const columns = getTableColumns(schema.timerBuckets);
+
+  it('has id column as text primary key', () => {
+    expect(columns.id.dataType).toBe('string');
+    expect(columns.id.notNull).toBe(true);
+  });
+
+  it('has name column as non-null text', () => {
+    expect(columns.name.dataType).toBe('string');
+    expect(columns.name.notNull).toBe(true);
+  });
+
+  it('has totalMinutes column as non-null integer', () => {
+    expect(columns.totalMinutes.dataType).toBe('number');
+    expect(columns.totalMinutes.notNull).toBe(true);
+  });
+
+  it('has colorIndex column as non-null integer', () => {
+    expect(columns.colorIndex.dataType).toBe('number');
+    expect(columns.colorIndex.notNull).toBe(true);
+  });
+
+  it('has daysOfWeek column as non-null text', () => {
+    expect(columns.daysOfWeek.dataType).toBe('string');
+    expect(columns.daysOfWeek.notNull).toBe(true);
+  });
+
+  it('has sortOrder column as non-null integer with default', () => {
+    expect(columns.sortOrder.dataType).toBe('number');
+    expect(columns.sortOrder.notNull).toBe(true);
+    expect(columns.sortOrder.hasDefault).toBe(true);
+  });
+
+  it('has createdAt column as non-null integer', () => {
+    expect(columns.createdAt.dataType).toBe('number');
+    expect(columns.createdAt.notNull).toBe(true);
+  });
+
+  it('has updatedAt column as non-null integer', () => {
+    expect(columns.updatedAt.dataType).toBe('number');
+    expect(columns.updatedAt.notNull).toBe(true);
+  });
+});
+
+describe('timerDailyProgress table', () => {
+  const columns = getTableColumns(schema.timerDailyProgress);
+
+  it('has id column as text primary key', () => {
+    expect(columns.id.dataType).toBe('string');
+    expect(columns.id.notNull).toBe(true);
+  });
+
+  it('has bucketId column as non-null text', () => {
+    expect(columns.bucketId.dataType).toBe('string');
+    expect(columns.bucketId.notNull).toBe(true);
+  });
+
+  it('has date column as non-null text', () => {
+    expect(columns.date.dataType).toBe('string');
+    expect(columns.date.notNull).toBe(true);
+  });
+
+  it('has elapsedSeconds column as non-null integer with default', () => {
+    expect(columns.elapsedSeconds.dataType).toBe('number');
+    expect(columns.elapsedSeconds.notNull).toBe(true);
+    expect(columns.elapsedSeconds.hasDefault).toBe(true);
+  });
+
+  it('has startedAt column as nullable text', () => {
+    expect(columns.startedAt.dataType).toBe('string');
+    expect(columns.startedAt.notNull).toBe(false);
+  });
+
+  it('has completedAt column as nullable text', () => {
+    expect(columns.completedAt.dataType).toBe('string');
+    expect(columns.completedAt.notNull).toBe(false);
   });
 });
 
