@@ -9,7 +9,7 @@ const mockFetch = vi.fn();
 
 beforeEach(() => {
   vi.stubGlobal('fetch', mockFetch);
-  vi.stubEnv('NEXT_PUBLIC_SERVER_PORT', '3202');
+  vi.stubEnv('VITE_SERVER_PORT', '3202');
 });
 
 afterEach(() => {
@@ -115,8 +115,6 @@ describe('createThread', () => {
 
   it('uses default port when env is not set', async () => {
     vi.unstubAllEnvs();
-    // Ensure the env var is not set
-    delete process.env.NEXT_PUBLIC_SERVER_PORT;
     const thread = { id: 't1', title: 'Test', claudeSessionId: null, createdAt: 1, updatedAt: 1 };
     mockFetch.mockReturnValue(jsonResponse({ thread }, 201));
 

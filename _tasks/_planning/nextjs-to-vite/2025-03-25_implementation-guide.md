@@ -80,11 +80,13 @@ apps/web/
 
 ### 1.3 Migrate environment variables (must happen before any page works)
 
-- [ ] Rename `NEXT_PUBLIC_SERVER_PORT` → `VITE_SERVER_PORT` in `.env` and `.env.example`
-- [ ] Update `apps/web/src/lib/server-url.ts`: change `process.env.NEXT_PUBLIC_SERVER_PORT` → `import.meta.env.VITE_SERVER_PORT` (Vite does not inject `process.env` in browser builds — without this, all API calls and WebSocket connections will fail)
-- [ ] Update all other source code references to use `import.meta.env.VITE_SERVER_PORT`
-- [ ] Update `chat/__tests__/api.test.ts`: change `vi.stubEnv('NEXT_PUBLIC_SERVER_PORT', ...)` → `vi.stubEnv('VITE_SERVER_PORT', ...)` and replace `delete process.env.NEXT_PUBLIC_SERVER_PORT` with `vi.unstubAllEnvs()` (cannot `delete` from `import.meta.env`)
-- [ ] Ensure `vite.config.ts` (from 1.2) injects server port from `project.config.json` via `define` or env var
+- [x] Rename `NEXT_PUBLIC_SERVER_PORT` → `VITE_SERVER_PORT` in `.env` and `.env.example`
+- [x] Update `apps/web/src/lib/server-url.ts`: change `process.env.NEXT_PUBLIC_SERVER_PORT` → `import.meta.env.VITE_SERVER_PORT` (Vite does not inject `process.env` in browser builds — without this, all API calls and WebSocket connections will fail)
+- [x] Update all other source code references to use `import.meta.env.VITE_SERVER_PORT`
+- [x] Update `chat/__tests__/api.test.ts`: change `vi.stubEnv('NEXT_PUBLIC_SERVER_PORT', ...)` → `vi.stubEnv('VITE_SERVER_PORT', ...)` and replace `delete process.env.NEXT_PUBLIC_SERVER_PORT` with `vi.unstubAllEnvs()` (cannot `delete` from `import.meta.env`)
+- [x] Ensure `vite.config.ts` (from 1.2) injects server port from `project.config.json` via `define` or env var
+
+> **Notes (1.3):** No `.env` or `.env.example` files exist — the server port is injected entirely via `vite.config.ts`'s `define` option (reading from `project.config.json` at build time), which was already set up in Phase 1.2. The only source code reference to `NEXT_PUBLIC_SERVER_PORT` was in `server-url.ts`; all other files consume it indirectly via `getServerHttpUrl()`/`getServerWsUrl()`. The `delete process.env.NEXT_PUBLIC_SERVER_PORT` line in the test was replaced with `vi.unstubAllEnvs()` which was already being called — the extra delete was redundant.
 
 **Acceptance Criteria:**
 - `server-url.ts` reads port from `import.meta.env.VITE_SERVER_PORT`

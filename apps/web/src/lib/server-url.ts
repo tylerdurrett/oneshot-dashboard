@@ -3,7 +3,7 @@
  *  automatically (e.g. when accessed via Tailscale HTTPS or a reverse proxy). */
 
 function getPort(): string {
-  return process.env.NEXT_PUBLIC_SERVER_PORT ?? '4902';
+  return import.meta.env.VITE_SERVER_PORT ?? '4902';
 }
 
 function getHost(): string {
