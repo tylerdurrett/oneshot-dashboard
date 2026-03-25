@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { generateId } from '@/lib/generate-id';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +21,7 @@ export interface UseChatSocketReturn {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   isStreaming: boolean;
   error: string | null;
+  setError: (msg: string) => void;
   clearError: () => void;
   connectionStatus: ConnectionStatus;
 }
@@ -186,22 +188,15 @@ export function useChatSocket(): UseChatSocketReturn {
 
       setError(null);
 
-      // Optimistically append the user message.
-      // Use Math.random() fallback because crypto.randomUUID() is only
-      // available in secure contexts (HTTPS / localhost) and fails on
-      // plain-HTTP LAN/Tailscale access.
-      const uid = () =>
-        typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2) + Date.now().toString(36);
-      const userMsgId = `local-${uid()}`;
+      // Optimistically append the user message
+      const userMsgId = `local-${generateId()}`;
       setMessages((prev) => [
         ...prev,
         { id: userMsgId, role: 'user', content },
       ]);
 
       // Prepare a placeholder for the assistant response
-      const assistantMsgId = `streaming-${uid()}`;
+      const assistantMsgId = `streaming-${generateId()}`;
       streamingIdRef.current = assistantMsgId;
       setMessages((prev) => [
         ...prev,
@@ -228,6 +223,7 @@ export function useChatSocket(): UseChatSocketReturn {
     setMessages,
     isStreaming,
     error,
+    setError,
     clearError,
     connectionStatus,
   };

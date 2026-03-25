@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -50,7 +50,7 @@ export default function ChatIndexPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { messages, sendMessage, isStreaming, error, clearError, connectionStatus } =
+  const { messages, sendMessage, isStreaming, error, setError, clearError, connectionStatus } =
     useChatSocketContext();
   const threadsQuery = useThreads();
   const deleteThreadMutation = useDeleteThread();
@@ -82,8 +82,6 @@ export default function ChatIndexPage() {
   // Submit handler — lazy thread creation on first message
   // ---------------------------------------------------------------------------
 
-  const [submitError, setSubmitError] = useState<string | null>(null);
-
   const handleSubmit = useCallback(
     async (message: { text: string }) => {
       const text = message.text.trim();
@@ -94,7 +92,6 @@ export default function ChatIndexPage() {
       if (connectionStatus !== 'connected') return;
 
       creatingRef.current = true;
-      setSubmitError(null);
 
       try {
         const thread = await createThread();
@@ -105,14 +102,15 @@ export default function ChatIndexPage() {
         const msg =
           err instanceof Error ? err.message : 'Failed to send message';
         console.error('Failed to send message:', err);
-        setSubmitError(msg);
-        creatingRef.current = false;
+        setError(msg);
         // Re-throw so PromptInput knows the submit failed and preserves
         // the user's input instead of clearing it.
         throw err;
+      } finally {
+        creatingRef.current = false;
       }
     },
-    [sendMessage, router, queryClient, connectionStatus],
+    [sendMessage, setError, router, queryClient, connectionStatus],
   );
 
   // ---------------------------------------------------------------------------
@@ -167,11 +165,8 @@ export default function ChatIndexPage() {
                   </Message>
                 ))
               )}
-              {(error || submitError) && (
-                <ChatErrorBanner
-                  error={error ?? submitError!}
-                  onDismiss={() => { clearError(); setSubmitError(null); }}
-                />
+              {error && (
+                <ChatErrorBanner error={error} onDismiss={clearError} />
               )}
             </ConversationContent>
             <ConversationScrollButton />
