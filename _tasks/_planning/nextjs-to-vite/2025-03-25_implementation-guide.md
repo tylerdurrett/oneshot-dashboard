@@ -346,6 +346,52 @@ apps/web/
 
 ---
 
+## Phase 6: Browser Smoke Test (Final Sanity Check)
+
+**Purpose:** Visually verify the entire app works end-to-end on both localhost and the Tailscale network access point before calling the migration done.
+
+**Rationale:** Automated tests can't catch everything — layout breakage, missing fonts, broken WebSocket connections, or subtle CSS regressions need a real browser. Testing both localhost and the Tailscale IP confirms network-accessible hosting works (Vite's `server.host` config).
+
+### 6.1 Localhost smoke test
+
+Use the Chrome DevTools skill to open the app at `http://localhost:4900/` (or whatever port is in `project.config.json`) and verify each route visually:
+
+- [ ] `/timers` — page loads, timers render, dark theme is applied, fonts look correct (Geist Sans body, Geist Mono for any code)
+- [ ] Create a timer bucket, start/stop a timer — verify SSE updates work in real time
+- [ ] `/chat` — empty draft state renders, connection status shows "Connected"
+- [ ] Send a message — verify thread is created, URL changes to `/chat/:threadId`, WebSocket streaming works
+- [ ] `/chat/:threadId` — navigate to an existing thread, verify messages load from DB
+- [ ] `/prototype` — page loads, links are clickable
+- [ ] `/prototype/chat` — fullscreen chat prototype renders
+- [ ] `/video` — Remotion player renders and plays
+- [ ] Sidebar navigation — verify active route highlighting, clicking between routes works
+- [ ] Mobile bottom nav — resize viewport to mobile width, verify bottom nav appears and works
+- [ ] Browser tab titles — verify each route sets the correct title (e.g. "Timers", "Chat")
+- [ ] Fix any issues encountered
+
+**Acceptance Criteria:**
+- All routes render correctly with no console errors
+- Real-time features (SSE timers, WebSocket chat) function properly
+- Navigation works across all routes
+- Dark theme, fonts, and layout match pre-migration appearance
+
+### 6.2 Tailscale network access smoke test
+
+Use the Chrome DevTools skill to open the app at `http://100.90.21.39:4900/` and repeat the critical checks:
+
+- [ ] `/timers` — page loads and renders correctly over the network
+- [ ] `/chat` — WebSocket connection establishes (not just localhost)
+- [ ] Send a message and verify streaming works over the Tailscale connection
+- [ ] Navigate between routes — verify client-side routing works (no 404s on direct URL access)
+- [ ] Fix any issues encountered (common: CORS, WebSocket URL construction, host header rejection)
+
+**Acceptance Criteria:**
+- App is fully functional when accessed via Tailscale IP
+- No CORS or WebSocket connection failures
+- Vite's dev server accepts connections from the network (not rejecting due to host header)
+
+---
+
 ## Dependency Graph
 
 ```
@@ -367,6 +413,9 @@ Phase 4 (Config) ───────┘
          |
 Phase 5 (Cleanup) ─────┘
   5.1 → 5.2 → 5.3
+         |
+Phase 6 (Browser Smoke Test)
+  6.1 → 6.2
 ```
 
 Phases 3.1, 3.2, and 3.3 can be done in parallel or any order.
