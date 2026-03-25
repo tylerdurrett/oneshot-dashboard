@@ -7,7 +7,7 @@ One Shot is a **monorepo** — one repository containing multiple packages that 
 ```
 your-project/
 ├── apps/
-│   └── web/                  ← Your Next.js app (where you build your product)
+│   └── web/                  ← Your Vite + React Router app (where you build your product)
 │
 ├── packages/
 │   ├── ui/                   ← Shared UI components (buttons, cards, inputs, etc.)
@@ -34,9 +34,9 @@ your-project/
 
 ### `apps/web/` — Your App
 
-This is where you spend most of your time. It's a [Next.js 15](https://nextjs.org/) app using the App Router.
+This is where you spend most of your time. It's a [Vite](https://vite.dev/) app with [React Router](https://reactrouter.com/) for client-side routing.
 
-- **`src/app/`** — Your pages and layouts (file-based routing, including browser tab titles via route metadata)
+- **`src/app/`** — Your pages and layouts (routes defined in `src/router.tsx`, browser tab titles via route metadata)
 - **`src/app/globals.css`** — Global styles and Tailwind theme
 - **`src/__tests__/`** — Tests for your app
 

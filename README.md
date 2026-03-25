@@ -61,11 +61,11 @@ I chose this stack for a couple of reasons.
 
 1. It's super standard, for one. You'll have zero problem finding libraries and support for it, and your agent was trained on this stack.
 
-2. On Next.js specifically - I considered Sveltekit or Tanstack Start, and I may end up using one of those in a future version, but Next.js is just such an easy button, allowing non-devs to quickly spin up full-stack apps. Tanstack Start is newer and was just coming out of beta last time I checked. I want to give it a little more time in the oven. Svelte is amazing, but there are more UI components for React. Again, will likely revisit this later, but this feels like an easy pragmatic choice at the moment.
+2. On the frontend — we use Vite + React Router. It's fast, simple, and well-supported. The app is a client-side SPA with a separate Fastify API server, so we don't need a full-stack framework. Vite gives us instant HMR and a clean build pipeline. React Router handles the few routes we have without overhead.
 
 3. Drizzle with SQLite - the intent here was to keep it simple (SQLite) but provide an easy upgrade path in case a project ends up needing a little more database juice. You can swap out the underlying database without rewriting all your DB code.
 
-- ⚡ **Next.js 15** with the App Router — your full-stack web framework
+- ⚡ **Vite + React Router** — fast dev server, client-side routing
 - 🎨 **Shadcn + Tailwind CSS v4** — beautiful UI components, ready to use
 - 🗄️ **Drizzle ORM + SQLite** — a real database with type-safe queries, zero setup
 - 📦 **Turborepo** — fast builds across all your packages

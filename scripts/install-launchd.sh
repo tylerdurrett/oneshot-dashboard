@@ -6,7 +6,7 @@ set -euo pipefail
 #   ./scripts/install-launchd.sh
 #
 # The service runs `pnpm dev` at the repo root, which starts both the
-# Next.js web app and the Fastify server with hot reload via Turbo.
+# Vite web app and the Fastify server with hot reload via Turbo.
 # Pre-dev hooks (migrations, setup checks) run automatically on each start.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

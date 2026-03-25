@@ -22,7 +22,7 @@ That's it. The app is now running at `http://localhost:4900` and will survive re
 ## How It Works
 
 - A macOS **launchd user agent** runs `pnpm dev` at the repo root
-- This starts both the **Next.js web app** and the **Fastify server** via Turbo
+- This starts both the **Vite web app** and the **Fastify server** via Turbo
 - **Hot reload** works exactly like normal dev — edit a file, see it update
 - If the process crashes, launchd **automatically restarts** it
 - Pre-dev hooks (database migrations, setup checks) run on each start

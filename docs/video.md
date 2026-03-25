@@ -130,16 +130,14 @@ const x = interpolate(frame, [0, 30], [-200, 0], {
 
 ## Embedding Videos in Your App
 
-Compositions can be embedded in the Next.js app using the Remotion Player. There's a working example at `/video` in the web app.
+Compositions can be embedded in the web app using the Remotion Player. There's a working example at `/video` in the web app.
 
 The pattern is:
 
-1. Create a `'use client'` component that imports the `Player` from `@remotion/player` and your composition from `@repo/video`
+1. Create a component that imports the `Player` from `@remotion/player` and your composition from `@repo/video`
 2. Pass the composition component and its metadata to the Player
 
 ```tsx
-'use client';
-
 import { Player } from '@remotion/player';
 import { HelloWorld, compositions } from '@repo/video';
 

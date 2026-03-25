@@ -375,17 +375,19 @@ apps/web/
 
 ### 5.3 Update documentation and scripts
 
-- [ ] Update `docs/project-structure.md`: change "Next.js 15 app using the App Router" to describe Vite + React Router
-- [ ] Update `docs/persistent-service.md`: change "Next.js web app" references to "Vite web app"
-- [ ] Update `docs/ui-conventions.md` if it references Next.js
-- [ ] Update `scripts/install-launchd.sh` comment (line 9-10): change "Next.js web app" to "Vite web app"
-- [ ] Update any README references to Next.js
-- [ ] Update `AGENTS.md` if it references Next.js conventions
+- [x] Update `docs/project-structure.md`: change "Next.js 15 app using the App Router" to describe Vite + React Router
+- [x] Update `docs/persistent-service.md`: change "Next.js web app" references to "Vite web app"
+- [x] Update `docs/ui-conventions.md` if it references Next.js
+- [x] Update `scripts/install-launchd.sh` comment (line 9-10): change "Next.js web app" to "Vite web app"
+- [x] Update any README references to Next.js
+- [x] Update `AGENTS.md` if it references Next.js conventions
+
+> **Notes (5.3):** `docs/ui-conventions.md` had no Next.js references — no changes needed. Also updated `docs/video.md` which referenced "the Next.js app" and `'use client'` in code examples (both removed). `AGENTS.md` env vars section changed from "Follows the Next.js convention" to "Uses a two-file convention" (the `.env`/`.env.local` pattern is framework-agnostic). The `.next` directory build conflict warning in AGENTS.md was replaced with a simpler type-check tip (Vite's `dist/` output doesn't conflict with dev server). `README.md` Next.js paragraph rewritten to describe the Vite + React Router choice. Verified: `grep -ri "next.js\|nextjs\|next js" docs/ scripts/ AGENTS.md README.md` returns zero results. One remaining reference in `.claude/skills/new-video/SKILL.md` (lines 93-99) still mentions "the Next.js app" and `'use client'` patterns — requires manual update (write permission to `.claude/skills/` was denied).
 
 **Acceptance Criteria:**
-- No documentation or script comments reference Next.js as the frontend framework
-- `grep -ri "next.js\|nextjs\|next js" docs/ scripts/ AGENTS.md` returns zero results (excluding migration plan files)
-- Vite-specific conventions are documented where relevant
+- No documentation or script comments reference Next.js as the frontend framework ✅
+- `grep -ri "next.js\|nextjs\|next js" docs/ scripts/ AGENTS.md` returns zero results (excluding migration plan files) ✅
+- Vite-specific conventions are documented where relevant ✅
 
 ---
 
