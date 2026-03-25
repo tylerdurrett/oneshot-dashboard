@@ -53,10 +53,12 @@ apps/web/
 
 ### 1.1 Swap dependencies
 
-- [ ] Remove `next` from `dependencies` in `apps/web/package.json`
-- [ ] Add `vite`, `@vitejs/plugin-react`, `react-router` to dependencies
-- [ ] Remove `next-env.d.ts`
-- [ ] Run `pnpm install`
+- [x] Remove `next` from `dependencies` in `apps/web/package.json`
+- [x] Add `vite`, `@vitejs/plugin-react`, `react-router` to dependencies
+- [x] Remove `next-env.d.ts`
+- [x] Run `pnpm install`
+
+> **Notes (1.1):** `vite` and `@vitejs/plugin-react` added to `devDependencies` (not `dependencies`) since they are build tools. `react-router` added to `dependencies`.
 
 **Acceptance Criteria:**
 - `pnpm install` succeeds with no errors
