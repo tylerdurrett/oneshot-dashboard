@@ -128,15 +128,17 @@ apps/web/
 
 ### 1.6 Update monorepo scripts and Turbo config
 
-- [ ] Update `apps/web/package.json` scripts: `dev` → `vite dev`, `build` → `vite build`, `preview` → `vite preview`
-- [ ] Update `turbo.json`: change build output from `.next/**` to `dist/**`
-- [ ] Update root `package.json` if any scripts reference Next.js-specific commands
-- [ ] Verify `pnpm dev` starts both Vite and the Fastify server via Turbo
+- [x] Update `apps/web/package.json` scripts: `dev` → `vite dev`, `build` → `vite build`, `preview` → `vite preview`
+- [x] Update `turbo.json`: change build output from `.next/**` to `dist/**`
+- [x] Update root `package.json` if any scripts reference Next.js-specific commands
+- [x] Verify `pnpm dev` starts both Vite and the Fastify server via Turbo
+
+> **Notes (1.6):** Removed `start` script (Next.js-specific) and replaced with `preview` (Vite convention). Port and host flags removed from `dev` script since they're configured in `vite.config.ts`. Root `package.json` needed no changes — all scripts delegate to Turbo which delegates to package-level scripts. `turbo.json` already had `dist/**` in outputs; removed `.next/**`. Four tests fail due to unresolved `next/link` and `next/navigation` imports — these are expected and will be fixed in Phase 2 (AppShell) and Phase 3 (pages).
 
 **Acceptance Criteria:**
-- `pnpm dev` starts the Vite dev server on the configured port
-- `pnpm --filter @repo/web build` produces output in `apps/web/dist/`
-- Turbo caching works for build output
+- `pnpm dev` starts the Vite dev server on the configured port ✅
+- `pnpm --filter @repo/web build` produces output in `apps/web/dist/` ✅
+- Turbo caching works for build output ✅
 
 ---
 
