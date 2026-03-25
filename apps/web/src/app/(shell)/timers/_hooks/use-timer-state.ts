@@ -131,10 +131,21 @@ export function useTimerState(): UseTimerStateReturn {
 
   // Derive todaysBuckets from serverBuckets (stable reference between ticks)
   // rather than allBuckets, since isBucketActiveToday only checks daysOfWeek.
+  // Buckets already completed on load (completedAt set, not running) are
+  // excluded — they'd otherwise show permanently at 0:00 after a page refresh
+  // because the animation→hide flow only runs for timers that complete during
+  // the current session.
   const todaysBuckets = useMemo(() => {
     const now = new Date();
     return serverBuckets
-      .filter((sb) => isBucketActiveToday(sb))
+      .filter((sb) => {
+        if (!isBucketActiveToday(sb)) return false;
+        // Hide buckets that finished before this session (completedAt set,
+        // not currently running). Buckets completing *during* this session
+        // are hidden via the animation flow in timer-grid.
+        if (sb.completedAt && !sb.startedAt) return false;
+        return true;
+      })
       .map((sb) => serverBucketToTimeBucket(sb, now));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverBuckets, tick]);
