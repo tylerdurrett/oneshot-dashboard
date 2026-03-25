@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
@@ -82,6 +82,8 @@ export default function ChatIndexPage() {
   // Submit handler — lazy thread creation on first message
   // ---------------------------------------------------------------------------
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const handleSubmit = useCallback(
     async (message: { text: string }) => {
       const text = message.text.trim();
@@ -92,14 +94,22 @@ export default function ChatIndexPage() {
       if (connectionStatus !== 'connected') return;
 
       creatingRef.current = true;
+      setSubmitError(null);
 
       try {
         const thread = await createThread();
         queryClient.invalidateQueries({ queryKey: threadKeys.all });
         sendMessage(thread.id, text);
         router.replace(`/chat/${thread.id}`);
-      } catch {
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : 'Failed to send message';
+        console.error('Failed to send message:', err);
+        setSubmitError(msg);
         creatingRef.current = false;
+        // Re-throw so PromptInput knows the submit failed and preserves
+        // the user's input instead of clearing it.
+        throw err;
       }
     },
     [sendMessage, router, queryClient, connectionStatus],
@@ -157,8 +167,11 @@ export default function ChatIndexPage() {
                   </Message>
                 ))
               )}
-              {error && (
-                <ChatErrorBanner error={error} onDismiss={clearError} />
+              {(error || submitError) && (
+                <ChatErrorBanner
+                  error={error ?? submitError!}
+                  onDismiss={() => { clearError(); setSubmitError(null); }}
+                />
               )}
             </ConversationContent>
             <ConversationScrollButton />
