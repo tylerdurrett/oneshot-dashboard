@@ -294,7 +294,7 @@ apps/web/src/app/(shell)/timers/
 
 ### 4.1 API Client & Types
 
-- [ ] Create `apps/web/src/app/(shell)/timers/_lib/timer-api.ts`:
+- [x] Create `apps/web/src/app/(shell)/timers/_lib/timer-api.ts`:
   - `getBaseUrl()` — same pattern as `chat/api.ts`, reads `NEXT_PUBLIC_SERVER_PORT`
   - Type definitions for server responses:
     - `ServerBucket` — bucket fields + `elapsedSeconds`, `startedAt`, `completedAt` from progress
@@ -312,16 +312,18 @@ apps/web/src/app/(shell)/timers/
     - `resetTimer(bucketId)` → `POST /timers/buckets/:id/reset`
     - `setTimerTime(bucketId, remainingSeconds)` → `POST /timers/buckets/:id/set-time`
   - Error handling: throw on non-OK status (matching `chat/api.ts` pattern)
+  - *Note: Also exports `BucketResponse` (for CRUD ops), `CreateBucketInput`, and `UpdateBucketInput` types. Response types mirror server shapes exactly — `StopTimerResponse` matches the route's transformed output (no `changed` field). All 222 existing web tests pass.*
 - [ ] Update `timer-types.ts`:
   - Keep: `TimeBucket` interface, `BucketColor`, `BUCKET_COLORS`, `formatTime()`, `isBucketActiveToday()`, `generateBucketId()`, `ADD_BUCKET_EVENT`
   - Remove: `TimerState` interface, `STORAGE_KEY`, `DEFAULT_BUCKETS` (defaults now live on the server)
   - Remove: `getResetDate()` (server is now source of truth for dates — client receives date in API response)
   - Keep `RESET_HOUR` and `adjustForResetBoundary` only if `isBucketActiveToday` still needs them for client-side display filtering. If the server's `GET /timers/today` already returns only today's state, these can be removed too. Decision: keep them — the client receives ALL buckets and filters locally for display, since it needs `allBuckets` for the settings dialog
+  - *Note: Deferred to Phase 4.4/4.5 — `TimerState`, `STORAGE_KEY`, `DEFAULT_BUCKETS`, and `getResetDate()` are still imported by the current `use-timer-state.ts`. Removing them now would break compilation. They will be removed when `use-timer-state.ts` is rewritten (4.4) and the migration cleanup runs (4.5).*
 
 **Acceptance Criteria:**
 - All API functions work against the running server
 - Response types match server response shapes
-- `timer-types.ts` has no localStorage-related exports
+- `timer-types.ts` has no localStorage-related exports *(deferred to 4.4/4.5 — see note above)*
 
 ### 4.2 SSE Hook
 
