@@ -51,8 +51,8 @@ export const config = {
   /** Fastify server port. Uses serverPort if available, otherwise port + 2. */
   port: projectConfig.serverPort ?? projectConfig.port + 2,
 
-  /** Origin of the web app, used for CORS. */
-  webOrigin: `http://localhost:${projectConfig.port}`,
+  /** Port of the web app, used for dynamic CORS origin matching. */
+  webPort: projectConfig.port,
 
   /** Docker sandbox name. */
   sandboxName: process.env.SANDBOX_NAME ?? 'oneshot-sandbox',
@@ -72,3 +72,12 @@ export const config = {
   healWindowMs: envInt('HEAL_WINDOW_MS', 900_000),
   credentialSweepEnabled: envBool('CREDENTIAL_SWEEP_ENABLED', true),
 };
+
+/** Check whether an origin is allowed for CORS (any host on the web app port). */
+export function isAllowedOrigin(origin: string): boolean {
+  try {
+    return parseInt(new URL(origin).port, 10) === config.webPort;
+  } catch {
+    return false;
+  }
+}

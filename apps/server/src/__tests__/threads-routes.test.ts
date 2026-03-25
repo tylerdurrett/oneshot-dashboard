@@ -277,11 +277,11 @@ describe('thread routes', () => {
       const response = await server.inject({
         method: 'GET',
         url: '/threads',
-        headers: { origin: config.webOrigin },
+        headers: { origin: `http://localhost:${config.webPort}` },
       });
 
       expect(response.headers['access-control-allow-origin']).toBe(
-        config.webOrigin,
+        `http://localhost:${config.webPort}`,
       );
 
       await server.close();
@@ -294,14 +294,14 @@ describe('thread routes', () => {
         method: 'OPTIONS',
         url: '/threads',
         headers: {
-          origin: config.webOrigin,
+          origin: `http://localhost:${config.webPort}`,
           'access-control-request-method': 'POST',
         },
       });
 
       expect(response.statusCode).toBe(204);
       expect(response.headers['access-control-allow-origin']).toBe(
-        config.webOrigin,
+        `http://localhost:${config.webPort}`,
       );
 
       await server.close();
@@ -314,7 +314,7 @@ describe('thread routes', () => {
         method: 'OPTIONS',
         url: '/threads/some-id',
         headers: {
-          origin: config.webOrigin,
+          origin: `http://localhost:${config.webPort}`,
           'access-control-request-method': 'DELETE',
         },
       });

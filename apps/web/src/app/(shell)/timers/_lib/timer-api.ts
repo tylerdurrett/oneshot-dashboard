@@ -70,10 +70,7 @@ export interface UpdateBucketInput {
 // Base URL
 // ---------------------------------------------------------------------------
 
-export function getBaseUrl(): string {
-  const port = process.env.NEXT_PUBLIC_SERVER_PORT ?? '4902';
-  return `http://localhost:${port}`;
-}
+export { getServerHttpUrl as getBaseUrl } from '@/lib/server-url';
 
 // ---------------------------------------------------------------------------
 // API functions

@@ -3,7 +3,7 @@ import 'dotenv/config';
 import cors from '@fastify/cors';
 import { db as defaultDb, enableWalMode, getJournalMode } from '@repo/db';
 import Fastify from 'fastify';
-import { config } from './config.js';
+import { config, isAllowedOrigin } from './config.js';
 import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
@@ -34,9 +34,13 @@ export function buildServer(opts?: BuildServerOptions) {
   let lastCredentialSweep: string | null = null;
   const credentialInjectionAvailable = isMacOS();
 
-  // @fastify/cors v11 defaults to GET,HEAD,POST only — explicitly allow DELETE for thread deletion
+  // Allow CORS from any host on the web app port (supports Tailscale / LAN access)
   server.register(cors, {
-    origin: config.webOrigin,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (isAllowedOrigin(origin)) return cb(null, true);
+      cb(new Error('CORS: origin not allowed'), false);
+    },
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
   });
   server.register(websocket);
@@ -172,7 +176,8 @@ if (!process.env.VITEST) {
     server.log.warn(`Failed to seed default timer buckets: ${err}`);
   }
 
-  server.listen({ port: config.port, host: '127.0.0.1' }, async (err) => {
+  // Bind to 0.0.0.0 so the server is reachable over Tailscale / LAN
+  server.listen({ port: config.port, host: '0.0.0.0' }, async (err) => {
     if (err) {
       server.log.error(err);
       process.exit(1);

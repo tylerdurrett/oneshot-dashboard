@@ -36,10 +36,9 @@ const BACKOFF_MULTIPLIER = 2;
 // Hook
 // ---------------------------------------------------------------------------
 
-function getServerUrl(): string {
-  const port = process.env.NEXT_PUBLIC_SERVER_PORT ?? '4902';
-  return `ws://localhost:${port}/chat`;
-}
+import { getServerWsUrl } from '@/lib/server-url';
+
+const getServerUrl = () => getServerWsUrl('/chat');
 
 export function useChatSocket(): UseChatSocketReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);

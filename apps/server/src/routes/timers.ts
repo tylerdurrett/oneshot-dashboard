@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ServerResponse } from 'node:http';
-import { config } from '../config.js';
+import { config, isAllowedOrigin } from '../config.js';
 import type { Database } from '../services/thread.js';
 import {
   listBuckets,
@@ -130,12 +130,18 @@ export async function timerRoutes(
     const raw = reply.raw;
 
     // reply.hijack() bypasses Fastify's response pipeline, so @fastify/cors
-    // never injects headers. We must add the CORS origin manually.
+    // never injects headers. We must set the CORS origin manually, applying
+    // the same port check the main CORS callback uses.
+    const reqOrigin = request.headers.origin;
+    const allowedOrigin =
+      reqOrigin && isAllowedOrigin(reqOrigin)
+        ? reqOrigin
+        : `http://localhost:${config.webPort}`;
     raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': config.webOrigin,
+      'Access-Control-Allow-Origin': allowedOrigin,
     });
 
     raw.write(':ok\n\n');
