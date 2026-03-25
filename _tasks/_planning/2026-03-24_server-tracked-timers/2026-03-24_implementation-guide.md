@@ -206,8 +206,8 @@ apps/web/src/app/(shell)/timers/
 
 ### 3.1 SSE Infrastructure
 
-- [ ] Add SSE client management to `apps/server/src/routes/timers.ts`:
-  - `sseClients: Map<string, ServerResponse>` — connected SSE clients
+- [x] Add SSE client management to `apps/server/src/routes/timers.ts`:
+  - `sseClients: Map<string, SSEClient>` — connected SSE clients (each entry holds the `ServerResponse` + heartbeat interval)
   - `broadcast(event, data)` — write `event: ${event}\ndata: ${JSON.stringify(data)}\n\n` to all clients
   - `GET /timers/events` route:
     - Set headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`
@@ -215,7 +215,8 @@ apps/web/src/app/(shell)/timers/
     - On connection close: remove from map
     - Send initial `:ok\n\n` comment as connection confirmation
   - Export `broadcast` so it can be passed to the scheduler
-- [ ] Write test verifying SSE connection sends correct headers and initial comment
+- [x] Write test verifying SSE connection sends correct headers and initial comment
+  - *Note: 8 tests covering SSE headers, initial `:ok` comment, client tracking, disconnect cleanup, broadcast to multiple clients, empty broadcast, sequential events, and event name constants. Tests use `server.listen(0)` + `http.get()` for real SSE streaming (Fastify `inject()` waits for response completion so can't test streaming). Added `SSEEventName` type-safe union for `broadcast()` event parameter. Added 30s heartbeat `:ping` to keep connections alive through proxies and detect dead sockets. Dead clients collected after iteration loop (not during) for safe Map modification. `_resetSSEClients()` clears heartbeat intervals. Also exports `SSE_EVENTS` constants, `getConnectedClientCount()`, and `_resetSSEClients()` for testing. 211 total tests pass.*
 
 **Acceptance Criteria:**
 - Client can connect to `/timers/events` and receive SSE stream
