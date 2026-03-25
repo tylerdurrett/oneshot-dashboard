@@ -522,10 +522,16 @@ function processStreamLine(line: string, emitter: EventEmitter): void {
       typeof obj.result === 'string' &&
       typeof obj.session_id === 'string'
     ) {
-      emitter.emit('result', {
-        result: obj.result as string,
-        sessionId: obj.session_id as string,
-      });
+      // Claude returns is_error: true for API/runtime errors — surface them
+      // as errors instead of persisting as assistant messages.
+      if (obj.is_error === true) {
+        emitter.emit('error', new Error(obj.result as string));
+      } else {
+        emitter.emit('result', {
+          result: obj.result as string,
+          sessionId: obj.session_id as string,
+        });
+      }
     }
   }
 }

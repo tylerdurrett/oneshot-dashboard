@@ -21,6 +21,7 @@ import {
   PromptInputTextarea,
   Spinner,
 } from '@repo/ui';
+import { ChatErrorBanner } from './chat-error-banner';
 import { useChatSocketContext } from './chat-socket-context';
 import { useDeleteThread, useThreads, threadKeys } from './use-threads';
 import { createThread } from './api';
@@ -50,7 +51,7 @@ export default function ChatIndexPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { messages, sendMessage, isStreaming, error, connectionStatus } =
+  const { messages, sendMessage, isStreaming, error, clearError, connectionStatus } =
     useChatSocketContext();
   const threadsQuery = useThreads();
   const deleteThreadMutation = useDeleteThread();
@@ -158,14 +159,7 @@ export default function ChatIndexPage() {
                 ))
               )}
               {error && (
-                <div
-                  role="alert"
-                  className="mx-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-                >
-                  {/sandbox|offline/i.test(error)
-                    ? 'Agent is offline. Check the Docker sandbox.'
-                    : error}
-                </div>
+                <ChatErrorBanner error={error} onDismiss={clearError} />
               )}
             </ConversationContent>
             <ConversationScrollButton />

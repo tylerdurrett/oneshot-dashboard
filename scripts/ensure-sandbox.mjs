@@ -145,6 +145,39 @@ function tryKeychainInjection() {
   return result.status === 0;
 }
 
+/**
+ * Docker Desktop's sandbox proxy sets PROXY_CA_CERT_B64 but doesn't always
+ * write the cert to disk. NODE_EXTRA_CA_CERTS / SSL_CERT_FILE point to
+ * the file, so HTTPS calls fail with "self-signed certificate" if it's missing.
+ * This writes the cert and updates the system trust store.
+ */
+function ensureProxyCACert() {
+  try {
+    // Single round-trip: check if cert exists, if not check for env var and write it.
+    // Runs as root since writing to /usr/local/share/ca-certificates/ requires it.
+    const script = [
+      '[ -f /usr/local/share/ca-certificates/proxy-ca.crt ] && exit 0',
+      '[ -z "$PROXY_CA_CERT_B64" ] && exit 0',
+      'echo "$PROXY_CA_CERT_B64" | base64 -d > /usr/local/share/ca-certificates/proxy-ca.crt && update-ca-certificates',
+    ].join(' && ');
+
+    const result = spawnSync(
+      'docker',
+      ['sandbox', 'exec', '--user', 'root', SANDBOX_NAME, 'sh', '-c', script],
+      { stdio: 'pipe', timeout: 15_000 },
+    );
+
+    // exit 0 from the first two guards means "nothing to do"
+    const output = result.stdout?.toString() ?? '';
+    if (output.includes('added')) {
+      console.log('  ✓ Proxy CA certificate installed');
+    }
+  } catch {
+    // Non-fatal — log and continue
+    console.log('  ⚠ Could not install proxy CA certificate');
+  }
+}
+
 // ── Main ────────────────────────────────────────────────
 
 function main() {
@@ -171,6 +204,7 @@ function main() {
         console.log('');
       }
     }
+    ensureProxyCACert();
     return;
   }
 
@@ -205,6 +239,8 @@ function main() {
       return;
     }
   }
+
+  ensureProxyCACert();
 
   console.log('  ✓ Sandbox ready');
   console.log('');

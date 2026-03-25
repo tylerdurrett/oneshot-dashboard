@@ -21,6 +21,7 @@ import {
   PromptInputTextarea,
   Spinner,
 } from '@repo/ui';
+import { ChatErrorBanner } from '../chat-error-banner';
 import { useChatSocketContext } from '../chat-socket-context';
 import { useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
 import { ThreadSelector } from '../thread-selector';
@@ -45,7 +46,7 @@ export default function ThreadPage() {
   const router = useRouter();
   const threadId = params.threadId;
 
-  const { messages, sendMessage, setMessages, isStreaming, error, connectionStatus } =
+  const { messages, sendMessage, setMessages, isStreaming, error, clearError, connectionStatus } =
     useChatSocketContext();
   const deleteThreadMutation = useDeleteThread();
   const threadsQuery = useThreads();
@@ -83,14 +84,15 @@ export default function ThreadPage() {
     setMessages(converted);
   }, [threadMessagesQuery.data, setMessages]);
 
-  // Clear messages when threadId changes via URL navigation
+  // Clear messages and stale errors when threadId changes via URL navigation
   const prevThreadIdRef = useRef(threadId);
   useEffect(() => {
     if (prevThreadIdRef.current !== threadId) {
       setMessages([]);
+      clearError();
       prevThreadIdRef.current = threadId;
     }
-  }, [threadId, setMessages]);
+  }, [threadId, setMessages, clearError]);
 
   // ---------------------------------------------------------------------------
   // Invalidate thread list when streaming ends
@@ -224,14 +226,7 @@ export default function ThreadPage() {
                   ))
               )}
               {error && (
-                <div
-                  role="alert"
-                  className="mx-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-                >
-                  {/sandbox|offline/i.test(error)
-                    ? 'Agent is offline. Check the Docker sandbox.'
-                    : error}
-                </div>
+                <ChatErrorBanner error={error} onDismiss={clearError} />
               )}
             </ConversationContent>
             <ConversationScrollButton />

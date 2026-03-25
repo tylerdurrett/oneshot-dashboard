@@ -12,6 +12,7 @@ const defaultReturn: UseChatSocketReturn = {
   setMessages: vi.fn(),
   isStreaming: false,
   error: null,
+  clearError: vi.fn(),
   connectionStatus: 'connected',
 };
 
@@ -425,7 +426,7 @@ describe('ThreadPage', () => {
     render(<ThreadPage />);
     const alert = screen.getByRole('alert');
     expect(alert).toBeDefined();
-    expect(alert.textContent).toBe('Something broke');
+    expect(alert.textContent).toContain('Something broke');
   });
 
   it('does not show error when error is null', () => {
@@ -437,7 +438,7 @@ describe('ThreadPage', () => {
   it('shows sandbox-specific error message for sandbox errors', () => {
     hookReturn = { ...defaultReturn, error: 'sandbox unavailable' };
     render(<ThreadPage />);
-    expect(screen.getByRole('alert').textContent).toBe(
+    expect(screen.getByRole('alert').textContent).toContain(
       'Agent is offline. Check the Docker sandbox.',
     );
   });
@@ -445,7 +446,7 @@ describe('ThreadPage', () => {
   it('shows sandbox-specific error message for offline errors', () => {
     hookReturn = { ...defaultReturn, error: 'Agent is offline' };
     render(<ThreadPage />);
-    expect(screen.getByRole('alert').textContent).toBe(
+    expect(screen.getByRole('alert').textContent).toContain(
       'Agent is offline. Check the Docker sandbox.',
     );
   });
@@ -462,7 +463,7 @@ describe('ThreadPage', () => {
     render(<ThreadPage />);
     expect(screen.getByText('Once upon a time...')).toBeDefined();
     expect(screen.getByRole('alert')).toBeDefined();
-    expect(screen.getByRole('alert').textContent).toBe('Stream interrupted');
+    expect(screen.getByRole('alert').textContent).toContain('Stream interrupted');
   });
 
   // -------------------------------------------------------------------------

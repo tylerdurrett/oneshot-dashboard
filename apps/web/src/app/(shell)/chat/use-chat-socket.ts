@@ -20,6 +20,7 @@ export interface UseChatSocketReturn {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   isStreaming: boolean;
   error: string | null;
+  clearError: () => void;
   connectionStatus: ConnectionStatus;
 }
 
@@ -177,6 +178,8 @@ export function useChatSocket(): UseChatSocketReturn {
   // Send
   // -----------------------------------------------------------------------
 
+  const clearError = useCallback(() => setError(null), []);
+
   const sendMessage = useCallback(
     (threadId: string, content: string) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
@@ -219,6 +222,7 @@ export function useChatSocket(): UseChatSocketReturn {
     setMessages,
     isStreaming,
     error,
+    clearError,
     connectionStatus,
   };
 }

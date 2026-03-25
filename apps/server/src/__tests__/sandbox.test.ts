@@ -383,6 +383,22 @@ describe('invokeClaude', () => {
       expect(events.errors).toHaveLength(0);
     });
 
+    it('emits error (not result) when result has is_error: true', async () => {
+      // Claude returns is_error: true for API/runtime errors — these should
+      // surface as errors, not be persisted as assistant messages.
+      const stdout = ndjson(
+        { type: 'result', result: 'API Error: Self-signed certificate', session_id: 'sess-err', is_error: true, subtype: 'error' },
+      );
+
+      const spawnFn = createFakeSpawn({ stdout, exitCode: 0 });
+      const emitter = invokeClaude({ prompt: 'test', spawnFn, inactivityTimeoutMs: 5000 });
+      const events = await collectEvents(emitter);
+
+      expect(events.result).toBeNull();
+      expect(events.errors).toHaveLength(1);
+      expect(events.errors[0]!.message).toContain('API Error: Self-signed certificate');
+    });
+
     it('emits text for assistant event type', async () => {
       const stdout = ndjson(
         {
