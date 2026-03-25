@@ -95,5 +95,10 @@ export function isBucketActiveToday(
  * Generate a unique ID for a new bucket.
  */
 export function generateBucketId(): string {
-  return crypto.randomUUID();
+  // crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
+  // Fall back to Math.random() for plain-HTTP LAN/Tailscale access.
+  if (typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
