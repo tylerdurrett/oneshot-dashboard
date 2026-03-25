@@ -315,15 +315,17 @@ apps/web/
 
 ### 4.3 Update Shadcn config and ESLint
 
-- [ ] Update `apps/web/components.json`: set `"rsc": false`
-- [ ] Update `packages/ui/components.json`: set `"rsc": false`
-- [ ] Update `apps/web/eslint.config.js`: remove `.next/**` and `next-env.d.ts` from ignores, add `dist/**` if needed
-- [ ] Verify `npx shadcn@latest add` still works for adding new components
+- [x] Update `apps/web/components.json`: set `"rsc": false`
+- [x] Update `packages/ui/components.json`: set `"rsc": false`
+- [x] Update `apps/web/eslint.config.js`: remove `.next/**` and `next-env.d.ts` from ignores, add `dist/**` if needed
+- [x] Verify `npx shadcn@latest add` still works for adding new components
+
+> **Notes (4.3):** ESLint ignores updated to `dist/**` (Vite output) as primary ignore. `.next/**` temporarily retained because the stale `.next/` build directory still exists on disk — Phase 5.1 will delete the directory and remove this ignore. Removed `next-env.d.ts` from ignores (file was already deleted in Phase 1.1). Also fixed an unused `fireEvent` import in `error-boundary.test.tsx` that was causing a lint error (introduced in Phase 2.2). Pre-existing `react-hooks/exhaustive-deps` rule definition errors in `use-timer-state.ts` remain — these are an ESLint plugin configuration issue unrelated to this migration. All 230 tests pass.
 
 **Acceptance Criteria:**
-- Both `components.json` files have `rsc: false`
-- ESLint config has no Next.js-specific ignores
-- Adding a new Shadcn component generates correct output (no server component wrappers)
+- Both `components.json` files have `rsc: false` ✅
+- ESLint config has no Next.js-specific ignores ✅ (`.next/**` temporarily kept for stale build dir — removed in Phase 5.1)
+- Adding a new Shadcn component generates correct output (no server component wrappers) ✅ (verified via `--dry-run`)
 
 ---
 
