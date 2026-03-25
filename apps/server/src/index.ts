@@ -1,12 +1,13 @@
 import 'dotenv/config';
 
 import cors from '@fastify/cors';
-import { enableWalMode, getJournalMode } from '@repo/db';
+import { db as defaultDb, enableWalMode, getJournalMode } from '@repo/db';
 import Fastify from 'fastify';
 import { config } from './config.js';
 import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
+import { timerRoutes, broadcast, SSE_EVENTS } from './routes/timers.js';
 import { isMacOS, refreshAndInjectCredentials } from './services/credentials.js';
 import {
   probeSandbox,
@@ -15,6 +16,7 @@ import {
 } from './services/sandbox.js';
 import type { Database } from './services/thread.js';
 import { seedDefaultBuckets } from './services/timer-bucket.js';
+import { TimerScheduler } from './services/timer-scheduler.js';
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -63,6 +65,27 @@ export function buildServer(opts?: BuildServerOptions) {
   if (opts?.spawnFn) chatOpts.spawnFn = opts.spawnFn;
   server.register(chatRoutes, chatOpts);
 
+  // -- Timer system: scheduler + routes --
+
+  const timerDb = opts?.database ?? defaultDb;
+  const scheduler = new TimerScheduler({
+    database: timerDb,
+    onTimerCompleted: (bucketId) =>
+      broadcast(SSE_EVENTS.TIMER_COMPLETED, { bucketId }),
+    onDailyReset: () => broadcast(SSE_EVENTS.DAILY_RESET, {}),
+  });
+
+  server.register(timerRoutes, {
+    database: timerDb,
+    scheduler,
+  });
+
+  /** Initialize the timer scheduler (recovery + completion jobs + daily reset).
+   *  Call after seeding default buckets. */
+  async function initScheduler(): Promise<void> {
+    await scheduler.init();
+  }
+
   /** Run the sandbox probe and cache the result for the health endpoint. */
   async function runSandboxProbe(): Promise<SandboxProbeResult> {
     const result = await probeSandbox(opts?.spawnFn);
@@ -105,10 +128,12 @@ export function buildServer(opts?: BuildServerOptions) {
   }
 
   server.addHook('onClose', () => {
+    scheduler.destroy();
     stopCredentialSweep();
   });
 
   return Object.assign(server, {
+    initScheduler,
     runSandboxProbe,
     runCredentialSweep,
     startCredentialSweep,
@@ -151,6 +176,14 @@ if (!process.env.VITEST) {
     if (err) {
       server.log.error(err);
       process.exit(1);
+    }
+
+    // Must run after seeding — scheduler recovery depends on buckets existing
+    try {
+      await server.initScheduler();
+      server.log.info('Timer scheduler initialized');
+    } catch (schedulerErr) {
+      server.log.warn(`Timer scheduler init failed: ${schedulerErr}`);
     }
 
     // Probe sandbox and run initial credential sweep in parallel (non-blocking)

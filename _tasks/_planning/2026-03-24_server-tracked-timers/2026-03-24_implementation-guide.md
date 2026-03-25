@@ -267,14 +267,15 @@ apps/web/src/app/(shell)/timers/
 
 ### 3.4 Server Wiring
 
-- [ ] Update `apps/server/src/index.ts`:
+- [x] Update `apps/server/src/index.ts`:
   - Import and register `timerRoutes` (same pattern as `threadRoutes`)
   - Pass `database` and `scheduler` via route options
   - Create `TimerScheduler` instance, call `scheduler.init()` after server starts listening
   - Add `scheduler.destroy()` to the `onClose` hook
   - Call seed function before scheduler init
-- [ ] Verify server starts cleanly with new routes registered
-- [ ] Add `/timers` prefix to all timer routes (or use Fastify `prefix` option on the plugin)
+- [x] Verify server starts cleanly with new routes registered
+- [x] Add `/timers` prefix to all timer routes (or use Fastify `prefix` option on the plugin)
+  - *Note: Routes already include `/timers` in their path definitions (e.g., `/timers/buckets`, `/timers/events`), so no Fastify `prefix` option needed. TimerScheduler created with resolved `timerDb` (opts.database ?? defaultDb) and passed to both scheduler and routes for consistency. Scheduler broadcasts timer-completed and daily-reset events via the SSE broadcast function. `initScheduler()` called in production after seeding + listen. 6 integration tests in `timer-server-wiring.test.ts` covering route registration, seed+init, running timer recovery, scheduler destroy on close, and full lifecycle. 252 total tests pass.*
 
 **Acceptance Criteria:**
 - Server starts without errors with timer routes registered
