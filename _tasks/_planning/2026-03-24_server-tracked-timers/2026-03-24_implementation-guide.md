@@ -370,24 +370,25 @@ apps/web/src/app/(shell)/timers/
 
 ### 4.4 Rewrite useTimerState Hook
 
-- [ ] Rewrite `_hooks/use-timer-state.ts` to maintain the **same return interface** (`UseTimerStateReturn`) so all UI components remain unchanged:
+- [x] Rewrite `_hooks/use-timer-state.ts` to maintain the **same return interface** (`UseTimerStateReturn`) so all UI components remain unchanged:
   - `isHydrated` — true after initial `useTodayState()` query succeeds (use `isSuccess` from the query)
   - `allBuckets` — mapped from `useTodayState().data.buckets`, converting `ServerBucket` to `TimeBucket` (compute `elapsedSeconds` live: if `startedAt` is set, add `floor((now - startedAt) / 1000)`)
   - `todaysBuckets` — filtered from `allBuckets` using `isBucketActiveToday()`
   - `activeBucketId` — derived: the bucket whose `startedAt` is not null
-  - `completedBuckets` — `Set<string>` tracking buckets completed during this session (for animations). Populated from SSE `timer-completed` events, not from initial load
+  - `completedBuckets` — `ReadonlySet<string>` tracking buckets completed during this session (for animations). Populated from SSE `timer-completed` events and tick-based completion detection, not from initial load
   - `toggleBucket(id)` — if active, call `stopTimer` mutation; otherwise call `startTimer` mutation
   - `addBucket(bucket)` — call `createBucket` mutation
   - `removeBucket(id)` — call `deleteBucket` mutation
-  - `updateBucket(id, updates)` — call `updateBucket` mutation
+  - `updateBucket(id, updates)` — call `updateBucket` mutation (uses typed `UpdateBucketInput` to filter server-accepted fields)
   - `resetBucketForToday(id)` — call `resetTimer` mutation, clear from `completedBuckets`
   - `setRemainingTime(id, remainingSeconds)` — call `setTimerTime` mutation
-  - **Local 1-second interval**: when `activeBucketId` is set, run a `setInterval` that increments a local `tickOffset` counter. The displayed elapsed time = server's `elapsedSeconds + floor((now - startedAt) / 1000)`. The interval just forces a re-render each second — it doesn't track state, it recalculates from the server timestamp
+  - **Local 1-second interval**: when `activeBucketId` is set, run a `setInterval` that increments a `tick` state counter. The counter is included in `allBuckets` useMemo deps so elapsed time is recalculated from `startedAt` each second
   - **SSE integration**: use `useTimerSSE` to listen for events:
-    - `onTimerCompleted(bucketId)` → add to `completedBuckets` set, invalidate `timerKeys.today`
+    - `onTimerCompleted(bucketId)` → add to `completedBuckets` set (with dedup guard), invalidate `timerKeys.today`
     - `onDailyReset()` → invalidate `timerKeys.today`, clear `completedBuckets`
-    - Other events → invalidate `timerKeys.today` (ensures UI reflects latest server state)
-- [ ] Rewrite tests in `__tests__/use-timer-state.test.ts`:
+    - Other events → shared `invalidateToday` callback (single `useCallback`, not 4 duplicates)
+  - *Note: `todaysBuckets` derived from `serverBuckets` (stable ref between ticks) rather than `allBuckets` for efficiency — `isBucketActiveToday` doesn't need elapsed time. Extracted `removeFromSet()` helper to deduplicate Set cleanup in `removeBucket` and `resetBucketForToday`. `completedBuckets` exposed as `ReadonlySet` to prevent external mutation. `prevCompletedRef` cleanup uses direct `.delete()` instead of spread+filter. 21 tests covering hydration, bucket mapping, live elapsed, activeBucketId, todaysBuckets, all CRUD mutations, SSE wiring, SSE daily-reset, tick interval, and completion detection. 229 total web tests pass.*
+- [x] Rewrite tests in `__tests__/use-timer-state.test.ts`:
   - Mock API functions instead of localStorage
   - Test that toggle calls start/stop mutations
   - Test that SSE completion event adds to `completedBuckets`

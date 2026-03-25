@@ -1,26 +1,30 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
+import { isBucketActiveToday, type TimeBucket } from '../_lib/timer-types';
+import type { ServerBucket, UpdateBucketInput } from '../_lib/timer-api';
+import type { TimerCompletedData } from './use-timer-sse';
 import {
-  DEFAULT_BUCKETS,
-  getResetDate,
-  isBucketActiveToday,
-  STORAGE_KEY,
-  type TimeBucket,
-  type TimerState,
-} from '../_lib/timer-types';
-
-// ---------------------------------------------------------------------------
-// Return type
-// ---------------------------------------------------------------------------
+  useTodayState,
+  useStartTimer,
+  useStopTimer,
+  useCreateBucket,
+  useDeleteBucket,
+  useUpdateBucket as useUpdateBucketMutation,
+  useResetTimer,
+  useSetTimerTime,
+  timerKeys,
+} from './use-timer-queries';
+import { useTimerSSE } from './use-timer-sse';
 
 export interface UseTimerStateReturn {
   isHydrated: boolean;
   allBuckets: TimeBucket[];
   todaysBuckets: TimeBucket[];
   activeBucketId: string | null;
-  completedBuckets: Set<string>;
+  completedBuckets: ReadonlySet<string>;
   toggleBucket: (id: string) => void;
   addBucket: (bucket: TimeBucket) => void;
   removeBucket: (id: string) => void;
@@ -29,149 +33,76 @@ export interface UseTimerStateReturn {
   setRemainingTime: (id: string, remainingSeconds: number) => void;
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+/** Convert a ServerBucket to a TimeBucket for UI components.
+ *  Computes live elapsed seconds from `startedAt` if the timer is running. */
+function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
+  let elapsedSeconds = sb.elapsedSeconds;
 
-function createDefaultState(): TimerState {
+  if (sb.startedAt) {
+    const startedAtMs = new Date(sb.startedAt).getTime();
+    const additionalElapsed = Math.floor((now.getTime() - startedAtMs) / 1000);
+    elapsedSeconds += Math.max(0, additionalElapsed);
+  }
+
+  const totalSeconds = sb.totalMinutes * 60;
+  elapsedSeconds = Math.min(elapsedSeconds, totalSeconds);
+
   return {
-    buckets: DEFAULT_BUCKETS,
-    activeBucketId: null,
-    lastActiveTime: null,
-    lastResetDate: getResetDate(),
+    id: sb.id,
+    name: sb.name,
+    totalMinutes: sb.totalMinutes,
+    elapsedSeconds,
+    colorIndex: sb.colorIndex,
+    daysOfWeek: sb.daysOfWeek,
   };
 }
 
-/**
- * Load persisted state from localStorage, applying daily reset and
- * elapsed-time recovery as needed. Returns default state if nothing
- * is stored or the stored data is corrupt.
- */
-export function loadState(): {
-  state: TimerState;
-  recovered: Set<string>;
-} {
-  const recovered = new Set<string>();
-
-  let raw: string | null = null;
-  try {
-    raw = localStorage.getItem(STORAGE_KEY);
-  } catch {
-    // localStorage unavailable (SSR, private browsing quota, etc.)
-    return { state: createDefaultState(), recovered };
-  }
-
-  if (!raw) {
-    return { state: createDefaultState(), recovered };
-  }
-
-  let parsed: TimerState;
-  try {
-    parsed = JSON.parse(raw) as TimerState;
-  } catch {
-    // Corrupt JSON — start fresh
-    return { state: createDefaultState(), recovered };
-  }
-
-  const currentResetDate = getResetDate();
-  const needsReset = parsed.lastResetDate !== currentResetDate;
-
-  // Daily reset: zero out all elapsed times when the 3AM boundary was crossed
-  if (needsReset) {
-    return {
-      state: {
-        buckets: parsed.buckets.map((b) => ({ ...b, elapsedSeconds: 0 })),
-        activeBucketId: null,
-        lastActiveTime: null,
-        lastResetDate: currentResetDate,
-      },
-      recovered,
-    };
-  }
-
-  // Time recovery: if a timer was running when the page closed, recover
-  // the elapsed seconds based on how much wall-clock time has passed.
-  if (parsed.activeBucketId && parsed.lastActiveTime) {
-    const elapsed = Math.floor(
-      (Date.now() - new Date(parsed.lastActiveTime).getTime()) / 1000,
-    );
-
-    if (elapsed > 0) {
-      const buckets = parsed.buckets.map((b) => {
-        if (b.id !== parsed.activeBucketId) return b;
-
-        const totalSeconds = b.totalMinutes * 60;
-        const newElapsed = Math.min(b.elapsedSeconds + elapsed, totalSeconds);
-
-        // Track completion that happened while the page was closed
-        if (newElapsed >= totalSeconds) {
-          recovered.add(b.id);
-        }
-        return { ...b, elapsedSeconds: newElapsed };
-      });
-
-      // If the active bucket completed during recovery, stop the timer
-      const activeCompleted = recovered.has(parsed.activeBucketId);
-
-      return {
-        state: {
-          ...parsed,
-          buckets,
-          activeBucketId: activeCompleted ? null : parsed.activeBucketId,
-          lastActiveTime: activeCompleted
-            ? null
-            : new Date().toISOString(),
-        },
-        recovered,
-      };
-    }
-  }
-
-  return { state: parsed, recovered };
+/** Remove an ID from the completedBuckets set (no-op if absent). */
+function removeFromSet(
+  setter: React.Dispatch<React.SetStateAction<Set<string>>>,
+  id: string,
+) {
+  setter((prev) => {
+    if (!prev.has(id)) return prev;
+    const next = new Set(prev);
+    next.delete(id);
+    return next;
+  });
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
 export function useTimerState(): UseTimerStateReturn {
-  const [state, setState] = useState<TimerState>(createDefaultState);
-  const [isHydrated, setIsHydrated] = useState(false);
-  // Separate state (not derived) so the UI can distinguish "just completed
-  // this session" from "was already complete on load" — needed for Phase 4
-  // completion animations that should only fire once.
+  const queryClient = useQueryClient();
+  const todayQuery = useTodayState();
+  const startMutation = useStartTimer();
+  const stopMutation = useStopTimer();
+  const createMutation = useCreateBucket();
+  const deleteMutation = useDeleteBucket();
+  const updateMutation = useUpdateBucketMutation();
+  const resetMutation = useResetTimer();
+  const setTimeMutation = useSetTimerTime();
+
+  // Session-only tracking of buckets completed during this browser session.
+  // Used for animations — should NOT include buckets already completed on load.
   const [completedBuckets, setCompletedBuckets] = useState<Set<string>>(
     () => new Set(),
   );
+
+  // Tick counter — included in allBuckets useMemo deps to force recalculation
+  // of live elapsed from startedAt each second.
+  const [tick, setTick] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ---- Mount: load from localStorage ----
-  useEffect(() => {
-    const { state: loaded, recovered } = loadState();
-    setState(loaded);
-    if (recovered.size > 0) {
-      setCompletedBuckets((prev) => {
-        const next = new Set(prev);
-        for (const id of recovered) next.add(id);
-        return next;
-      });
-    }
-    setIsHydrated(true);
-  }, []);
+  const serverBuckets: ServerBucket[] = todayQuery.data?.buckets ?? [];
 
-  // ---- Persist to localStorage on every state change (after hydration) ----
-  useEffect(() => {
-    if (!isHydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Quota exceeded or unavailable — silently ignore
-    }
-  }, [state, isHydrated]);
+  const activeBucketId = useMemo(() => {
+    const running = serverBuckets.find((b) => b.startedAt !== null);
+    return running?.id ?? null;
+  }, [serverBuckets]);
 
-  // ---- 1-second interval when a bucket is active ----
+  // 1-second interval when a timer is running — forces re-render so
+  // allBuckets recalculates from startedAt timestamp.
   useEffect(() => {
-    if (!isHydrated || !state.activeBucketId) {
+    if (!activeBucketId) {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -180,27 +111,7 @@ export function useTimerState(): UseTimerStateReturn {
     }
 
     intervalRef.current = setInterval(() => {
-      setState((prev) => {
-        if (!prev.activeBucketId) return prev;
-
-        const bucket = prev.buckets.find((b) => b.id === prev.activeBucketId);
-        if (!bucket) return prev;
-
-        const totalSeconds = bucket.totalMinutes * 60;
-        const newElapsed = Math.min(bucket.elapsedSeconds + 1, totalSeconds);
-        const completed = newElapsed >= totalSeconds;
-
-        return {
-          ...prev,
-          buckets: prev.buckets.map((b) =>
-            b.id === prev.activeBucketId
-              ? { ...b, elapsedSeconds: newElapsed }
-              : b,
-          ),
-          activeBucketId: completed ? null : prev.activeBucketId,
-          lastActiveTime: completed ? null : new Date().toISOString(),
-        };
-      });
+      setTick((t) => t + 1);
     }, 1000);
 
     return () => {
@@ -209,19 +120,52 @@ export function useTimerState(): UseTimerStateReturn {
         intervalRef.current = null;
       }
     };
-  }, [isHydrated, state.activeBucketId]);
+  }, [activeBucketId]);
 
-  // ---- Completion detection ----
+  const allBuckets = useMemo(() => {
+    const now = new Date();
+    return serverBuckets.map((sb) => serverBucketToTimeBucket(sb, now));
+    // tick forces recalculation of live elapsed each second
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverBuckets, tick]);
+
+  // Derive todaysBuckets from serverBuckets (stable reference between ticks)
+  // rather than allBuckets, since isBucketActiveToday only checks daysOfWeek.
+  const todaysBuckets = useMemo(() => {
+    const now = new Date();
+    return serverBuckets
+      .filter((sb) => isBucketActiveToday(sb))
+      .map((sb) => serverBucketToTimeBucket(sb, now));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverBuckets, tick]);
+
+  // Completion detection — when tick causes a bucket to reach its total,
+  // add to completedBuckets. Buckets already completed on initial load are
+  // excluded so animations only fire for timers that complete this session.
+  const prevCompletedRef = useRef<Set<string>>(new Set());
+  const initializedRef = useRef(false);
   useEffect(() => {
-    if (!isHydrated) return;
+    if (!todayQuery.isSuccess) return;
+
+    // On first data load, snapshot initially-completed buckets so we skip them.
+    if (!initializedRef.current && allBuckets.length > 0) {
+      initializedRef.current = true;
+      for (const bucket of allBuckets) {
+        if (bucket.elapsedSeconds >= bucket.totalMinutes * 60) {
+          prevCompletedRef.current.add(bucket.id);
+        }
+      }
+      return;
+    }
 
     let changed = false;
     const next = new Set(completedBuckets);
 
-    for (const bucket of state.buckets) {
+    for (const bucket of allBuckets) {
       if (
         bucket.elapsedSeconds >= bucket.totalMinutes * 60 &&
-        !completedBuckets.has(bucket.id)
+        !completedBuckets.has(bucket.id) &&
+        !prevCompletedRef.current.has(bucket.id)
       ) {
         next.add(bucket.id);
         changed = true;
@@ -231,135 +175,113 @@ export function useTimerState(): UseTimerStateReturn {
     if (changed) {
       setCompletedBuckets(next);
     }
-    // Intentionally excludes completedBuckets from deps to avoid an infinite
-    // loop: this effect reads completedBuckets and conditionally sets it.
-    // Safe because removeBucket/resetBucketForToday always also mutate
-    // state.buckets, so a stale closure here cannot re-add a removed ID.
-  }, [state.buckets, isHydrated]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Intentionally excludes completedBuckets from deps to avoid infinite loop.
+  }, [allBuckets, todayQuery.isSuccess]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ---- Derived: today's buckets ----
-  const todaysBuckets = useMemo(
-    () => state.buckets.filter((b) => isBucketActiveToday(b)),
-    [state.buckets],
+  // SSE integration — useTimerSSE stores handlers in a ref, so useCallback
+  // wrappers are unnecessary (handler identity doesn't trigger reconnection).
+  const invalidateToday = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: timerKeys.today }),
+    [queryClient],
   );
 
-  // ---- Actions ----
+  useTimerSSE({
+    onTimerCompleted: useCallback(
+      (data: TimerCompletedData) => {
+        setCompletedBuckets((prev) => {
+          if (prev.has(data.bucketId)) return prev;
+          const next = new Set(prev);
+          next.add(data.bucketId);
+          return next;
+        });
+        queryClient.invalidateQueries({ queryKey: timerKeys.today });
+      },
+      [queryClient],
+    ),
+    onDailyReset: useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: timerKeys.today });
+      setCompletedBuckets(new Set());
+      prevCompletedRef.current = new Set();
+    }, [queryClient]),
+    onTimerStarted: invalidateToday,
+    onTimerStopped: invalidateToday,
+    onTimerReset: invalidateToday,
+    onTimerUpdated: invalidateToday,
+  });
 
-  const toggleBucket = useCallback((id: string) => {
-    setState((prev) => {
-      if (prev.activeBucketId === id) {
-        return { ...prev, activeBucketId: null, lastActiveTime: null };
+  const toggleBucket = useCallback(
+    (id: string) => {
+      if (activeBucketId === id) {
+        stopMutation.mutate(id);
+      } else {
+        startMutation.mutate(id);
       }
-
-      // Don't start a completed bucket
-      const bucket = prev.buckets.find((b) => b.id === id);
-      if (bucket && bucket.elapsedSeconds >= bucket.totalMinutes * 60) {
-        return prev;
-      }
-
-      // Start the new bucket (previous one keeps its elapsed time)
-      return {
-        ...prev,
-        activeBucketId: id,
-        lastActiveTime: new Date().toISOString(),
-      };
-    });
-  }, []);
-
-  const addBucket = useCallback((bucket: TimeBucket) => {
-    setState((prev) => ({
-      ...prev,
-      buckets: [...prev.buckets, bucket],
-    }));
-  }, []);
-
-  const removeBucket = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      buckets: prev.buckets.filter((b) => b.id !== id),
-      activeBucketId: prev.activeBucketId === id ? null : prev.activeBucketId,
-      lastActiveTime:
-        prev.activeBucketId === id ? null : prev.lastActiveTime,
-    }));
-    setCompletedBuckets((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
-
-  const updateBucket = useCallback(
-    (id: string, updates: Partial<TimeBucket>) => {
-      setState((prev) => ({
-        ...prev,
-        buckets: prev.buckets.map((b) => {
-          if (b.id !== id) return b;
-          const updated = { ...b, ...updates };
-          // Cap elapsed if totalMinutes was reduced
-          const totalSeconds = updated.totalMinutes * 60;
-          if (updated.elapsedSeconds > totalSeconds) {
-            updated.elapsedSeconds = totalSeconds;
-          }
-          return updated;
-        }),
-      }));
     },
-    [],
+    [activeBucketId, startMutation, stopMutation],
   );
 
-  const resetBucketForToday = useCallback((id: string) => {
-    setState((prev) => ({
-      ...prev,
-      buckets: prev.buckets.map((b) =>
-        b.id === id ? { ...b, elapsedSeconds: 0 } : b,
-      ),
-    }));
-    setCompletedBuckets((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }, []);
+  const addBucket = useCallback(
+    (bucket: TimeBucket) => {
+      createMutation.mutate({
+        name: bucket.name,
+        totalMinutes: bucket.totalMinutes,
+        colorIndex: bucket.colorIndex,
+        daysOfWeek: bucket.daysOfWeek,
+      });
+    },
+    [createMutation],
+  );
 
-  const setRemainingTime = useCallback((id: string, remainingSeconds: number) => {
-    setState((prev) => {
-      const bucket = prev.buckets.find((b) => b.id === id);
-      if (!bucket) return prev;
+  const removeBucket = useCallback(
+    (id: string) => {
+      deleteMutation.mutate(id);
+      removeFromSet(setCompletedBuckets, id);
+    },
+    [deleteMutation],
+  );
 
-      const totalSeconds = bucket.totalMinutes * 60;
-      const elapsed = Math.max(0, Math.min(totalSeconds, totalSeconds - remainingSeconds));
-
-      const isNowComplete = elapsed >= totalSeconds;
-
-      return {
-        ...prev,
-        buckets: prev.buckets.map((b) =>
-          b.id === id ? { ...b, elapsedSeconds: elapsed } : b,
-        ),
-        activeBucketId:
-          isNowComplete && prev.activeBucketId === id
-            ? null
-            : prev.activeBucketId,
-        lastActiveTime:
-          isNowComplete && prev.activeBucketId === id
-            ? null
-            : prev.lastActiveTime,
+  const updateBucketFn = useCallback(
+    (id: string, updates: Partial<TimeBucket>) => {
+      const { name, totalMinutes, colorIndex, daysOfWeek } = updates;
+      const serverUpdates: UpdateBucketInput = {
+        ...(name !== undefined && { name }),
+        ...(totalMinutes !== undefined && { totalMinutes }),
+        ...(colorIndex !== undefined && { colorIndex }),
+        ...(daysOfWeek !== undefined && { daysOfWeek }),
       };
-    });
-  }, []);
+      updateMutation.mutate({ id, updates: serverUpdates });
+    },
+    [updateMutation],
+  );
+
+  const resetBucketForToday = useCallback(
+    (id: string) => {
+      resetMutation.mutate(id);
+      removeFromSet(setCompletedBuckets, id);
+      // Clear from initially-completed tracking so re-completion
+      // after reset triggers animation
+      prevCompletedRef.current.delete(id);
+    },
+    [resetMutation],
+  );
+
+  const setRemainingTime = useCallback(
+    (id: string, remainingSeconds: number) => {
+      setTimeMutation.mutate({ bucketId: id, remainingSeconds });
+    },
+    [setTimeMutation],
+  );
 
   return {
-    isHydrated,
-    allBuckets: state.buckets,
+    isHydrated: todayQuery.isSuccess,
+    allBuckets,
     todaysBuckets,
-    activeBucketId: state.activeBucketId,
+    activeBucketId,
     completedBuckets,
     toggleBucket,
     addBucket,
     removeBucket,
-    updateBucket,
+    updateBucket: updateBucketFn,
     resetBucketForToday,
     setRemainingTime,
   };
