@@ -1,5 +1,5 @@
 {
-  "extends": "@repo/typescript-config/nextjs.json",
+  "extends": "@repo/typescript-config/vite.json",
   "compilerOptions": {
     "paths": {
       "@/*": [
@@ -12,9 +12,7 @@
     "incremental": true
   },
   "include": [
-    "src",
-    "next-env.d.ts",
-    ".next/types/**/*.ts"
+    "src"
   ],
   "exclude": [
     "node_modules"

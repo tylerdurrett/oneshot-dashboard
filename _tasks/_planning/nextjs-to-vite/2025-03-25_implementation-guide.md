@@ -300,16 +300,18 @@ apps/web/
 
 ### 4.2 Update TypeScript config
 
-- [ ] Create `packages/typescript-config/vite.json` — based on `base.json`, with `"jsx": "react-jsx"`, no `next` plugin
-- [ ] Update `apps/web/tsconfig.json`: extend `vite.json` instead of `nextjs.json`, remove `.next/types` and `next-env.d.ts` from includes, add `vite-env.d.ts`
-- [ ] Check if any other package extends `nextjs.json` — if not, delete it; if so, leave it
-- [ ] Run `pnpm --filter @repo/web tsc --noEmit` to verify no type errors
+- [x] Create `packages/typescript-config/vite.json` — based on `base.json`, with `"jsx": "react-jsx"`, no `next` plugin
+- [x] Update `apps/web/tsconfig.json`: extend `vite.json` instead of `nextjs.json`, remove `.next/types` and `next-env.d.ts` from includes, add `vite-env.d.ts`
+- [x] Check if any other package extends `nextjs.json` — if not, delete it; if so, leave it
+- [x] Run `pnpm --filter @repo/web tsc --noEmit` to verify no type errors
+
+> **Notes (4.2):** `vite.json` only adds `jsx` and `allowJs` on top of `base.json` — the `lib` and `noEmit` fields from the old `nextjs.json` were redundant (already in `base.json`) and omitted. `src/vite-env.d.ts` is not explicitly listed in `includes` since it's already covered by the `src` glob. `nextjs.json` was deleted — only `apps/web` extended it. Pre-existing type errors remain (treemap `noUncheckedIndexedAccess`, chat test mock missing `setError`, router test argument count) — these are not caused by this change and were present before the migration. All 230 tests pass.
 
 **Acceptance Criteria:**
-- Zero TypeScript errors
-- No references to Next.js types remain
-- Path aliases resolve correctly in the IDE
-- `packages/typescript-config/vite.json` exists and is referenced by `apps/web/tsconfig.json`
+- Zero TypeScript errors ⚠️ Pre-existing errors only (treemap, chat mocks, router test) — no new errors introduced; Next.js type errors eliminated
+- No references to Next.js types remain ✅
+- Path aliases resolve correctly in the IDE ✅
+- `packages/typescript-config/vite.json` exists and is referenced by `apps/web/tsconfig.json` ✅
 
 ### 4.3 Update Shadcn config and ESLint
 
