@@ -29,3 +29,11 @@ The app uses `#09090b` (near-black) as its theme color, matching the dark backgr
 
 - `apps/web/public/manifest.json` — `background_color` and `theme_color`
 - `apps/web/index.html` — the `theme-color` meta tag
+
+## iPhone safe area
+
+On iPhone home-screen mode, iOS reserves space for the home indicator at the bottom. The dashboard handles that by making the mobile bottom nav include the safe-area inset as part of its own height, instead of adding extra space below the whole app shell.
+
+The app also uses a standalone-only mobile workaround: when launched from the home screen, the bottom nav is pinned to the viewport bottom and the main content reserves the bar's base height above it. On some iPhone PWA layouts, Safari already offsets a fixed bottom bar for the home indicator, so adding extra bottom safe-area padding can create a second dead strip.
+
+The iPhone home-screen app uses the `black` status bar style instead of `black-translucent`, so content stays below the system status area instead of rendering underneath the clock and indicators.

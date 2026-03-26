@@ -45,6 +45,7 @@
 }
 
 :root {
+  --mobile-bottom-nav-height: 57px;
   --background: 0 0% 100%;
   --foreground: 240 10% 3.9%;
   --card: 0 0% 100%;
@@ -203,7 +204,33 @@
   }
 }
 
-/* Safe area padding for mobile bottom nav — accounts for home-bar on notch devices */
+/* Safe area padding — accounts for home-bar on notch iPhones in PWA standalone mode */
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.app-shell-mobile-nav {
+  min-height: var(--mobile-bottom-nav-height);
+}
+
+@media (max-width: 767px) {
+  .app-shell-standalone {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .app-shell-standalone .app-shell-main {
+    padding-bottom: var(--mobile-bottom-nav-height);
+  }
+
+  .app-shell-standalone .app-shell-mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* Installed iOS PWAs can already offset fixed bottom bars for the
+       home-indicator area. Adding env(safe-area-inset-bottom) on top of
+       that can create a second dead strip below the nav. */
+    padding-bottom: 0;
+    z-index: 40;
+  }
 }

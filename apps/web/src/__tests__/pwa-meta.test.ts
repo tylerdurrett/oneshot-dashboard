@@ -19,7 +19,9 @@ describe('PWA meta tags in index.html', () => {
   });
 
   it('sets apple-mobile-web-app-status-bar-style', () => {
-    expect(html).toContain('name="apple-mobile-web-app-status-bar-style"');
+    expect(html).toContain(
+      'name="apple-mobile-web-app-status-bar-style" content="black"',
+    );
   });
 
   it('sets apple-mobile-web-app-title', () => {

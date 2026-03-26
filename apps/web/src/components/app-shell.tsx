@@ -42,6 +42,44 @@ const LONG_PRESS_MOVE_THRESHOLD = 10;
 const VIEWPORT_MARGIN = 8;
 const OFFSET_BELOW = 10;
 
+function getIsStandaloneMode() {
+  if (typeof window === 'undefined') return false;
+
+  const displayModeStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches ?? false;
+  const iosStandalone = (
+    window.navigator as Navigator & { standalone?: boolean }
+  ).standalone === true;
+
+  return displayModeStandalone || iosStandalone;
+}
+
+function useStandaloneMode() {
+  const [isStandaloneMode, setIsStandaloneMode] = useState(() => getIsStandaloneMode());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const syncStandaloneMode = () => {
+      setIsStandaloneMode(getIsStandaloneMode());
+    };
+
+    const mediaQuery = window.matchMedia?.('(display-mode: standalone)');
+    syncStandaloneMode();
+
+    if (!mediaQuery) return;
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncStandaloneMode);
+      return () => mediaQuery.removeEventListener('change', syncStandaloneMode);
+    }
+
+    mediaQuery.addListener(syncStandaloneMode);
+    return () => mediaQuery.removeListener(syncStandaloneMode);
+  }, []);
+
+  return isStandaloneMode;
+}
+
 // ---------------------------------------------------------------------------
 // NavLink (plain — no context menu)
 // ---------------------------------------------------------------------------
@@ -361,9 +399,15 @@ function renderNavItem(item: NavItem, isMobile: boolean, isActive: boolean) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
+  const isStandaloneMode = useStandaloneMode();
 
   return (
-    <div className="h-dvh flex flex-col md:flex-row bg-background overflow-hidden">
+    <div
+      className={cn(
+        'fixed inset-0 flex flex-col md:flex-row bg-background overflow-hidden',
+        isStandaloneMode && 'app-shell-standalone',
+      )}
+    >
       {/* Desktop sidebar */}
       <nav
         aria-label="Sidebar navigation"
@@ -378,15 +422,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
+      <main className="app-shell-main flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         {children}
       </main>
 
       {/* Mobile bottom nav */}
       <nav
         aria-label="Bottom navigation"
-        className="flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb"
+        className="app-shell-mobile-nav flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb"
       >
+        {/* Keep the iPhone standalone safe-area inset on the nav itself.
+            Installed iOS PWAs also pin the nav to the viewport bottom via CSS,
+            because WebKit can misplace bottom-aligned flex layouts in standalone mode. */}
         {NAV_ITEMS.map((item) =>
           renderNavItem(item, true, isItemActive(item, pathname)),
         )}

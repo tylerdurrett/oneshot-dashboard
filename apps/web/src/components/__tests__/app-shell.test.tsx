@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router';
 
 import { AppShell } from '../app-shell';
@@ -14,7 +14,31 @@ function renderWithRouter(pathname: string, children: React.ReactNode = <div />)
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
+  delete (navigator as Navigator & { standalone?: boolean }).standalone;
 });
+
+function mockStandaloneMode(isStandalone: boolean) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: isStandalone && query === '(display-mode: standalone)',
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+
+  Object.defineProperty(navigator, 'standalone', {
+    configurable: true,
+    value: isStandalone,
+  });
+}
 
 describe('AppShell', () => {
   it('renders children in the main content area', () => {
@@ -41,6 +65,26 @@ describe('AppShell', () => {
     renderWithRouter('/timers');
     const moreButtons = screen.getAllByRole('button', { name: 'More options' });
     expect(moreButtons).toHaveLength(2);
+  });
+
+  it('applies the iPhone safe-area inset to the bottom nav instead of the shell', () => {
+    const { container } = renderWithRouter('/timers');
+
+    expect(container.firstElementChild?.classList.contains('safe-area-pb')).toBe(false);
+    expect(
+      screen.getByRole('navigation', { name: 'Bottom navigation' }).classList.contains('safe-area-pb'),
+    ).toBe(true);
+  });
+
+  it('marks the shell for the standalone PWA layout workaround when installed', () => {
+    mockStandaloneMode(true);
+    const { container } = renderWithRouter('/timers');
+
+    expect(container.firstElementChild?.classList.contains('app-shell-standalone')).toBe(true);
+    expect(screen.getByRole('main').classList.contains('app-shell-main')).toBe(true);
+    expect(
+      screen.getByRole('navigation', { name: 'Bottom navigation' }).classList.contains('app-shell-mobile-nav'),
+    ).toBe(true);
   });
 
   it('highlights Timers when pathname is /timers', () => {
