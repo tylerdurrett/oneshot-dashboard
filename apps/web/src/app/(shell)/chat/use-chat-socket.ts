@@ -43,12 +43,12 @@ import { getServerWsUrl } from '@/lib/server-url';
 
 const getServerUrl = () => getServerWsUrl('/chat');
 
-export function useChatSocket(): UseChatSocketReturn {
+export function useChatSocket(enabled = true): UseChatSocketReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] =
-    useState<ConnectionStatus>('disconnected');
+    useState<ConnectionStatus>(enabled ? 'connecting' : 'disconnected');
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
@@ -57,11 +57,13 @@ export function useChatSocket(): UseChatSocketReturn {
   const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const heartbeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const enabledRef = useRef(enabled);
   const isStreamingRef = useRef(false);
   // Tracks the in-progress streaming assistant message id
   const streamingIdRef = useRef<string | null>(null);
 
   // Keep ref in sync with state for stable sendMessage identity
+  enabledRef.current = enabled;
   isStreamingRef.current = isStreaming;
 
   // -----------------------------------------------------------------------
@@ -104,6 +106,7 @@ export function useChatSocket(): UseChatSocketReturn {
 
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
+    if (!enabledRef.current) return;
 
     clearReconnectTimer();
 
@@ -157,6 +160,7 @@ export function useChatSocket(): UseChatSocketReturn {
   const connect = useCallback(() => {
     // Guard against connecting when unmounted
     if (!mountedRef.current) return;
+    if (!enabledRef.current) return;
     if (wsRef.current) return;
 
     const url = getServerUrl();
@@ -282,7 +286,6 @@ export function useChatSocket(): UseChatSocketReturn {
 
   useEffect(() => {
     mountedRef.current = true;
-    connect();
 
     return () => {
       mountedRef.current = false;
@@ -297,11 +300,32 @@ export function useChatSocket(): UseChatSocketReturn {
   }, [clearReconnectTimer, clearSocketTimers, connect]);
 
   useEffect(() => {
+    enabledRef.current = enabled;
+
+    if (!enabled) {
+      clearReconnectTimer();
+      clearSocketTimers();
+      setConnectionStatus('disconnected');
+
+      if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      return;
+    }
+
+    connect();
+  }, [enabled, clearReconnectTimer, clearSocketTimers, connect]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const handleOnline = () => {
       reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
       clearReconnectTimer();
+
+      if (!enabledRef.current) return;
 
       if (!wsRef.current) {
         connect();
@@ -360,6 +384,7 @@ export function useChatSocket(): UseChatSocketReturn {
 
   const sendMessage = useCallback(
     (threadId: string, content: string) => {
+      if (!enabledRef.current) return;
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
       if (isStreamingRef.current) return;
 

@@ -90,6 +90,34 @@ function getLastWs(): MockWebSocket {
 // ---------------------------------------------------------------------------
 
 describe('useChatSocket', () => {
+  it('does not connect until explicitly enabled', () => {
+    const { result } = renderHook(({ enabled }) => useChatSocket(enabled), {
+      initialProps: { enabled: false },
+    });
+
+    expect(MockWebSocket.instances).toHaveLength(0);
+    expect(result.current.connectionStatus).toBe('disconnected');
+  });
+
+  it('connects when enabled after an initial disabled render', async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useChatSocket(enabled),
+      { initialProps: { enabled: false } },
+    );
+
+    expect(MockWebSocket.instances).toHaveLength(0);
+
+    rerender({ enabled: true });
+    expect(MockWebSocket.instances).toHaveLength(1);
+    expect(result.current.connectionStatus).toBe('connecting');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(result.current.connectionStatus).toBe('connected');
+  });
+
   it('connects to the WebSocket server on mount', async () => {
     renderHook(() => useChatSocket());
 

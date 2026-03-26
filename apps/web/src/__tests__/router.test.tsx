@@ -25,6 +25,7 @@ vi.mock('../app/(shell)/chat/chat-socket-context', async () => {
       clearError: vi.fn(),
       connectionStatus: 'connected',
     }),
+    useActivateChatSocket: () => vi.fn(),
     ChatSocketProvider: ({ children }: { children: React.ReactNode }) => {
       React.useEffect(() => {
         providerLifecycle.mounts += 1;
