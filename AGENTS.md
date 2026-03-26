@@ -16,7 +16,7 @@ When building UI, follow `docs/ui-conventions.md`. Key rules:
 
 ## Database Workflow
 
-Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (never `db:push`) for real work.
+Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (never `db:push`) for real work. For column renames, use a two-step migration (add new → drop old) — never hand-write migration files. See `docs/database.md`.
 
 ## Environment Variables
 

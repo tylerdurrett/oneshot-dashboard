@@ -72,6 +72,19 @@ pnpm --filter @repo/db db:push
 
 This updates your local database to match the schema without creating a migration file. Handy for prototyping, but use proper migrations for anything you want to keep.
 
+## Renaming Columns
+
+`drizzle-kit generate` can't tell the difference between "renamed a column" and "deleted one column, added another." It will ask interactively, which doesn't work in agent or CI environments.
+
+**Use a two-step migration instead:**
+
+1. **Add the new column** alongside the old one in `schema.ts`. Run `db:generate` + `db:migrate`. No prompt.
+2. **Remove the old column** from `schema.ts`. Run `db:generate` + `db:migrate`. No prompt.
+
+If you need to preserve data, add a backfill step between the two migrations. This is also the standard pattern for zero-downtime deploys (add new → backfill → cut over → drop old).
+
+> **Never hand-write migration SQL or snapshot files.** Let drizzle-kit generate everything so snapshots stay in sync. Hand-written snapshots risk corrupting future migration diffs.
+
 ## Configuration
 
 The database connection is configured via the `DATABASE_URL` environment variable:
