@@ -400,12 +400,19 @@ describe('TimerBucket context menu integration', () => {
     );
 
     const bucketButton = screen.getByRole('button');
-    const activeGlow = bucketButton.querySelector('.pointer-events-none') as HTMLElement | null;
+    const activeOverlays = Array.from(
+      bucketButton.querySelectorAll('.pointer-events-none'),
+    ) as HTMLElement[];
+    const activeGlow = activeOverlays[0] ?? null;
+    const activeBorder = activeOverlays.find((element) =>
+      element.className.includes('border-white/55'),
+    );
 
     expect(bucketButton.className).not.toContain('ring-2');
     expect(activeGlow).not.toBeNull();
     expect(activeGlow?.style.boxShadow).toContain('inset');
     expect(activeGlow?.style.background).toContain('radial-gradient');
+    expect(activeBorder).toBeTruthy();
   });
 
   it('uses compact typography for tiny buckets', () => {
