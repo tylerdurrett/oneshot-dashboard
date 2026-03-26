@@ -24,9 +24,10 @@ const SUCCESS_OVERLAY_MS = 1200;
 
 /** Keep the active highlight inset so a running bucket feels brighter
  *  without visually spilling into neighboring treemap cells. The hard-edge
- *  inner outline keeps the active bucket obvious at a glance. */
+ *  inner outline keeps the active bucket obvious at a glance without adding
+ *  a second visible border. */
 const ACTIVE_BUCKET_GLOW =
-  'inset 0 0 0 2px rgba(255, 255, 255, 0.58), inset 0 0 0 5px rgba(255, 255, 255, 0.12), inset 0 0 28px rgba(255, 255, 255, 0.2), inset 0 -12px 24px rgba(255, 255, 255, 0.12)';
+  'inset 0 0 0 2px rgba(255, 255, 255, 0.58), inset 0 0 28px rgba(255, 255, 255, 0.2), inset 0 -12px 24px rgba(255, 255, 255, 0.12)';
 const ACTIVE_BUCKET_GLOW_BACKGROUND =
   'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.12) 38%, rgba(255, 255, 255, 0.04) 62%, transparent 78%)';
 
@@ -322,18 +323,13 @@ export function TimerBucket({
           }}
         />
         {isActive && (
-          <>
-            <div
-              className="pointer-events-none absolute inset-0 animate-pulse rounded-lg"
-              style={{
-                boxShadow: ACTIVE_BUCKET_GLOW,
-                background: ACTIVE_BUCKET_GLOW_BACKGROUND,
-              }}
-            />
-            <div
-              className="pointer-events-none absolute inset-[4px] rounded-md border border-white/55"
-            />
-          </>
+          <div
+            className="pointer-events-none absolute inset-0 animate-pulse rounded-lg"
+            style={{
+              boxShadow: ACTIVE_BUCKET_GLOW,
+              background: ACTIVE_BUCKET_GLOW_BACKGROUND,
+            }}
+          />
         )}
         {showSuccess && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 animate-in fade-in zoom-in duration-300">
