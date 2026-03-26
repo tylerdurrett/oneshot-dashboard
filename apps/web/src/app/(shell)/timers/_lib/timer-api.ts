@@ -15,7 +15,7 @@ export interface ServerBucket {
   sortOrder: number;
   elapsedSeconds: number;
   startedAt: string | null;
-  completedAt: string | null;
+  goalReachedAt: string | null;
 }
 
 /** Response from GET /timers/today. */
@@ -34,7 +34,7 @@ export interface StartTimerResponse {
 /** Response from POST /timers/buckets/:id/stop. */
 export interface StopTimerResponse {
   elapsedSeconds: number;
-  completedAt: string | null;
+  goalReachedAt: string | null;
 }
 
 /** A bucket row from CRUD operations (from GET/POST/PATCH /timers/buckets). */

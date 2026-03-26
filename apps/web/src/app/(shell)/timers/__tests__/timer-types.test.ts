@@ -41,8 +41,9 @@ describe('formatTime', () => {
     expect(formatTime(36330)).toBe('10:05:30');
   });
 
-  it('treats negative values as 0:00', () => {
-    expect(formatTime(-10)).toBe('0:00');
+  it('formats negative values with a minus prefix', () => {
+    expect(formatTime(-10)).toBe('-0:10');
+    expect(formatTime(-3661)).toBe('-1:01:01');
   });
 
   it('floors fractional seconds', () => {
@@ -62,6 +63,8 @@ describe('isBucketActiveToday', () => {
     elapsedSeconds: 0,
     colorIndex: 0,
     daysOfWeek,
+    startedAt: null,
+    goalReachedAt: null,
   });
 
   it('returns true when today is in the bucket daysOfWeek', () => {

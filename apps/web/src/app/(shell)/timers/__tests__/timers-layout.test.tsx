@@ -57,6 +57,18 @@ describe('TimersLayout', () => {
     expect(screen.getByText('All')).toBeDefined();
   });
 
+  it('keeps the timer view nav non-selectable', () => {
+    renderTimersRoute('/timers/remaining');
+
+    const nav = screen.getByLabelText('Timer views');
+    expect(nav.classList.contains('select-none')).toBe(true);
+
+    const remainingLink = screen.getByText('Remaining').closest('a');
+    const allLink = screen.getByText('All').closest('a');
+    expect(remainingLink?.classList.contains('select-none')).toBe(true);
+    expect(allLink?.classList.contains('select-none')).toBe(true);
+  });
+
   it('renders the TimerGrid on the remaining route', () => {
     renderTimersRoute('/timers/remaining');
     // The sub-nav tabs are present alongside the timer content
@@ -64,9 +76,9 @@ describe('TimersLayout', () => {
     expect(screen.getByLabelText('Timer views')).toBeDefined();
   });
 
-  it('renders the All placeholder on the all route', () => {
+  it('renders the All page on the all route', () => {
     renderTimersRoute('/timers/all');
-    expect(screen.getByText('All timers view coming soon.')).toBeDefined();
+    expect(screen.getByText('No time tracked yet')).toBeDefined();
   });
 
   it('highlights the active tab', () => {

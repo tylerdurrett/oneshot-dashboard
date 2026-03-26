@@ -17,6 +17,8 @@ function makeBucket(overrides: Partial<TimeBucket> = {}): TimeBucket {
     elapsedSeconds: 900, // 15 minutes elapsed → 45 minutes remaining
     colorIndex: 0,
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startedAt: null,
+    goalReachedAt: null,
     ...overrides,
   };
 }
@@ -185,13 +187,12 @@ describe('TimerBucket context menu integration', () => {
       <TimerBucket
         bucket={makeBucket()}
         isActive={false}
-        isCompleted={false}
+        isGoalReached={false}
         style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
         onToggle={vi.fn()}
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
-        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -208,13 +209,12 @@ describe('TimerBucket context menu integration', () => {
       <TimerBucket
         bucket={makeBucket()}
         isActive={false}
-        isCompleted={false}
+        isGoalReached={false}
         style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
         onToggle={onToggle}
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
-        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -228,13 +228,12 @@ describe('TimerBucket context menu integration', () => {
       <TimerBucket
         bucket={makeBucket()}
         isActive={false}
-        isCompleted={false}
+        isGoalReached={false}
         style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
         onToggle={vi.fn()}
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
-        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -250,13 +249,12 @@ describe('TimerBucket context menu integration', () => {
       <TimerBucket
         bucket={makeBucket()}
         isActive={false}
-        isCompleted={false}
+        isGoalReached={false}
         style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
         onToggle={vi.fn()}
         onOpenSettings={vi.fn()}
         onResetForToday={onResetForToday}
         onSetRemainingTime={vi.fn()}
-        onAnimationComplete={vi.fn()}
       />,
     );
 
@@ -273,17 +271,33 @@ describe('TimerBucket context menu integration', () => {
       <TimerBucket
         bucket={makeBucket()}
         isActive={false}
-        isCompleted={false}
+        isGoalReached={false}
         style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
         onToggle={onToggle}
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
-        onAnimationComplete={vi.fn()}
       />,
     );
 
     fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
     expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it('keeps timer bucket text non-selectable', () => {
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
+        onToggle={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button').classList.contains('select-none')).toBe(true);
   });
 });

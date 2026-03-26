@@ -11,18 +11,18 @@ import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
 
 describe('TimerScheduler — init()', () => {
   let testDb: Database;
-  let completedBuckets: string[];
+  let goalReachedBuckets: string[];
   let resetCount: number;
   let scheduler: TimerScheduler;
 
   beforeEach(() => {
     vi.useFakeTimers();
     testDb = createTimerTestDb();
-    completedBuckets = [];
+    goalReachedBuckets = [];
     resetCount = 0;
     scheduler = new TimerScheduler({
       database: testDb,
-      onTimerCompleted: (id) => completedBuckets.push(id),
+      onGoalReached: (id) => goalReachedBuckets.push(id),
       onDailyReset: () => resetCount++,
     });
   });
@@ -57,7 +57,7 @@ describe('TimerScheduler — init()', () => {
     expect(rows[0]!.elapsedSeconds).toBe(100 + 43200);
   });
 
-  it('schedules completion for currently running timers', async () => {
+  it('schedules goal-reached for currently running timers', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 10 }); // 600s total
 
     // Start a timer that's been running for 5 minutes (300s elapsed of 600s total)
@@ -74,21 +74,22 @@ describe('TimerScheduler — init()', () => {
     vi.setSystemTime(now);
     await scheduler.init(now);
 
-    // Timer should still be running (300s remaining)
-    expect(completedBuckets).toHaveLength(0);
+    // Goal not yet reached (300s remaining)
+    expect(goalReachedBuckets).toHaveLength(0);
 
-    // Advance time by 5 minutes (300s) — completion should fire
+    // Advance time by 5 minutes (300s) — goal should be reached
     await vi.advanceTimersByTimeAsync(300_000);
 
-    expect(completedBuckets).toHaveLength(1);
-    expect(completedBuckets[0]).toBe(bucket.id);
+    expect(goalReachedBuckets).toHaveLength(1);
+    expect(goalReachedBuckets[0]).toBe(bucket.id);
 
-    // Verify the timer was stopped in DB
+    // Timer should STILL be running (goal reached, not stopped)
     const rows = await testDb.select().from(timerDailyProgress);
-    expect(rows[0]!.startedAt).toBeNull();
+    expect(rows[0]!.startedAt).not.toBeNull();
+    expect(rows[0]!.goalReachedAt).not.toBeNull();
   });
 
-  it('auto-completes overdue timers and fires callback', async () => {
+  it('marks goal reached for overdue timers and fires callback (timer keeps running)', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 1 }); // 60s total
 
     // Timer started 10 minutes ago — way past its 60s total
@@ -106,13 +107,13 @@ describe('TimerScheduler — init()', () => {
     await scheduler.init(now);
 
     // Callback should fire immediately during init
-    expect(completedBuckets).toHaveLength(1);
-    expect(completedBuckets[0]).toBe(bucket.id);
+    expect(goalReachedBuckets).toHaveLength(1);
+    expect(goalReachedBuckets[0]).toBe(bucket.id);
 
-    // Timer should be stopped in DB
+    // Timer should STILL be running (not stopped)
     const rows = await testDb.select().from(timerDailyProgress);
-    expect(rows[0]!.startedAt).toBeNull();
-    expect(rows[0]!.completedAt).not.toBeNull();
+    expect(rows[0]!.startedAt).not.toBeNull();
+    expect(rows[0]!.goalReachedAt).not.toBeNull();
   });
 
   it('handles mix of stale and current running timers', async () => {
@@ -150,26 +151,26 @@ describe('TimerScheduler — init()', () => {
     // Current timer should still be running (10 min of 60 min elapsed)
     const currentRow = rows.find((r) => r.bucketId === current.id)!;
     expect(currentRow.startedAt).not.toBeNull();
-    expect(completedBuckets).toHaveLength(0);
+    expect(goalReachedBuckets).toHaveLength(0);
   });
 });
 
 // ---------------------------------------------------------------------------
-// scheduleCompletion / cancelCompletion
+// scheduleGoalReached / cancelGoalJob
 // ---------------------------------------------------------------------------
 
-describe('TimerScheduler — scheduleCompletion', () => {
+describe('TimerScheduler — scheduleGoalReached', () => {
   let testDb: Database;
-  let completedBuckets: string[];
+  let goalReachedBuckets: string[];
   let scheduler: TimerScheduler;
 
   beforeEach(() => {
     vi.useFakeTimers();
     testDb = createTimerTestDb();
-    completedBuckets = [];
+    goalReachedBuckets = [];
     scheduler = new TimerScheduler({
       database: testDb,
-      onTimerCompleted: (id) => completedBuckets.push(id),
+      onGoalReached: (id) => goalReachedBuckets.push(id),
       onDailyReset: () => {},
     });
   });
@@ -179,29 +180,34 @@ describe('TimerScheduler — scheduleCompletion', () => {
     vi.useRealTimers();
   });
 
-  it('fires callback at the correct time', async () => {
+  it('fires callback at the correct time and keeps timer running', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 10 });
     const now = new Date(2026, 2, 24, 10, 0, 0);
     vi.setSystemTime(now);
 
-    // Start the timer so stopTimer has something to stop
+    // Start the timer so markGoalReached has a progress row to update
     await startTimer(bucket.id, testDb, now);
 
-    // Schedule completion for 5 minutes from now
-    const completesAt = now.getTime() + 300_000;
-    scheduler.scheduleCompletion(bucket.id, completesAt, now);
+    // Schedule goal at 5 minutes from now
+    const goalAt = now.getTime() + 300_000;
+    scheduler.scheduleGoalReached(bucket.id, goalAt, now);
 
     // Not yet fired
-    expect(completedBuckets).toHaveLength(0);
+    expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance 4 minutes — still not fired
     await vi.advanceTimersByTimeAsync(240_000);
-    expect(completedBuckets).toHaveLength(0);
+    expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance 1 more minute — should fire
     await vi.advanceTimersByTimeAsync(60_000);
-    expect(completedBuckets).toHaveLength(1);
-    expect(completedBuckets[0]).toBe(bucket.id);
+    expect(goalReachedBuckets).toHaveLength(1);
+    expect(goalReachedBuckets[0]).toBe(bucket.id);
+
+    // Timer should still be running (not stopped)
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows[0]!.startedAt).not.toBeNull();
+    expect(rows[0]!.goalReachedAt).not.toBeNull();
   });
 
   it('cancels previous job when scheduling same bucket', async () => {
@@ -210,48 +216,48 @@ describe('TimerScheduler — scheduleCompletion', () => {
     vi.setSystemTime(now);
     await startTimer(bucket.id, testDb, now);
 
-    // Schedule completion at +5 min
-    scheduler.scheduleCompletion(bucket.id, now.getTime() + 300_000, now);
+    // Schedule goal at +5 min
+    scheduler.scheduleGoalReached(bucket.id, now.getTime() + 300_000, now);
 
     // Reschedule at +10 min — should cancel the first
-    scheduler.scheduleCompletion(bucket.id, now.getTime() + 600_000, now);
+    scheduler.scheduleGoalReached(bucket.id, now.getTime() + 600_000, now);
 
     // Advance past the first scheduled time — should NOT fire
     await vi.advanceTimersByTimeAsync(300_000);
-    expect(completedBuckets).toHaveLength(0);
+    expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance to the new scheduled time — should fire
     await vi.advanceTimersByTimeAsync(300_000);
-    expect(completedBuckets).toHaveLength(1);
+    expect(goalReachedBuckets).toHaveLength(1);
   });
 
-  it('fires immediately when completesAtMs is in the past', async () => {
+  it('fires immediately when goalAtMs is in the past', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 1 });
     const now = new Date(2026, 2, 24, 10, 0, 0);
     vi.setSystemTime(now);
     await startTimer(bucket.id, testDb, now);
 
     // Schedule with a time in the past
-    scheduler.scheduleCompletion(bucket.id, now.getTime() - 1000, now);
+    scheduler.scheduleGoalReached(bucket.id, now.getTime() - 1000, now);
 
     // Should fire on next tick (setTimeout(fn, 0))
     await vi.advanceTimersByTimeAsync(0);
-    expect(completedBuckets).toHaveLength(1);
+    expect(goalReachedBuckets).toHaveLength(1);
   });
 });
 
-describe('TimerScheduler — cancelCompletion', () => {
+describe('TimerScheduler — cancelGoalJob', () => {
   let testDb: Database;
-  let completedBuckets: string[];
+  let goalReachedBuckets: string[];
   let scheduler: TimerScheduler;
 
   beforeEach(() => {
     vi.useFakeTimers();
     testDb = createTimerTestDb();
-    completedBuckets = [];
+    goalReachedBuckets = [];
     scheduler = new TimerScheduler({
       database: testDb,
-      onTimerCompleted: (id) => completedBuckets.push(id),
+      onGoalReached: (id) => goalReachedBuckets.push(id),
       onDailyReset: () => {},
     });
   });
@@ -267,17 +273,17 @@ describe('TimerScheduler — cancelCompletion', () => {
     vi.setSystemTime(now);
     await startTimer(bucket.id, testDb, now);
 
-    scheduler.scheduleCompletion(bucket.id, now.getTime() + 300_000, now);
-    scheduler.cancelCompletion(bucket.id);
+    scheduler.scheduleGoalReached(bucket.id, now.getTime() + 300_000, now);
+    scheduler.cancelGoalJob(bucket.id);
 
     // Advance past the scheduled time — callback should not fire
     await vi.advanceTimersByTimeAsync(600_000);
-    expect(completedBuckets).toHaveLength(0);
+    expect(goalReachedBuckets).toHaveLength(0);
   });
 
   it('is a no-op for a bucket with no scheduled job', () => {
     // Should not throw
-    scheduler.cancelCompletion('nonexistent-id');
+    scheduler.cancelGoalJob('nonexistent-id');
   });
 });
 
@@ -296,7 +302,7 @@ describe('TimerScheduler — scheduleNextReset', () => {
     resetCount = 0;
     scheduler = new TimerScheduler({
       database: testDb,
-      onTimerCompleted: () => {},
+      onGoalReached: () => {},
       onDailyReset: () => resetCount++,
     });
   });
@@ -379,18 +385,18 @@ describe('TimerScheduler — scheduleNextReset', () => {
 
 describe('TimerScheduler — destroy', () => {
   let testDb: Database;
-  let completedBuckets: string[];
+  let goalReachedBuckets: string[];
   let resetCount: number;
   let scheduler: TimerScheduler;
 
   beforeEach(() => {
     vi.useFakeTimers();
     testDb = createTimerTestDb();
-    completedBuckets = [];
+    goalReachedBuckets = [];
     resetCount = 0;
     scheduler = new TimerScheduler({
       database: testDb,
-      onTimerCompleted: (id) => completedBuckets.push(id),
+      onGoalReached: (id) => goalReachedBuckets.push(id),
       onDailyReset: () => resetCount++,
     });
   });
@@ -405,8 +411,8 @@ describe('TimerScheduler — destroy', () => {
     vi.setSystemTime(now);
     await startTimer(bucket.id, testDb, now);
 
-    // Schedule a completion job and a reset job
-    scheduler.scheduleCompletion(bucket.id, now.getTime() + 300_000, now);
+    // Schedule a goal job and a reset job
+    scheduler.scheduleGoalReached(bucket.id, now.getTime() + 300_000, now);
     scheduler.scheduleNextReset(now);
 
     // Destroy everything
@@ -416,7 +422,7 @@ describe('TimerScheduler — destroy', () => {
     await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
 
     // Neither callback should have fired
-    expect(completedBuckets).toHaveLength(0);
+    expect(goalReachedBuckets).toHaveLength(0);
     expect(resetCount).toBe(0);
   });
 

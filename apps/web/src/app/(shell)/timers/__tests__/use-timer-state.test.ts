@@ -65,7 +65,7 @@ vi.mock('../_hooks/use-timer-sse', () => ({
   SSE_EVENTS: {
     TIMER_STARTED: 'timer-started',
     TIMER_STOPPED: 'timer-stopped',
-    TIMER_COMPLETED: 'timer-completed',
+    TIMER_GOAL_REACHED: 'timer-goal-reached',
     TIMER_RESET: 'timer-reset',
     TIMER_UPDATED: 'timer-updated',
     DAILY_RESET: 'daily-reset',
@@ -109,7 +109,7 @@ function makeServerBucket(overrides: Partial<ServerBucket> = {}): ServerBucket {
     sortOrder: 0,
     elapsedSeconds: 0,
     startedAt: null,
-    completedAt: null,
+    goalReachedAt: null,
     ...overrides,
   };
 }
@@ -180,8 +180,9 @@ describe('useTimerState', () => {
     expect(bucket.daysOfWeek).toEqual([0, 1, 2, 3, 4, 5, 6]);
     // Should not have server-only fields
     expect(bucket).not.toHaveProperty('sortOrder');
-    expect(bucket).not.toHaveProperty('startedAt');
-    expect(bucket).not.toHaveProperty('completedAt');
+    // startedAt and goalReachedAt are now part of TimeBucket
+    expect(bucket.startedAt).toBeNull();
+    expect(bucket.goalReachedAt).toBeNull();
   });
 
   it('computes live elapsed for running timers', async () => {
@@ -203,8 +204,8 @@ describe('useTimerState', () => {
     expect(result.current.allBuckets[0]!.elapsedSeconds).toBe(130);
   });
 
-  it('caps elapsed at total duration', async () => {
-    // Timer would exceed total: 50s base + 20s from startedAt on a 1-minute bucket
+  it('does NOT cap elapsed at total duration (tracks actual usage)', async () => {
+    // Timer exceeds total: 50s base + 20s from startedAt on a 1-minute bucket
     const twentySecsAgo = new Date(Date.now() - 20_000).toISOString();
     const sb = makeServerBucket({
       totalMinutes: 1,
@@ -219,8 +220,8 @@ describe('useTimerState', () => {
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
-    // Capped at 60 (1 minute * 60)
-    expect(result.current.allBuckets[0]!.elapsedSeconds).toBe(60);
+    // NOT capped — elapsed can exceed totalMinutes * 60 to track actual usage
+    expect(result.current.allBuckets[0]!.elapsedSeconds).toBe(70);
   });
 
   // ---- activeBucketId ----
@@ -318,7 +319,7 @@ describe('useTimerState', () => {
         }),
       ]),
     );
-    mockStopTimer.mockResolvedValue({ elapsedSeconds: 100, completedAt: null });
+    mockStopTimer.mockResolvedValue({ elapsedSeconds: 100, goalReachedAt: null });
 
     const { result } = renderHook(() => useTimerState(), {
       wrapper: createWrapper(),
@@ -361,6 +362,8 @@ describe('useTimerState', () => {
         elapsedSeconds: 0, // should be ignored — server tracks progress
         colorIndex: 7,
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+        startedAt: null,
+        goalReachedAt: null,
       }),
     );
 
@@ -421,7 +424,7 @@ describe('useTimerState', () => {
 
   // ---- resetBucketForToday ----
 
-  it('resetBucketForToday calls resetTimer and clears from completedBuckets', async () => {
+  it('resetBucketForToday calls resetTimer and clears from goalReachedBuckets', async () => {
     mockFetchTodayState.mockResolvedValue(makeTodayState());
     mockResetTimer.mockResolvedValue(undefined);
 
@@ -432,14 +435,14 @@ describe('useTimerState', () => {
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     // First mark as completed via SSE
-    await act(async () => getSSEHandlers().onTimerCompleted?.({ bucketId: 'b1' }));
-    await waitFor(() => expect(result.current.completedBuckets.has('b1')).toBe(true));
+    await act(async () => getSSEHandlers().onGoalReached?.({ bucketId: 'b1' }));
+    await waitFor(() => expect(result.current.goalReachedBuckets.has('b1')).toBe(true));
 
     // Then reset
     act(() => result.current.resetBucketForToday('b1'));
 
     await waitFor(() => expect(mockResetTimer).toHaveBeenCalledWith('b1'));
-    expect(result.current.completedBuckets.has('b1')).toBe(false);
+    expect(result.current.goalReachedBuckets.has('b1')).toBe(false);
   });
 
   // ---- setRemainingTime ----
@@ -448,7 +451,7 @@ describe('useTimerState', () => {
     mockFetchTodayState.mockResolvedValue(makeTodayState());
     mockSetTimerTime.mockResolvedValue({
       elapsedSeconds: 3300,
-      completedAt: null,
+      goalReachedAt: null,
     });
 
     const { result } = renderHook(() => useTimerState(), {
@@ -476,7 +479,7 @@ describe('useTimerState', () => {
     // Verify useTimerSSE was called with all expected handler callbacks
     expect(mockUseTimerSSE).toHaveBeenCalled();
     const handlers = getSSEHandlers();
-    expect(typeof handlers.onTimerCompleted).toBe('function');
+    expect(typeof handlers.onGoalReached).toBe('function');
     expect(typeof handlers.onDailyReset).toBe('function');
     expect(typeof handlers.onTimerStarted).toBe('function');
     expect(typeof handlers.onTimerStopped).toBe('function');
@@ -484,7 +487,7 @@ describe('useTimerState', () => {
     expect(typeof handlers.onTimerUpdated).toBe('function');
   });
 
-  it('SSE daily-reset event clears completedBuckets', async () => {
+  it('SSE daily-reset event clears goalReachedBuckets', async () => {
     mockFetchTodayState.mockResolvedValue(makeTodayState());
 
     const { result } = renderHook(() => useTimerState(), {
@@ -493,16 +496,16 @@ describe('useTimerState', () => {
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
-    // Add to completedBuckets via SSE (same approach as resetBucketForToday test)
-    await act(async () => getSSEHandlers().onTimerCompleted?.({ bucketId: 'b1' }));
+    // Add to goalReachedBuckets via SSE (same approach as resetBucketForToday test)
+    await act(async () => getSSEHandlers().onGoalReached?.({ bucketId: 'b1' }));
     await waitFor(() =>
-      expect(result.current.completedBuckets.has('b1')).toBe(true),
+      expect(result.current.goalReachedBuckets.has('b1')).toBe(true),
     );
 
-    // Trigger daily reset — should clear completedBuckets
+    // Trigger daily reset — should clear goalReachedBuckets
     await act(async () => getSSEHandlers().onDailyReset?.());
     await waitFor(() =>
-      expect(result.current.completedBuckets.size).toBe(0),
+      expect(result.current.goalReachedBuckets.size).toBe(0),
     );
   });
 
@@ -560,14 +563,14 @@ describe('useTimerState', () => {
 
   // ---- Completion detection on initial load ----
 
-  it('does not add already-completed buckets to completedBuckets on load', async () => {
+  it('does not add already-completed buckets to goalReachedBuckets on load', async () => {
     // Bucket already completed before page load
     mockFetchTodayState.mockResolvedValue(
       makeTodayState([
         makeServerBucket({
           totalMinutes: 1,
           elapsedSeconds: 60,
-          completedAt: new Date().toISOString(),
+          goalReachedAt: new Date().toISOString(),
         }),
       ]),
     );
@@ -578,9 +581,9 @@ describe('useTimerState', () => {
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
-    // Should NOT be in completedBuckets (it was already complete on load,
+    // Should NOT be in goalReachedBuckets (it was already complete on load,
     // not completed during this session)
-    expect(result.current.completedBuckets.has('b1')).toBe(false);
+    expect(result.current.goalReachedBuckets.has('b1')).toBe(false);
   });
 
   // ---- Empty state ----

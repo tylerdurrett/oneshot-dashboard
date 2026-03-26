@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { isBucketActiveToday, type TimeBucket } from '../_lib/timer-types';
 import type { ServerBucket, UpdateBucketInput } from '../_lib/timer-api';
-import type { TimerCompletedData } from './use-timer-sse';
+import type { TimerGoalReachedData } from './use-timer-sse';
 import {
   useTodayState,
   useStartTimer,
@@ -22,7 +22,7 @@ export interface UseTimerStateReturn {
   allBuckets: TimeBucket[];
   todaysBuckets: TimeBucket[];
   activeBucketId: string | null;
-  completedBuckets: ReadonlySet<string>;
+  goalReachedBuckets: ReadonlySet<string>;
   toggleBucket: (id: string) => void;
   addBucket: (bucket: TimeBucket) => void;
   removeBucket: (id: string) => void;
@@ -32,7 +32,8 @@ export interface UseTimerStateReturn {
 }
 
 /** Convert a ServerBucket to a TimeBucket for UI components.
- *  Computes live elapsed seconds from `startedAt` if the timer is running. */
+ *  Computes live elapsed seconds from `startedAt` if the timer is running.
+ *  Elapsed is NOT capped — it can exceed totalMinutes * 60. */
 function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
   let elapsedSeconds = sb.elapsedSeconds;
 
@@ -42,9 +43,6 @@ function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
     elapsedSeconds += Math.max(0, additionalElapsed);
   }
 
-  const totalSeconds = sb.totalMinutes * 60;
-  elapsedSeconds = Math.min(elapsedSeconds, totalSeconds);
-
   return {
     id: sb.id,
     name: sb.name,
@@ -52,10 +50,12 @@ function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
     elapsedSeconds,
     colorIndex: sb.colorIndex,
     daysOfWeek: sb.daysOfWeek,
+    startedAt: sb.startedAt,
+    goalReachedAt: sb.goalReachedAt,
   };
 }
 
-/** Remove an ID from the completedBuckets set (no-op if absent). */
+/** Remove an ID from the goalReachedBuckets set (no-op if absent). */
 function removeFromSet(
   setter: React.Dispatch<React.SetStateAction<Set<string>>>,
   id: string,
@@ -79,9 +79,10 @@ export function useTimerState(): UseTimerStateReturn {
   const resetMutation = useResetTimer();
   const setTimeMutation = useSetTimerTime();
 
-  // Session-only tracking of buckets completed during this browser session.
-  // Used for animations — should NOT include buckets already completed on load.
-  const [completedBuckets, setCompletedBuckets] = useState<Set<string>>(
+  // Session-only tracking of buckets that reached their goal during this
+  // browser session. Used for chime/animation — should NOT include buckets
+  // already goal-reached on load.
+  const [goalReachedBuckets, setGoalReachedBuckets] = useState<Set<string>>(
     () => new Set(),
   );
 
@@ -120,70 +121,81 @@ export function useTimerState(): UseTimerStateReturn {
     };
   }, [activeBucketId]);
 
-  const allBuckets = useMemo(() => {
-    const now = new Date();
-    return serverBuckets.map((sb) => serverBucketToTimeBucket(sb, now));
-    // tick forces recalculation of live elapsed each second
-  }, [serverBuckets, tick]);
+  // Stable base conversion — only changes when server data changes (not per-tick).
+  // Stores converted TimeBuckets with their elapsed frozen at the server snapshot.
+  const baseBuckets = useMemo(
+    () => serverBuckets.map((sb) => serverBucketToTimeBucket(sb, new Date())),
+    [serverBuckets],
+  );
 
-  // Derive todaysBuckets from serverBuckets (stable reference between ticks)
-  // rather than allBuckets, since isBucketActiveToday only checks daysOfWeek.
-  // Buckets already completed on load (completedAt set, not running) are
-  // excluded — they'd otherwise show permanently at 0:00 after a page refresh
-  // because the animation→hide flow only runs for timers that complete during
-  // the current session.
+  // Per-tick: only recompute the running bucket's elapsed. Non-running buckets
+  // keep stable object references so downstream useMemo/React.memo isn't defeated.
+  const allBuckets = useMemo(() => {
+    if (!activeBucketId) return baseBuckets;
+    const now = new Date();
+    return baseBuckets.map((b) => {
+      if (b.id !== activeBucketId || !b.startedAt) return b;
+      const startedAtMs = new Date(b.startedAt).getTime();
+      const liveElapsed =
+        (serverBuckets.find((sb) => sb.id === b.id)?.elapsedSeconds ?? 0) +
+        Math.max(0, Math.floor((now.getTime() - startedAtMs) / 1000));
+      return { ...b, elapsedSeconds: liveElapsed };
+    });
+  }, [baseBuckets, activeBucketId, serverBuckets, tick]);
+
+  // Filter criteria (daysOfWeek, goalReachedAt, startedAt) only change on
+  // server events, not per-tick — so no tick dependency here.
   const todaysBuckets = useMemo(() => {
     const now = new Date();
     return serverBuckets
       .filter((sb) => {
         if (!isBucketActiveToday(sb)) return false;
-        // Hide buckets that finished before this session (completedAt set,
-        // not currently running). Buckets completing *during* this session
-        // are hidden via the animation flow in timer-grid.
-        if (sb.completedAt && !sb.startedAt) return false;
+        // Hide buckets that hit their goal and are stopped. Running timers
+        // past goal stay visible (showing negative remaining + check icon).
+        if (sb.goalReachedAt && !sb.startedAt) return false;
         return true;
       })
       .map((sb) => serverBucketToTimeBucket(sb, now));
-  }, [serverBuckets, tick]);
+  }, [serverBuckets]);
 
-  // Completion detection — when tick causes a bucket to reach its total,
-  // add to completedBuckets. Buckets already completed on initial load are
-  // excluded so animations only fire for timers that complete this session.
-  const prevCompletedRef = useRef<Set<string>>(new Set());
+  // Goal-reached detection — when server data shows a bucket has goalReachedAt
+  // set and it wasn't already in goalReachedBuckets, add it for chime/animation.
+  // SSE onGoalReached is the primary mechanism; this is backup for edge cases.
+  const prevGoalReachedRef = useRef<Set<string>>(new Set());
   const initializedRef = useRef(false);
   useEffect(() => {
     if (!todayQuery.isSuccess) return;
 
-    // On first data load, snapshot initially-completed buckets so we skip them.
-    if (!initializedRef.current && allBuckets.length > 0) {
+    // On first data load, snapshot initially-goal-reached buckets so we skip them.
+    if (!initializedRef.current && serverBuckets.length > 0) {
       initializedRef.current = true;
-      for (const bucket of allBuckets) {
-        if (bucket.elapsedSeconds >= bucket.totalMinutes * 60) {
-          prevCompletedRef.current.add(bucket.id);
+      for (const sb of serverBuckets) {
+        if (sb.goalReachedAt) {
+          prevGoalReachedRef.current.add(sb.id);
         }
       }
       return;
     }
 
     let changed = false;
-    const next = new Set(completedBuckets);
+    const next = new Set(goalReachedBuckets);
 
-    for (const bucket of allBuckets) {
+    for (const sb of serverBuckets) {
       if (
-        bucket.elapsedSeconds >= bucket.totalMinutes * 60 &&
-        !completedBuckets.has(bucket.id) &&
-        !prevCompletedRef.current.has(bucket.id)
+        sb.goalReachedAt &&
+        !goalReachedBuckets.has(sb.id) &&
+        !prevGoalReachedRef.current.has(sb.id)
       ) {
-        next.add(bucket.id);
+        next.add(sb.id);
         changed = true;
       }
     }
 
     if (changed) {
-      setCompletedBuckets(next);
+      setGoalReachedBuckets(next);
     }
-    // Intentionally excludes completedBuckets from deps to avoid infinite loop.
-  }, [allBuckets, todayQuery.isSuccess]);
+    // Intentionally excludes goalReachedBuckets from deps to avoid infinite loop.
+  }, [serverBuckets, todayQuery.isSuccess]);
 
   // SSE integration — useTimerSSE stores handlers in a ref, so useCallback
   // wrappers are unnecessary (handler identity doesn't trigger reconnection).
@@ -193,9 +205,9 @@ export function useTimerState(): UseTimerStateReturn {
   );
 
   useTimerSSE({
-    onTimerCompleted: useCallback(
-      (data: TimerCompletedData) => {
-        setCompletedBuckets((prev) => {
+    onGoalReached: useCallback(
+      (data: TimerGoalReachedData) => {
+        setGoalReachedBuckets((prev) => {
           if (prev.has(data.bucketId)) return prev;
           const next = new Set(prev);
           next.add(data.bucketId);
@@ -207,8 +219,8 @@ export function useTimerState(): UseTimerStateReturn {
     ),
     onDailyReset: useCallback(() => {
       queryClient.invalidateQueries({ queryKey: timerKeys.today });
-      setCompletedBuckets(new Set());
-      prevCompletedRef.current = new Set();
+      setGoalReachedBuckets(new Set());
+      prevGoalReachedRef.current = new Set();
     }, [queryClient]),
     onTimerStarted: invalidateToday,
     onTimerStopped: invalidateToday,
@@ -242,7 +254,7 @@ export function useTimerState(): UseTimerStateReturn {
   const removeBucket = useCallback(
     (id: string) => {
       deleteMutation.mutate(id);
-      removeFromSet(setCompletedBuckets, id);
+      removeFromSet(setGoalReachedBuckets, id);
     },
     [deleteMutation],
   );
@@ -264,10 +276,10 @@ export function useTimerState(): UseTimerStateReturn {
   const resetBucketForToday = useCallback(
     (id: string) => {
       resetMutation.mutate(id);
-      removeFromSet(setCompletedBuckets, id);
-      // Clear from initially-completed tracking so re-completion
-      // after reset triggers animation
-      prevCompletedRef.current.delete(id);
+      removeFromSet(setGoalReachedBuckets, id);
+      // Clear from initially-goal-reached tracking so re-reaching
+      // the goal after reset triggers chime/animation
+      prevGoalReachedRef.current.delete(id);
     },
     [resetMutation],
   );
@@ -284,7 +296,7 @@ export function useTimerState(): UseTimerStateReturn {
     allBuckets,
     todaysBuckets,
     activeBucketId,
-    completedBuckets,
+    goalReachedBuckets,
     toggleBucket,
     addBucket,
     removeBucket,

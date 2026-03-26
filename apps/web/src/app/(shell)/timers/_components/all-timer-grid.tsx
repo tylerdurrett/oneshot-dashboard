@@ -1,14 +1,10 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { Clock, Plus } from 'lucide-react';
-
-import { Button } from '@repo/ui';
+import { useMemo, useState, useCallback } from 'react';
+import { Clock } from 'lucide-react';
 
 import {
-  ADD_BUCKET_EVENT,
-  BUCKET_COLORS,
   GRID_GAP,
   GRID_PADDING,
-  generateBucketId,
+  isBucketActiveToday,
   type TimeBucket,
 } from '../_lib/timer-types';
 import { squarify, type TreemapItem } from '../_lib/treemap';
@@ -18,46 +14,28 @@ import { BucketSettingsDialog } from './bucket-settings-dialog';
 import { TimerBucket } from './timer-bucket';
 
 // ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
-/** All 7 days of the week (Sunday through Saturday). */
-const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Using totalMinutes (not remaining time) keeps the layout stable — buckets
- *  won't swap positions as their timers tick down. */
-function bucketsToItems(buckets: TimeBucket[]): TreemapItem[] {
+/** Treemap sized by elapsed (rounded to nearest minute for layout stability). */
+function bucketsToElapsedItems(buckets: TimeBucket[]): TreemapItem[] {
   return buckets.map((b) => ({
     id: b.id,
-    value: Math.max(1, b.totalMinutes),
+    value: Math.max(1, Math.ceil(b.elapsedSeconds / 60)),
   }));
-}
-
-function nextAvailableColorIndex(buckets: TimeBucket[]): number {
-  const used = new Set(buckets.map((b) => b.colorIndex));
-  for (let i = 0; i < BUCKET_COLORS.length; i++) {
-    if (!used.has(i)) return i;
-  }
-  return 0;
 }
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-export function TimerGrid() {
+export function AllTimerGrid() {
   const {
     isHydrated,
     allBuckets,
-    todaysBuckets,
     activeBucketId,
     goalReachedBuckets,
     toggleBucket,
-    addBucket,
     updateBucket,
     removeBucket,
     resetBucketForToday,
@@ -74,79 +52,42 @@ export function TimerGrid() {
     [removeBucket],
   );
 
-  const allBucketsRef = useRef(allBuckets);
-  allBucketsRef.current = allBuckets;
-
-  const handleAddBucket = useCallback(() => {
-    const newBucket: TimeBucket = {
-      id: generateBucketId(),
-      name: 'New Bucket',
-      totalMinutes: 60,
-      elapsedSeconds: 0,
-      colorIndex: nextAvailableColorIndex(allBucketsRef.current),
-      daysOfWeek: ALL_DAYS,
-      startedAt: null,
-      goalReachedAt: null,
-    };
-    addBucket(newBucket);
-    setSelectedBucketId(newBucket.id);
-  }, [addBucket]);
-
-  useEffect(() => {
-    const handler = () => handleAddBucket();
-    window.addEventListener(ADD_BUCKET_EVENT, handler);
-    return () => window.removeEventListener(ADD_BUCKET_EVENT, handler);
-  }, [handleAddBucket]);
+  const usedBuckets = useMemo(
+    () => allBuckets.filter((b) => isBucketActiveToday(b) && b.elapsedSeconds > 0),
+    [allBuckets],
+  );
 
   const { containerRef, size } = useContainerSize(isHydrated);
 
   const innerWidth = Math.max(0, size.width - GRID_PADDING * 2);
   const innerHeight = Math.max(0, size.height - GRID_PADDING * 2);
 
-  const items = useMemo(() => bucketsToItems(todaysBuckets), [todaysBuckets]);
+  const items = useMemo(() => bucketsToElapsedItems(usedBuckets), [usedBuckets]);
   const rects = useMemo(
     () => squarify(items, innerWidth, innerHeight),
     [items, innerWidth, innerHeight],
   );
   const bucketMap = useMemo(
-    () => new Map(todaysBuckets.map((b) => [b.id, b])),
-    [todaysBuckets],
+    () => new Map(usedBuckets.map((b) => [b.id, b])),
+    [usedBuckets],
   );
-
-  if (!isHydrated) return null;
 
   const selectedBucket = selectedBucketId
     ? allBuckets.find((b) => b.id === selectedBucketId) ?? null
     : null;
 
-  if (todaysBuckets.length === 0) {
+  if (!isHydrated || usedBuckets.length === 0) {
     return (
       <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <Clock className="size-12 text-muted-foreground" />
           <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold text-foreground">No buckets yet</h2>
+            <h2 className="text-lg font-semibold text-foreground">No time tracked yet</h2>
             <p className="text-sm text-muted-foreground">
-              Create a bucket to start tracking your time.
+              Start a timer on the Remaining tab to see your usage here.
             </p>
           </div>
-          <Button onClick={handleAddBucket}>
-            <Plus className="size-4" />
-            Create your first bucket
-          </Button>
         </div>
-
-        {selectedBucketId && (
-          <BucketSettingsDialog
-            bucket={selectedBucket}
-            open
-            onOpenChange={(open) => {
-              if (!open) setSelectedBucketId(null);
-            }}
-            onSave={updateBucket}
-            onDelete={handleDeleteBucket}
-          />
-        )}
       </div>
     );
   }
@@ -171,7 +112,7 @@ export function TimerGrid() {
             bucket={bucket}
             isActive={activeBucketId === bucket.id}
             isGoalReached={goalReachedBuckets.has(bucket.id)}
-            mode="remaining"
+            mode="elapsed"
             style={bucketStyle}
             onToggle={() => toggleBucket(bucket.id)}
             onOpenSettings={() => setSelectedBucketId(bucket.id)}

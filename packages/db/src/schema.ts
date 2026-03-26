@@ -42,7 +42,7 @@ export const timerDailyProgress = sqliteTable(
     date: text('date').notNull(), // YYYY-MM-DD, 3AM-adjusted
     elapsedSeconds: integer('elapsed_seconds').notNull().default(0),
     startedAt: text('started_at'), // ISO timestamp if currently running, null if paused
-    completedAt: text('completed_at'), // ISO timestamp if timer finished, null otherwise
+    goalReachedAt: text('goal_reached_at'), // ISO timestamp when elapsed first hit totalMinutes goal, null otherwise
   },
   (table) => [
     unique('uq_bucket_date').on(table.bucketId, table.date),

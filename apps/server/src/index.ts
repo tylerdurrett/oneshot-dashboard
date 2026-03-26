@@ -76,8 +76,8 @@ export function buildServer(opts?: BuildServerOptions) {
   const timerDb = opts?.database ?? defaultDb;
   const scheduler = new TimerScheduler({
     database: timerDb,
-    onTimerCompleted: (bucketId) =>
-      broadcast(SSE_EVENTS.TIMER_COMPLETED, { bucketId }),
+    onGoalReached: (bucketId) =>
+      broadcast(SSE_EVENTS.TIMER_GOAL_REACHED, { bucketId }),
     onDailyReset: () => broadcast(SSE_EVENTS.DAILY_RESET, {}),
   });
 

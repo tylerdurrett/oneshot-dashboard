@@ -84,7 +84,7 @@ describe('router', () => {
 
   it('renders /timers/all page', () => {
     renderRoute('/timers/all');
-    expect(screen.getByText('All timers view coming soon.')).toBeDefined();
+    expect(screen.getByText('No time tracked yet')).toBeDefined();
   });
 
   it('renders /chat page', () => {

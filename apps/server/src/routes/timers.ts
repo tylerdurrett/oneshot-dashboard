@@ -17,18 +17,18 @@ import {
   stopTimer,
   resetProgress,
   setRemainingTime,
-  computeCompletionMs,
+  computeGoalMs,
 } from '../services/timer-progress.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-/** Minimal interface so routes can schedule/cancel completion jobs
+/** Minimal interface so routes can schedule/cancel goal-reached jobs
  *  without depending on the full TimerScheduler class. */
 export interface TimerSchedulerLike {
-  scheduleCompletion(bucketId: string, completesAtMs: number): void;
-  cancelCompletion(bucketId: string): void;
+  scheduleGoalReached(bucketId: string, goalAtMs: number): void;
+  cancelGoalJob(bucketId: string): void;
 }
 
 export interface TimerRoutesOptions {
@@ -40,7 +40,7 @@ export interface TimerRoutesOptions {
 export const SSE_EVENTS = {
   TIMER_STARTED: 'timer-started',
   TIMER_STOPPED: 'timer-stopped',
-  TIMER_COMPLETED: 'timer-completed',
+  TIMER_GOAL_REACHED: 'timer-goal-reached',
   TIMER_RESET: 'timer-reset',
   TIMER_UPDATED: 'timer-updated',
   DAILY_RESET: 'daily-reset',
@@ -68,7 +68,7 @@ const sseClients = new Map<string, SSEClient>();
  * Broadcast a Server-Sent Event to all connected clients.
  * Follows the SSE protocol: `event: <name>\ndata: <json>\n\n`
  *
- * Exported so the TimerScheduler can broadcast completion and reset events.
+ * Exported so the TimerScheduler can broadcast goal-reached and reset events.
  */
 export function broadcast(event: SSEEventName, data: unknown): void {
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -207,7 +207,7 @@ export async function timerRoutes(
       if (!deleted) {
         return reply.status(404).send({ error: 'Bucket not found' });
       }
-      scheduler?.cancelCompletion(id);
+      scheduler?.cancelGoalJob(id);
       return reply.status(200).send({ success: true });
     },
   );
@@ -235,18 +235,18 @@ export async function timerRoutes(
       const now = new Date();
       const result = await startTimer(id, db, now);
 
-      // Cancel completion for the previously-running timer (if any)
+      // Cancel goal job for the previously-running timer (if any)
       if (result.stoppedBucketId) {
-        scheduler?.cancelCompletion(result.stoppedBucketId);
+        scheduler?.cancelGoalJob(result.stoppedBucketId);
         broadcast(SSE_EVENTS.TIMER_STOPPED, {
           bucketId: result.stoppedBucketId,
         });
       }
 
-      // Schedule completion for the newly-started timer
-      const completesAtMs = await computeCompletionMs(id, db, now);
-      if (completesAtMs) {
-        scheduler?.scheduleCompletion(id, completesAtMs);
+      // Schedule goal-reached for the newly-started timer
+      const goalAtMs = await computeGoalMs(id, db, now);
+      if (goalAtMs) {
+        scheduler?.scheduleGoalReached(id, goalAtMs);
       }
 
       broadcast(SSE_EVENTS.TIMER_STARTED, {
@@ -258,7 +258,7 @@ export async function timerRoutes(
     },
   );
 
-  /** Stop a running timer. Accumulates elapsed and detects completion. */
+  /** Stop a running timer. Accumulates elapsed time. */
   server.post<{ Params: { id: string } }>(
     '/timers/buckets/:id/stop',
     async (request) => {
@@ -266,34 +266,32 @@ export async function timerRoutes(
       const result = await stopTimer(id, db);
 
       if (result.changed) {
-        scheduler?.cancelCompletion(id);
+        scheduler?.cancelGoalJob(id);
         broadcast(SSE_EVENTS.TIMER_STOPPED, { bucketId: id });
-
-        if (result.completedAt) {
-          broadcast(SSE_EVENTS.TIMER_COMPLETED, { bucketId: id });
-        }
+        // Goal-reached is only fired while the timer is running (by the
+        // scheduler). Stopping a timer does NOT trigger goal-reached.
       }
 
       return {
         elapsedSeconds: result.elapsedSeconds ?? 0,
-        completedAt: result.completedAt ?? null,
+        goalReachedAt: result.goalReachedAt ?? null,
       };
     },
   );
 
-  /** Reset a bucket's progress for today — zero elapsed, clear completion. */
+  /** Reset a bucket's progress for today — zero elapsed, clear goal state. */
   server.post<{ Params: { id: string } }>(
     '/timers/buckets/:id/reset',
     async (request) => {
       const { id } = request.params;
       await resetProgress(id, db);
-      scheduler?.cancelCompletion(id);
+      scheduler?.cancelGoalJob(id);
       broadcast(SSE_EVENTS.TIMER_RESET, { bucketId: id });
       return { success: true };
     },
   );
 
-  /** Set remaining time for a bucket. Reschedules completion if running. */
+  /** Set remaining time for a bucket. Reschedules goal if running. */
   server.post<{ Params: { id: string }; Body: { remainingSeconds: number } }>(
     '/timers/buckets/:id/set-time',
     async (request, reply) => {
@@ -307,23 +305,23 @@ export async function timerRoutes(
 
       const result = await setRemainingTime(id, remainingSeconds, db);
 
-      // Reschedule completion if the timer is currently running
-      const completesAtMs = await computeCompletionMs(id, db);
-      if (completesAtMs) {
-        scheduler?.scheduleCompletion(id, completesAtMs);
+      // Reschedule goal if the timer is currently running
+      const goalAtMs = await computeGoalMs(id, db);
+      if (goalAtMs) {
+        scheduler?.scheduleGoalReached(id, goalAtMs);
       } else {
-        scheduler?.cancelCompletion(id);
+        scheduler?.cancelGoalJob(id);
       }
 
       broadcast(SSE_EVENTS.TIMER_UPDATED, {
         bucketId: id,
         elapsedSeconds: result.elapsedSeconds,
-        completedAt: result.completedAt,
+        goalReachedAt: result.goalReachedAt,
       });
 
       return {
         elapsedSeconds: result.elapsedSeconds,
-        completedAt: result.completedAt,
+        goalReachedAt: result.goalReachedAt,
       };
     },
   );

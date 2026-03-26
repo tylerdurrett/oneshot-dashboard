@@ -104,7 +104,7 @@ const todayState = {
       sortOrder: 0,
       elapsedSeconds: 120,
       startedAt: null,
-      completedAt: null,
+      goalReachedAt: null,
     },
   ],
 };
@@ -229,7 +229,7 @@ describe('useStartTimer', () => {
 
 describe('useStopTimer', () => {
   it('stops a timer and invalidates today cache', async () => {
-    const response = { elapsedSeconds: 300, completedAt: null };
+    const response = { elapsedSeconds: 300, goalReachedAt: null };
     mockStopTimer.mockResolvedValue(response);
     mockFetchTodayState.mockResolvedValue(todayState);
 
@@ -273,7 +273,7 @@ describe('useResetTimer', () => {
 
 describe('useSetTimerTime', () => {
   it('sets timer time and invalidates today cache', async () => {
-    const response = { elapsedSeconds: 3300, completedAt: null };
+    const response = { elapsedSeconds: 3300, goalReachedAt: null };
     mockSetTimerTime.mockResolvedValue(response);
     mockFetchTodayState.mockResolvedValue(todayState);
 

@@ -8,6 +8,7 @@ import {
   stopTimer,
   resetProgress,
   setRemainingTime,
+  markGoalReached,
   stopAllRunningTimers,
 } from '../services/timer-progress.js';
 import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
@@ -71,7 +72,7 @@ describe('getTodayState', () => {
     expect(result.buckets[0]!.name).toBe('A');
     expect(result.buckets[0]!.elapsedSeconds).toBe(0);
     expect(result.buckets[0]!.startedAt).toBeNull();
-    expect(result.buckets[0]!.completedAt).toBeNull();
+    expect(result.buckets[0]!.goalReachedAt).toBeNull();
   });
 
   it('merges existing progress data correctly', async () => {
@@ -85,14 +86,14 @@ describe('getTodayState', () => {
       date: '2026-03-24',
       elapsedSeconds: 300,
       startedAt: null,
-      completedAt: null,
+      goalReachedAt: null,
     });
 
     const result = await getTodayState(testDb, now);
     expect(result.buckets[0]!.elapsedSeconds).toBe(300);
   });
 
-  it('auto-completes overdue running timers', async () => {
+  it('does NOT auto-complete overdue running timers (timer keeps running past goal)', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 1 }); // 60 seconds total
     const startedAt = new Date(2026, 2, 24, 9, 0, 0).toISOString(); // started an hour ago
 
@@ -107,13 +108,13 @@ describe('getTodayState', () => {
     const now = new Date(2026, 2, 24, 10, 0, 0); // 1 hour later
     const result = await getTodayState(testDb, now);
 
-    // Timer should be auto-completed: elapsed capped at total, startedAt cleared
-    expect(result.buckets[0]!.elapsedSeconds).toBe(60);
-    expect(result.buckets[0]!.startedAt).toBeNull();
-    expect(result.buckets[0]!.completedAt).not.toBeNull();
+    // Timer should still be running — no auto-stop, no capping
+    expect(result.buckets[0]!.elapsedSeconds).toBe(0); // raw DB value (live elapsed computed client-side)
+    expect(result.buckets[0]!.startedAt).toBe(startedAt);
+    expect(result.buckets[0]!.goalReachedAt).toBeNull();
   });
 
-  it('does not auto-complete a timer that has not exceeded its total', async () => {
+  it('does not modify a timer that has not exceeded its total', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 60 }); // 3600 seconds total
     const startedAt = new Date(2026, 2, 24, 9, 50, 0).toISOString(); // started 10 min ago
 
@@ -131,7 +132,7 @@ describe('getTodayState', () => {
     // Timer should still be running
     expect(result.buckets[0]!.elapsedSeconds).toBe(0); // not accumulated yet (still running)
     expect(result.buckets[0]!.startedAt).toBe(startedAt);
-    expect(result.buckets[0]!.completedAt).toBeNull();
+    expect(result.buckets[0]!.goalReachedAt).toBeNull();
   });
 
   it('returns daysOfWeek as number array', async () => {
@@ -213,23 +214,25 @@ describe('startTimer', () => {
     expect(rows[0]!.elapsedSeconds).toBe(120); // preserved
   });
 
-  it('clears completedAt when restarting a completed timer', async () => {
+  it('preserves goalReachedAt when restarting a goal-reached timer', async () => {
     const bucket = await seedBucket(testDb);
     const now = new Date(2026, 2, 24, 10, 0, 0);
+    const goalTime = new Date(2026, 2, 24, 9, 0, 0).toISOString();
 
-    // Pre-create a completed progress row
+    // Pre-create a goal-reached progress row
     await testDb.insert(timerDailyProgress).values({
       id: crypto.randomUUID(),
       bucketId: bucket.id,
       date: '2026-03-24',
       elapsedSeconds: 3600,
-      completedAt: new Date(2026, 2, 24, 9, 0, 0).toISOString(),
+      goalReachedAt: goalTime,
     });
 
     await startTimer(bucket.id, testDb, now);
 
     const rows = await testDb.select().from(timerDailyProgress);
-    expect(rows[0]!.completedAt).toBeNull();
+    // goalReachedAt should be preserved — only resetProgress clears it
+    expect(rows[0]!.goalReachedAt).toBe(goalTime);
     expect(rows[0]!.startedAt).toBe(now.toISOString());
   });
 });
@@ -256,7 +259,7 @@ describe('stopTimer', () => {
 
     expect(result.changed).toBe(true);
     expect(result.elapsedSeconds).toBe(600); // 10 minutes
-    expect(result.completedAt).toBeNull();
+    expect(result.goalReachedAt).toBeNull();
   });
 
   it('returns changed: false when timer is not running', async () => {
@@ -281,7 +284,7 @@ describe('stopTimer', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('detects completion when elapsed >= total', async () => {
+  it('does NOT set goalReachedAt when elapsed exceeds total (scheduler handles that)', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 1 }); // 60 seconds
     const t1 = new Date(2026, 2, 24, 10, 0, 0);
     await startTimer(bucket.id, testDb, t1);
@@ -291,8 +294,10 @@ describe('stopTimer', () => {
     const result = await stopTimer(bucket.id, testDb, t2);
 
     expect(result.changed).toBe(true);
+    // Elapsed is NOT capped — tracks actual usage
     expect(result.elapsedSeconds).toBe(120);
-    expect(result.completedAt).toBe(t2.toISOString());
+    // goalReachedAt is NOT set by stopTimer — that's the scheduler's job
+    expect(result.goalReachedAt).toBeNull();
   });
 
   it('accumulates across start/stop cycles', async () => {
@@ -312,6 +317,46 @@ describe('stopTimer', () => {
 
     expect(result.elapsedSeconds).toBe(480); // 5 min + 3 min = 480 seconds
   });
+
+  it('allows elapsed to exceed totalMinutes without capping', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 1 }); // 60 seconds
+    const t1 = new Date(2026, 2, 24, 10, 0, 0);
+    await startTimer(bucket.id, testDb, t1);
+
+    // Stop 5 minutes later (300s >> 60s total)
+    const t2 = new Date(2026, 2, 24, 10, 5, 0);
+    const result = await stopTimer(bucket.id, testDb, t2);
+
+    expect(result.elapsedSeconds).toBe(300); // not capped at 60
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markGoalReached
+// ---------------------------------------------------------------------------
+
+describe('markGoalReached', () => {
+  let testDb: Database;
+
+  beforeEach(() => {
+    testDb = createTimerTestDb();
+  });
+
+  it('sets goalReachedAt without clearing startedAt', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 1 });
+    const startTime = new Date(2026, 2, 24, 10, 0, 0);
+    await startTimer(bucket.id, testDb, startTime);
+
+    const goalTime = new Date(2026, 2, 24, 10, 1, 0);
+    const result = await markGoalReached(bucket.id, testDb, goalTime);
+
+    expect(result.goalReachedAt).toBe(goalTime.toISOString());
+
+    // Timer should still be running
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows[0]!.startedAt).toBe(startTime.toISOString());
+    expect(rows[0]!.goalReachedAt).toBe(goalTime.toISOString());
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -325,17 +370,17 @@ describe('resetProgress', () => {
     testDb = createTimerTestDb();
   });
 
-  it('zeros out elapsed and clears completion', async () => {
+  it('zeros out elapsed and clears goalReachedAt', async () => {
     const bucket = await seedBucket(testDb);
     const now = new Date(2026, 2, 24, 10, 0, 0);
 
-    // Create a completed progress row
+    // Create a goal-reached progress row
     await testDb.insert(timerDailyProgress).values({
       id: crypto.randomUUID(),
       bucketId: bucket.id,
       date: '2026-03-24',
       elapsedSeconds: 3600,
-      completedAt: now.toISOString(),
+      goalReachedAt: now.toISOString(),
     });
 
     await resetProgress(bucket.id, testDb, now);
@@ -343,7 +388,7 @@ describe('resetProgress', () => {
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows[0]!.elapsedSeconds).toBe(0);
     expect(rows[0]!.startedAt).toBeNull();
-    expect(rows[0]!.completedAt).toBeNull();
+    expect(rows[0]!.goalReachedAt).toBeNull();
   });
 
   it('clears a running timer', async () => {
@@ -378,21 +423,23 @@ describe('setRemainingTime', () => {
     const result = await setRemainingTime(bucket.id, 1800, testDb, now);
 
     expect(result.elapsedSeconds).toBe(1800); // 3600 - 1800
-    expect(result.completedAt).toBeNull();
+    // goalReachedAt is always cleared when manually setting time
+    expect(result.goalReachedAt).toBeNull();
 
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.elapsedSeconds).toBe(1800);
   });
 
-  it('detects completion when remaining is 0', async () => {
+  it('does NOT set goalReachedAt when remaining is 0 (clears it)', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 60 });
     const now = new Date(2026, 2, 24, 10, 0, 0);
 
     const result = await setRemainingTime(bucket.id, 0, testDb, now);
 
     expect(result.elapsedSeconds).toBe(3600);
-    expect(result.completedAt).toBe(now.toISOString());
+    // Manually setting time always clears goalReachedAt
+    expect(result.goalReachedAt).toBeNull();
   });
 
   it('creates a progress row if none exists', async () => {

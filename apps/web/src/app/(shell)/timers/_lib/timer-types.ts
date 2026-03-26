@@ -9,14 +9,18 @@
 export interface TimeBucket {
   id: string;
   name: string;
-  /** Total allocated time in minutes. */
+  /** Total allocated time in minutes (the daily goal/budget). */
   totalMinutes: number;
-  /** Seconds elapsed today (resets daily at 3 AM). */
+  /** Seconds elapsed today (resets daily at 3 AM). Can exceed totalMinutes * 60. */
   elapsedSeconds: number;
   /** Index into BUCKET_COLORS (0-9). */
   colorIndex: number;
   /** Days of the week this bucket is active (0 = Sunday … 6 = Saturday). */
   daysOfWeek: number[];
+  /** ISO timestamp if timer is currently running, null if paused/stopped. */
+  startedAt: string | null;
+  /** ISO timestamp when elapsed first reached totalMinutes goal, null if not yet reached. */
+  goalReachedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -46,6 +50,12 @@ export const BUCKET_COLORS: BucketColor[] = [
  *  timers page (e.g. from the app shell nav context menu). */
 export const ADD_BUCKET_EVENT = 'add-bucket';
 
+/** Padding around the outer edge of the treemap grid (px). */
+export const GRID_PADDING = 8;
+
+/** Gap between adjacent treemap buckets (px). */
+export const GRID_GAP = 4;
+
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
@@ -67,17 +77,20 @@ function adjustForResetBoundary(now: Date): Date {
 /**
  * Format a duration in seconds as a human-readable time string.
  * Returns `H:MM:SS` when >= 1 hour, otherwise `M:SS`.
+ * Supports negative values (prefixed with `-`) for over-budget display.
  */
 export function formatTime(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const hrs = Math.floor(s / 3600);
-  const mins = Math.floor((s % 3600) / 60);
-  const secs = s % 60;
+  const negative = seconds < 0;
+  const abs = Math.abs(Math.floor(seconds));
+  const hrs = Math.floor(abs / 3600);
+  const mins = Math.floor((abs % 3600) / 60);
+  const secs = abs % 60;
+  const prefix = negative ? '-' : '';
 
   if (hrs > 0) {
-    return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    return `${prefix}${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   }
-  return `${mins}:${String(secs).padStart(2, '0')}`;
+  return `${prefix}${mins}:${String(secs).padStart(2, '0')}`;
 }
 
 /**

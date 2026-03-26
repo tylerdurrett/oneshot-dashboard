@@ -16,7 +16,7 @@ export interface TodayBucketState {
   sortOrder: number;
   elapsedSeconds: number;
   startedAt: string | null;
-  completedAt: string | null;
+  goalReachedAt: string | null;
 }
 
 /** Result of getTodayState(). */
@@ -36,7 +36,7 @@ export interface StartTimerResult {
 export interface StopTimerResult {
   changed: boolean;
   elapsedSeconds?: number;
-  completedAt?: string | null;
+  goalReachedAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -72,8 +72,9 @@ export function getResetDate(now: Date = new Date()): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Get all buckets merged with today's progress. Auto-completes any running
- * timer that has exceeded its total duration.
+ * Get all buckets merged with today's progress. Returns raw state —
+ * elapsed is NOT capped at totalMinutes, and running timers past their
+ * goal are NOT auto-stopped.
  */
 export async function getTodayState(
   database: Database = defaultDb,
@@ -99,33 +100,6 @@ export async function getTodayState(
     const bucket = row.timer_buckets;
     const progress = row.timer_daily_progress;
 
-    let elapsedSeconds = progress?.elapsedSeconds ?? 0;
-    let startedAt = progress?.startedAt ?? null;
-    let completedAt = progress?.completedAt ?? null;
-
-    // Auto-complete check: if timer is running and has exceeded its total
-    if (startedAt && !completedAt) {
-      const totalElapsed = elapsedSeconds + elapsedSince(startedAt, now);
-      const totalSeconds = bucket.totalMinutes * 60;
-
-      if (totalElapsed >= totalSeconds) {
-        // Timer has completed — persist the completion.
-        // progress is guaranteed non-null here since startedAt came from it.
-        elapsedSeconds = totalSeconds;
-        completedAt = now.toISOString();
-        startedAt = null;
-
-        await database
-          .update(timerDailyProgress)
-          .set({
-            elapsedSeconds,
-            startedAt: null,
-            completedAt,
-          })
-          .where(eq(timerDailyProgress.id, progress!.id));
-      }
-    }
-
     buckets.push({
       id: bucket.id,
       name: bucket.name,
@@ -133,9 +107,9 @@ export async function getTodayState(
       colorIndex: bucket.colorIndex,
       daysOfWeek: JSON.parse(bucket.daysOfWeek) as number[],
       sortOrder: bucket.sortOrder,
-      elapsedSeconds,
-      startedAt,
-      completedAt,
+      elapsedSeconds: progress?.elapsedSeconds ?? 0,
+      startedAt: progress?.startedAt ?? null,
+      goalReachedAt: progress?.goalReachedAt ?? null,
     });
   }
 
@@ -154,7 +128,6 @@ export async function startTimer(
   const date = getResetDate(now);
   let stoppedBucketId: string | null = null;
 
-  // Enforce single-active: stop any currently running timer for today
   const running = await database
     .select()
     .from(timerDailyProgress)
@@ -177,7 +150,6 @@ export async function startTimer(
     stoppedBucketId = row.bucketId;
   }
 
-  // Get-or-create progress row for this bucket + today
   const existing = await database
     .select()
     .from(timerDailyProgress)
@@ -191,15 +163,16 @@ export async function startTimer(
   const startedAt = now.toISOString();
 
   if (existing.length > 0) {
-    // If this timer was already running, accumulate elapsed before restarting
     const row = existing[0]!;
     let elapsedSeconds = row.elapsedSeconds;
     if (row.startedAt) {
       elapsedSeconds += elapsedSince(row.startedAt, now);
     }
+    // Preserve goalReachedAt — if the goal was already reached, don't clear it.
+    // Only resetProgress() clears goalReachedAt.
     await database
       .update(timerDailyProgress)
-      .set({ startedAt, elapsedSeconds, completedAt: null })
+      .set({ startedAt, elapsedSeconds })
       .where(eq(timerDailyProgress.id, row.id));
   } else {
     await database.insert(timerDailyProgress).values({
@@ -215,7 +188,8 @@ export async function startTimer(
 }
 
 /**
- * Stop a running timer. Accumulates elapsed time and checks for completion.
+ * Stop a running timer. Accumulates elapsed time without capping.
+ * Does NOT set goalReachedAt — that's the scheduler's job while running.
  */
 export async function stopTimer(
   bucketId: string,
@@ -241,30 +215,19 @@ export async function stopTimer(
   const row = rows[0]!;
   const elapsedSeconds = row.elapsedSeconds + elapsedSince(row.startedAt!, now);
 
-  // Look up the bucket to check for completion
-  const bucketRows = await database
-    .select()
-    .from(timerBuckets)
-    .where(eq(timerBuckets.id, bucketId));
-
-  const totalSeconds = bucketRows[0] ? bucketRows[0].totalMinutes * 60 : Infinity;
-  const completedAt =
-    elapsedSeconds >= totalSeconds ? now.toISOString() : null;
-
   await database
     .update(timerDailyProgress)
     .set({
       elapsedSeconds,
       startedAt: null,
-      completedAt: completedAt ?? row.completedAt,
     })
     .where(eq(timerDailyProgress.id, row.id));
 
-  return { changed: true, elapsedSeconds, completedAt };
+  return { changed: true, elapsedSeconds, goalReachedAt: row.goalReachedAt };
 }
 
 /**
- * Reset a bucket's progress for today — zero elapsed, clear startedAt and completedAt.
+ * Reset a bucket's progress for today — zero elapsed, clear startedAt and goalReachedAt.
  */
 export async function resetProgress(
   bucketId: string,
@@ -278,7 +241,7 @@ export async function resetProgress(
     .set({
       elapsedSeconds: 0,
       startedAt: null,
-      completedAt: null,
+      goalReachedAt: null,
     })
     .where(
       and(
@@ -290,14 +253,14 @@ export async function resetProgress(
 
 /**
  * Set remaining time for a bucket. Computes elapsedSeconds from the bucket's
- * totalMinutes and handles completion when remaining is 0.
+ * totalMinutes. Clears goalReachedAt since the user is manually adjusting time.
  */
 export async function setRemainingTime(
   bucketId: string,
   remainingSeconds: number,
   database: Database = defaultDb,
   now: Date = new Date(),
-): Promise<{ elapsedSeconds: number; completedAt: string | null }> {
+): Promise<{ elapsedSeconds: number; goalReachedAt: string | null }> {
   const date = getResetDate(now);
 
   const bucketRows = await database
@@ -311,9 +274,10 @@ export async function setRemainingTime(
 
   const totalSeconds = bucketRows[0]!.totalMinutes * 60;
   const elapsedSeconds = Math.max(0, totalSeconds - remainingSeconds);
-  const completedAt = remainingSeconds <= 0 ? now.toISOString() : null;
+  // Manually adjusting time clears goal state so the scheduler can
+  // re-notify if the timer crosses the goal again while running.
+  const goalReachedAt = null;
 
-  // Get-or-create progress row
   const existing = await database
     .select()
     .from(timerDailyProgress)
@@ -327,7 +291,7 @@ export async function setRemainingTime(
   if (existing.length > 0) {
     await database
       .update(timerDailyProgress)
-      .set({ elapsedSeconds, completedAt })
+      .set({ elapsedSeconds, goalReachedAt })
       .where(eq(timerDailyProgress.id, existing[0]!.id));
   } else {
     await database.insert(timerDailyProgress).values({
@@ -336,38 +300,37 @@ export async function setRemainingTime(
       date,
       elapsedSeconds,
       startedAt: null,
-      completedAt,
+      goalReachedAt,
     });
   }
 
-  return { elapsedSeconds, completedAt };
+  return { elapsedSeconds, goalReachedAt };
 }
 
 /**
- * Compute the absolute timestamp (ms) when a running timer will complete.
- * Returns null if the bucket doesn't exist, there's no progress row, or
- * the timer is not currently running.
+ * Compute the absolute timestamp (ms) when a running timer will reach its goal.
+ * Returns null if the bucket doesn't exist, there's no progress row, the timer
+ * is not running, or the goal has already been reached.
  *
- * Used by routes to schedule completion jobs after starting a timer or
+ * Used by routes to schedule goal-reached jobs after starting a timer or
  * adjusting remaining time.
  */
-export async function computeCompletionMs(
+export async function computeGoalMs(
   bucketId: string,
   database: Database = defaultDb,
   now: Date = new Date(),
 ): Promise<number | null> {
   const date = getResetDate(now);
 
-  const bucketRows = await database
-    .select()
-    .from(timerBuckets)
-    .where(eq(timerBuckets.id, bucketId));
-
-  if (bucketRows.length === 0) return null;
-
   const rows = await database
-    .select()
+    .select({
+      totalMinutes: timerBuckets.totalMinutes,
+      elapsedSeconds: timerDailyProgress.elapsedSeconds,
+      startedAt: timerDailyProgress.startedAt,
+      goalReachedAt: timerDailyProgress.goalReachedAt,
+    })
     .from(timerDailyProgress)
+    .innerJoin(timerBuckets, eq(timerDailyProgress.bucketId, timerBuckets.id))
     .where(
       and(
         eq(timerDailyProgress.bucketId, bucketId),
@@ -376,13 +339,41 @@ export async function computeCompletionMs(
     );
 
   if (rows.length === 0 || !rows[0]!.startedAt) return null;
+  if (rows[0]!.goalReachedAt) return null;
 
-  const totalSeconds = bucketRows[0]!.totalMinutes * 60;
+  const totalSeconds = rows[0]!.totalMinutes * 60;
   const remainingSeconds = totalSeconds - rows[0]!.elapsedSeconds;
 
-  // Timer completes at startedAt + remaining seconds (since startedAt marks
-  // the beginning of the current segment and elapsedSeconds is accumulated)
+  if (remainingSeconds <= 0) return null;
+
   return new Date(rows[0]!.startedAt).getTime() + remainingSeconds * 1000;
+}
+
+/**
+ * Mark a timer's goal as reached without stopping it. Sets goalReachedAt
+ * but preserves startedAt so the timer keeps running.
+ *
+ * Called by the scheduler when a running timer crosses its totalMinutes goal.
+ */
+export async function markGoalReached(
+  bucketId: string,
+  database: Database = defaultDb,
+  now: Date = new Date(),
+): Promise<{ goalReachedAt: string }> {
+  const date = getResetDate(now);
+  const goalReachedAt = now.toISOString();
+
+  await database
+    .update(timerDailyProgress)
+    .set({ goalReachedAt })
+    .where(
+      and(
+        eq(timerDailyProgress.bucketId, bucketId),
+        eq(timerDailyProgress.date, date),
+      ),
+    );
+
+  return { goalReachedAt };
 }
 
 /**

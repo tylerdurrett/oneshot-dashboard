@@ -9,7 +9,7 @@ import { getBaseUrl } from '../_lib/timer-api';
 export const SSE_EVENTS = {
   TIMER_STARTED: 'timer-started',
   TIMER_STOPPED: 'timer-stopped',
-  TIMER_COMPLETED: 'timer-completed',
+  TIMER_GOAL_REACHED: 'timer-goal-reached',
   TIMER_RESET: 'timer-reset',
   TIMER_UPDATED: 'timer-updated',
   DAILY_RESET: 'daily-reset',
@@ -28,7 +28,7 @@ export interface TimerStoppedData {
   bucketId: string;
 }
 
-export interface TimerCompletedData {
+export interface TimerGoalReachedData {
   bucketId: string;
 }
 
@@ -39,13 +39,13 @@ export interface TimerResetData {
 export interface TimerUpdatedData {
   bucketId: string;
   elapsedSeconds: number;
-  completedAt: string | null;
+  goalReachedAt: string | null;
 }
 
 export interface TimerSSEHandlers {
   onTimerStarted?: (data: TimerStartedData) => void;
   onTimerStopped?: (data: TimerStoppedData) => void;
-  onTimerCompleted?: (data: TimerCompletedData) => void;
+  onGoalReached?: (data: TimerGoalReachedData) => void;
   onTimerReset?: (data: TimerResetData) => void;
   onTimerUpdated?: (data: TimerUpdatedData) => void;
   onDailyReset?: () => void;
@@ -90,9 +90,9 @@ export function useTimerSSE(handlers: TimerSSEHandlers): void {
       if (data) handlersRef.current.onTimerStopped?.(data);
     });
 
-    es.addEventListener(SSE_EVENTS.TIMER_COMPLETED, (e) => {
-      const data = safeParse<TimerCompletedData>(e.data);
-      if (data) handlersRef.current.onTimerCompleted?.(data);
+    es.addEventListener(SSE_EVENTS.TIMER_GOAL_REACHED, (e) => {
+      const data = safeParse<TimerGoalReachedData>(e.data);
+      if (data) handlersRef.current.onGoalReached?.(data);
     });
 
     es.addEventListener(SSE_EVENTS.TIMER_RESET, (e) => {

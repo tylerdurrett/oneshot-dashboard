@@ -5,7 +5,7 @@ import {
   RESET_HOUR,
   elapsedSince,
   getResetDate,
-  stopTimer,
+  markGoalReached,
   stopAllRunningTimers,
 } from './timer-progress.js';
 
@@ -15,7 +15,7 @@ import {
 
 export interface TimerSchedulerOptions {
   database: Database;
-  onTimerCompleted: (bucketId: string) => void;
+  onGoalReached: (bucketId: string) => void;
   onDailyReset: () => void;
 }
 
@@ -24,7 +24,7 @@ export interface TimerSchedulerOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Manages background timer jobs: completion detection via setTimeout,
+ * Manages background timer jobs: goal-reached detection via setTimeout,
  * daily reset, and startup recovery for stale timers.
  *
  * Uses in-process setTimeout — appropriate for a single-user SQLite app.
@@ -32,26 +32,26 @@ export interface TimerSchedulerOptions {
  */
 export class TimerScheduler {
   private database: Database;
-  private onTimerCompleted: (bucketId: string) => void;
+  private onGoalReached: (bucketId: string) => void;
   private onDailyReset: () => void;
   private destroyed = false;
 
-  /** Maps bucketId → scheduled completion timeout. */
-  private completionJobs = new Map<string, NodeJS.Timeout>();
+  /** Maps bucketId → scheduled goal-reached timeout. */
+  private goalJobs = new Map<string, NodeJS.Timeout>();
 
   /** The next daily reset timeout. */
   private resetJob: NodeJS.Timeout | null = null;
 
   constructor(opts: TimerSchedulerOptions) {
     this.database = opts.database;
-    this.onTimerCompleted = opts.onTimerCompleted;
+    this.onGoalReached = opts.onGoalReached;
     this.onDailyReset = opts.onDailyReset;
   }
 
   /**
    * Initialize the scheduler on server startup.
    * 1. Recover stale timers from previous dates (server was down during reset)
-   * 2. Handle today's running timers (auto-complete overdue, schedule remaining)
+   * 2. Handle today's running timers (mark goal if overdue, schedule remaining)
    * 3. Schedule the next daily reset
    */
   async init(now: Date = new Date()): Promise<void> {
@@ -64,6 +64,7 @@ export class TimerScheduler {
         date: timerDailyProgress.date,
         elapsedSeconds: timerDailyProgress.elapsedSeconds,
         startedAt: timerDailyProgress.startedAt,
+        goalReachedAt: timerDailyProgress.goalReachedAt,
         totalMinutes: timerBuckets.totalMinutes,
       })
       .from(timerDailyProgress)
@@ -87,14 +88,18 @@ export class TimerScheduler {
         const totalSeconds = row.totalMinutes * 60;
         const totalElapsed = row.elapsedSeconds + elapsed;
 
-        if (totalElapsed >= totalSeconds) {
-          await stopTimer(row.bucketId, this.database, now);
-          this.onTimerCompleted(row.bucketId);
-        } else {
+        if (totalElapsed >= totalSeconds && !row.goalReachedAt) {
+          // Timer is past its goal but goal wasn't marked yet —
+          // mark it now. Timer keeps running.
+          await markGoalReached(row.bucketId, this.database, now);
+          this.onGoalReached(row.bucketId);
+        } else if (totalElapsed < totalSeconds) {
+          // Timer hasn't reached goal yet — schedule notification
           const remainingSeconds = totalSeconds - totalElapsed;
-          const completesAtMs = now.getTime() + remainingSeconds * 1000;
-          this.scheduleCompletion(row.bucketId, completesAtMs, now);
+          const goalAtMs = now.getTime() + remainingSeconds * 1000;
+          this.scheduleGoalReached(row.bucketId, goalAtMs, now);
         }
+        // If goal was already reached (row.goalReachedAt set), nothing to do
       }
     }
 
@@ -102,43 +107,45 @@ export class TimerScheduler {
   }
 
   /**
-   * Schedule a completion timeout for a bucket. Fires `onTimerCompleted`
-   * when the timer's total duration is reached.
+   * Schedule a goal-reached timeout for a bucket. Fires `onGoalReached`
+   * when the timer's total duration is reached. The timer keeps running
+   * after the goal is marked.
    *
    * Cancels any existing job for the same bucket first.
    */
-  scheduleCompletion(
+  scheduleGoalReached(
     bucketId: string,
-    completesAtMs: number,
+    goalAtMs: number,
     now: Date = new Date(),
   ): void {
     if (this.destroyed) return;
-    this.cancelCompletion(bucketId);
+    this.cancelGoalJob(bucketId);
 
-    const delay = Math.max(0, completesAtMs - now.getTime());
+    const delay = Math.max(0, goalAtMs - now.getTime());
 
     const timeout = setTimeout(async () => {
-      this.completionJobs.delete(bucketId);
+      this.goalJobs.delete(bucketId);
       if (this.destroyed) return;
       try {
-        await stopTimer(bucketId, this.database);
+        // Mark goal reached but keep timer running
+        await markGoalReached(bucketId, this.database);
         if (this.destroyed) return;
-        this.onTimerCompleted(bucketId);
+        this.onGoalReached(bucketId);
       } catch (err) {
         // Log but don't crash — unhandled rejections in setTimeout are fatal
-        console.error(`Timer completion failed for bucket ${bucketId}:`, err);
+        console.error(`Goal reached marking failed for bucket ${bucketId}:`, err);
       }
     }, delay);
 
-    this.completionJobs.set(bucketId, timeout);
+    this.goalJobs.set(bucketId, timeout);
   }
 
-  /** Cancel a scheduled completion job for a bucket, if one exists. */
-  cancelCompletion(bucketId: string): void {
-    const existing = this.completionJobs.get(bucketId);
+  /** Cancel a scheduled goal-reached job for a bucket, if one exists. */
+  cancelGoalJob(bucketId: string): void {
+    const existing = this.goalJobs.get(bucketId);
     if (existing) {
       clearTimeout(existing);
-      this.completionJobs.delete(bucketId);
+      this.goalJobs.delete(bucketId);
     }
   }
 
@@ -185,10 +192,10 @@ export class TimerScheduler {
   destroy(): void {
     this.destroyed = true;
 
-    for (const timeout of this.completionJobs.values()) {
+    for (const timeout of this.goalJobs.values()) {
       clearTimeout(timeout);
     }
-    this.completionJobs.clear();
+    this.goalJobs.clear();
 
     if (this.resetJob) {
       clearTimeout(this.resetJob);

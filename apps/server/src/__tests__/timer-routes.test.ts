@@ -199,7 +199,7 @@ describe('SSE infrastructure', () => {
     it('exports all expected event names', () => {
       expect(SSE_EVENTS.TIMER_STARTED).toBe('timer-started');
       expect(SSE_EVENTS.TIMER_STOPPED).toBe('timer-stopped');
-      expect(SSE_EVENTS.TIMER_COMPLETED).toBe('timer-completed');
+      expect(SSE_EVENTS.TIMER_GOAL_REACHED).toBe('timer-goal-reached');
       expect(SSE_EVENTS.TIMER_RESET).toBe('timer-reset');
       expect(SSE_EVENTS.TIMER_UPDATED).toBe('timer-updated');
       expect(SSE_EVENTS.DAILY_RESET).toBe('daily-reset');
@@ -384,7 +384,7 @@ describe('Bucket CRUD routes', () => {
       expect(response.json()).toEqual({ error: 'Bucket not found' });
     });
 
-    it('cancels scheduled completion job on delete', async () => {
+    it('cancels scheduled goal job on delete', async () => {
       const mockScheduler = createMockScheduler();
       // Scheduler tests need their own server instance with the mock injected
       const schedulerServer = buildTimerTestServer(testDb, mockScheduler);
@@ -395,12 +395,12 @@ describe('Bucket CRUD routes', () => {
         url: `/timers/buckets/${bucket.id}`,
       });
 
-      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+      expect(mockScheduler.cancelGoalJob).toHaveBeenCalledWith(bucket.id);
 
       await schedulerServer.close();
     });
 
-    it('does not call scheduler.cancelCompletion on 404', async () => {
+    it('does not call scheduler.cancelGoalJob on 404', async () => {
       const mockScheduler = createMockScheduler();
       const schedulerServer = buildTimerTestServer(testDb, mockScheduler);
 
@@ -409,7 +409,7 @@ describe('Bucket CRUD routes', () => {
         url: '/timers/buckets/nonexistent',
       });
 
-      expect(mockScheduler.cancelCompletion).not.toHaveBeenCalled();
+      expect(mockScheduler.cancelGoalJob).not.toHaveBeenCalled();
 
       await schedulerServer.close();
     });
@@ -422,12 +422,12 @@ describe('Bucket CRUD routes', () => {
 
 /** Helper: create a mock scheduler with both methods as vi.fn(). */
 function createMockScheduler(): TimerSchedulerLike & {
-  scheduleCompletion: ReturnType<typeof vi.fn>;
-  cancelCompletion: ReturnType<typeof vi.fn>;
+  scheduleGoalReached: ReturnType<typeof vi.fn>;
+  cancelGoalJob: ReturnType<typeof vi.fn>;
 } {
   return {
-    scheduleCompletion: vi.fn(),
-    cancelCompletion: vi.fn(),
+    scheduleGoalReached: vi.fn(),
+    cancelGoalJob: vi.fn(),
   };
 }
 
@@ -439,7 +439,7 @@ async function insertProgress(
     date?: string;
     elapsedSeconds?: number;
     startedAt?: string | null;
-    completedAt?: string | null;
+    goalReachedAt?: string | null;
   } = {},
 ) {
   await db.insert(timerDailyProgress).values({
@@ -448,7 +448,7 @@ async function insertProgress(
     date: overrides.date ?? getResetDate(),
     elapsedSeconds: overrides.elapsedSeconds ?? 0,
     startedAt: overrides.startedAt ?? null,
-    completedAt: overrides.completedAt ?? null,
+    goalReachedAt: overrides.goalReachedAt ?? null,
   });
 }
 
@@ -548,7 +548,7 @@ describe('Timer control routes', () => {
       expect(body.stoppedBucketId).toBe(bucketA.id);
     });
 
-    it('calls scheduler.scheduleCompletion', async () => {
+    it('calls scheduler.scheduleGoalReached', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
 
       await server.inject({
@@ -556,19 +556,19 @@ describe('Timer control routes', () => {
         url: `/timers/buckets/${bucket.id}/start`,
       });
 
-      expect(mockScheduler.scheduleCompletion).toHaveBeenCalledWith(
+      expect(mockScheduler.scheduleGoalReached).toHaveBeenCalledWith(
         bucket.id,
         expect.any(Number),
       );
 
-      // Completion should be ~60 minutes from now
-      const completesAtMs = mockScheduler.scheduleCompletion.mock.calls[0]![1] as number;
+      // Goal should be ~60 minutes from now
+      const goalAtMs = mockScheduler.scheduleGoalReached.mock.calls[0]![1] as number;
       const expectedMs = Date.now() + 60 * 60 * 1000;
-      expect(completesAtMs).toBeGreaterThan(expectedMs - 5000);
-      expect(completesAtMs).toBeLessThan(expectedMs + 5000);
+      expect(goalAtMs).toBeGreaterThan(expectedMs - 5000);
+      expect(goalAtMs).toBeLessThan(expectedMs + 5000);
     });
 
-    it('cancels completion for previously running timer', async () => {
+    it('cancels goal job for previously running timer', async () => {
       const bucketA = await seedBucket(testDb, { name: 'A' });
       const bucketB = await seedBucket(testDb, { name: 'B' });
 
@@ -577,17 +577,17 @@ describe('Timer control routes', () => {
         url: `/timers/buckets/${bucketA.id}/start`,
       });
 
-      mockScheduler.cancelCompletion.mockClear();
+      mockScheduler.cancelGoalJob.mockClear();
 
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucketB.id}/start`,
       });
 
-      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucketA.id);
+      expect(mockScheduler.cancelGoalJob).toHaveBeenCalledWith(bucketA.id);
     });
 
-    it('schedules correct completion time when bucket has prior elapsed', async () => {
+    it('schedules correct goal time when bucket has prior elapsed', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
       // Pre-insert 300 seconds of prior progress
       await insertProgress(testDb, bucket.id, { elapsedSeconds: 300 });
@@ -597,11 +597,11 @@ describe('Timer control routes', () => {
         url: `/timers/buckets/${bucket.id}/start`,
       });
 
-      const completesAtMs = mockScheduler.scheduleCompletion.mock.calls[0]![1] as number;
+      const goalAtMs = mockScheduler.scheduleGoalReached.mock.calls[0]![1] as number;
       // Remaining: 3600 - 300 = 3300 seconds
       const expectedMs = Date.now() + 3300 * 1000;
-      expect(completesAtMs).toBeGreaterThan(expectedMs - 5000);
-      expect(completesAtMs).toBeLessThan(expectedMs + 5000);
+      expect(goalAtMs).toBeGreaterThan(expectedMs - 5000);
+      expect(goalAtMs).toBeLessThan(expectedMs + 5000);
     });
   });
 
@@ -625,7 +625,7 @@ describe('Timer control routes', () => {
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.elapsedSeconds).toBeGreaterThanOrEqual(0);
-      expect(body.completedAt).toBeNull();
+      expect(body.goalReachedAt).toBeNull();
     });
 
     it('returns defaults when timer is not running', async () => {
@@ -637,10 +637,10 @@ describe('Timer control routes', () => {
       });
 
       expect(res.statusCode).toBe(200);
-      expect(res.json()).toEqual({ elapsedSeconds: 0, completedAt: null });
+      expect(res.json()).toEqual({ elapsedSeconds: 0, goalReachedAt: null });
     });
 
-    it('detects completion when elapsed exceeds total', async () => {
+    it('does NOT broadcast goal-reached when stopping an over-budget timer', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 1 });
       // Pre-insert a progress row with 59s elapsed and startedAt 2s ago
       const twoSecondsAgo = new Date(Date.now() - 2000).toISOString();
@@ -655,39 +655,39 @@ describe('Timer control routes', () => {
       });
 
       const body = res.json();
-      // 59 + ~2 = ~61, which exceeds 60 seconds
+      // 59 + ~2 = ~61, which exceeds 60 seconds, but stopTimer does NOT set goalReachedAt
       expect(body.elapsedSeconds).toBeGreaterThanOrEqual(60);
-      expect(body.completedAt).not.toBeNull();
+      expect(body.goalReachedAt).toBeNull();
     });
 
-    it('cancels scheduled completion on stop', async () => {
+    it('cancels scheduled goal job on stop', async () => {
       const bucket = await seedBucket(testDb);
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/start`,
       });
 
-      mockScheduler.cancelCompletion.mockClear();
+      mockScheduler.cancelGoalJob.mockClear();
 
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/stop`,
       });
 
-      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+      expect(mockScheduler.cancelGoalJob).toHaveBeenCalledWith(bucket.id);
     });
 
-    it('does not cancel completion when timer was not running', async () => {
+    it('does not cancel goal job when timer was not running', async () => {
       const bucket = await seedBucket(testDb);
 
-      mockScheduler.cancelCompletion.mockClear();
+      mockScheduler.cancelGoalJob.mockClear();
 
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/stop`,
       });
 
-      expect(mockScheduler.cancelCompletion).not.toHaveBeenCalled();
+      expect(mockScheduler.cancelGoalJob).not.toHaveBeenCalled();
     });
   });
 
@@ -721,20 +721,20 @@ describe('Timer control routes', () => {
       );
       expect(b.elapsedSeconds).toBe(0);
       expect(b.startedAt).toBeNull();
-      expect(b.completedAt).toBeNull();
+      expect(b.goalReachedAt).toBeNull();
     });
 
-    it('cancels completion job on reset', async () => {
+    it('cancels goal job on reset', async () => {
       const bucket = await seedBucket(testDb);
 
-      mockScheduler.cancelCompletion.mockClear();
+      mockScheduler.cancelGoalJob.mockClear();
 
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/reset`,
       });
 
-      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+      expect(mockScheduler.cancelGoalJob).toHaveBeenCalledWith(bucket.id);
     });
   });
 
@@ -756,10 +756,11 @@ describe('Timer control routes', () => {
       const body = res.json();
       // elapsed = 3600 - 1800 = 1800
       expect(body.elapsedSeconds).toBe(1800);
-      expect(body.completedAt).toBeNull();
+      // goalReachedAt is always cleared when manually setting time
+      expect(body.goalReachedAt).toBeNull();
     });
 
-    it('detects completion when remaining is 0', async () => {
+    it('clears goalReachedAt when remaining is 0', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
 
       const res = await server.inject({
@@ -770,7 +771,8 @@ describe('Timer control routes', () => {
 
       const body = res.json();
       expect(body.elapsedSeconds).toBe(3600);
-      expect(body.completedAt).not.toBeNull();
+      // Manually setting time always clears goalReachedAt
+      expect(body.goalReachedAt).toBeNull();
     });
 
     it('returns 404 for nonexistent bucket', async () => {
@@ -784,7 +786,7 @@ describe('Timer control routes', () => {
       expect(res.json()).toEqual({ error: 'Bucket not found' });
     });
 
-    it('reschedules completion if timer is running', async () => {
+    it('reschedules goal if timer is running', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
       // Start the timer first so it's running
       await server.inject({
@@ -792,7 +794,7 @@ describe('Timer control routes', () => {
         url: `/timers/buckets/${bucket.id}/start`,
       });
 
-      mockScheduler.scheduleCompletion.mockClear();
+      mockScheduler.scheduleGoalReached.mockClear();
 
       await server.inject({
         method: 'POST',
@@ -800,19 +802,19 @@ describe('Timer control routes', () => {
         payload: { remainingSeconds: 900 },
       });
 
-      // Should reschedule completion for the still-running timer
-      expect(mockScheduler.scheduleCompletion).toHaveBeenCalledWith(
+      // Should reschedule goal for the still-running timer
+      expect(mockScheduler.scheduleGoalReached).toHaveBeenCalledWith(
         bucket.id,
         expect.any(Number),
       );
     });
 
-    it('cancels completion if timer is not running after set-time', async () => {
+    it('cancels goal job if timer is not running after set-time', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
       // Don't start the timer — just set time on a non-running bucket
       await insertProgress(testDb, bucket.id, { elapsedSeconds: 100 });
 
-      mockScheduler.cancelCompletion.mockClear();
+      mockScheduler.cancelGoalJob.mockClear();
 
       await server.inject({
         method: 'POST',
@@ -820,7 +822,7 @@ describe('Timer control routes', () => {
         payload: { remainingSeconds: 500 },
       });
 
-      expect(mockScheduler.cancelCompletion).toHaveBeenCalledWith(bucket.id);
+      expect(mockScheduler.cancelGoalJob).toHaveBeenCalledWith(bucket.id);
     });
   });
 });

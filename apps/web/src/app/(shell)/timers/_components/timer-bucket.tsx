@@ -19,11 +19,8 @@ const LONG_PRESS_MS = 800;
 /** Maximum movement (px) before a long-press is cancelled. */
 const LONG_PRESS_MOVE_THRESHOLD = 10;
 
-/** Duration (ms) for the success checkmark overlay. */
+/** Duration (ms) for the success checkmark overlay when goal is reached. */
 const SUCCESS_OVERLAY_MS = 1200;
-
-/** Duration (ms) for the exit shrink/fade animation. */
-const EXIT_ANIMATION_MS = 400;
 
 // ---------------------------------------------------------------------------
 // Props
@@ -32,15 +29,14 @@ const EXIT_ANIMATION_MS = 400;
 export interface TimerBucketProps {
   bucket: TimeBucket;
   isActive: boolean;
-  isCompleted: boolean;
+  isGoalReached: boolean;
+  /** Display mode: 'remaining' counts down, 'elapsed' counts up. */
+  mode?: 'remaining' | 'elapsed';
   style: CSSProperties;
   onToggle: () => void;
   onOpenSettings: () => void;
   onResetForToday: () => void;
   onSetRemainingTime: (remainingSeconds: number) => void;
-  /** Called after the completion exit animation finishes so the grid can
-   *  remove this bucket from the treemap layout and let others reflow. */
-  onAnimationComplete: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,13 +46,13 @@ export interface TimerBucketProps {
 export function TimerBucket({
   bucket,
   isActive,
-  isCompleted,
+  isGoalReached,
+  mode = 'remaining',
   style,
   onToggle,
   onOpenSettings,
   onResetForToday,
   onSetRemainingTime,
-  onAnimationComplete,
 }: TimerBucketProps) {
   const totalSeconds = bucket.totalMinutes * 60;
   const remainingSeconds = totalSeconds - bucket.elapsedSeconds;
@@ -67,15 +63,12 @@ export function TimerBucket({
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
-  // -- Completion animation state --
-  // Single enum prevents impossible state combos (e.g. showSuccess + isExiting both true).
-  const [animPhase, setAnimPhase] = useState<'idle' | 'success' | 'exiting'>('idle');
-  const prevCompletedRef = useRef(isCompleted);
-  const animationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
-  // Ref for onAnimationComplete so the effect doesn't re-run when the
-  // parent passes a new inline arrow each tick.
-  const onAnimationCompleteRef = useRef(onAnimationComplete);
-  onAnimationCompleteRef.current = onAnimationComplete;
+  // -- Goal-reached animation state --
+  // Shows a brief success overlay when the goal is first reached.
+  // No exit/shrink animation — the bucket stays visible.
+  const [showSuccess, setShowSuccess] = useState(false);
+  const prevGoalReachedRef = useRef(isGoalReached);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStartRef = useRef({ x: 0, y: 0 });
@@ -90,31 +83,26 @@ export function TimerBucket({
     };
   }, []);
 
-  // Completion animation: detect false→true transition on isCompleted
+  // Goal-reached animation: detect false→true transition on isGoalReached
   useEffect(() => {
-    if (isCompleted && !prevCompletedRef.current) {
-      // Clear any in-flight animation timers before scheduling new ones
-      for (const t of animationTimersRef.current) clearTimeout(t);
+    if (isGoalReached && !prevGoalReachedRef.current) {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
 
-      setAnimPhase('success');
+      setShowSuccess(true);
       playCompletionChime();
 
-      const exitTimer = setTimeout(() => {
-        setAnimPhase('exiting');
+      // After overlay duration, return to normal display (bucket stays visible)
+      successTimerRef.current = setTimeout(() => {
+        setShowSuccess(false);
+        successTimerRef.current = null;
       }, SUCCESS_OVERLAY_MS);
-
-      const completeTimer = setTimeout(() => {
-        onAnimationCompleteRef.current();
-      }, SUCCESS_OVERLAY_MS + EXIT_ANIMATION_MS);
-
-      animationTimersRef.current = [exitTimer, completeTimer];
     }
-    prevCompletedRef.current = isCompleted;
+    prevGoalReachedRef.current = isGoalReached;
 
     return () => {
-      for (const t of animationTimersRef.current) clearTimeout(t);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
     };
-  }, [isCompleted]);
+  }, [isGoalReached]);
 
   const clearLongPress = () => {
     if (longPressTimerRef.current) {
@@ -211,6 +199,22 @@ export function TimerBucket({
   // two-step interaction (menu dismiss → confirmation dialog).
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
+  // Display time based on mode
+  const displayTime =
+    mode === 'elapsed'
+      ? formatTime(bucket.elapsedSeconds)
+      : formatTime(remainingSeconds);
+
+  // Progress bar: in remaining mode, vibrant fills from right and shrinks left.
+  // In elapsed mode, vibrant fills from left. Clamped to [0, 1].
+  const barScale =
+    mode === 'elapsed'
+      ? Math.min(1, progress)
+      : Math.max(0, 1 - progress);
+
+  // Show persistent check icon when goal has been reached (not just during animation)
+  const showGoalCheck = bucket.goalReachedAt != null && !showSuccess;
+
   return (
     <>
       <div
@@ -231,10 +235,10 @@ export function TimerBucket({
           'touch-none relative select-none cursor-pointer rounded-lg overflow-hidden',
           'transition-[opacity,transform] duration-400',
           isActive && 'ring-2 ring-white/40',
-          isCompleted && animPhase === 'idle' && 'opacity-60',
-          animPhase === 'exiting' && 'scale-0 opacity-0',
         )}
-        style={style}
+        // Prevent iOS long-press from selecting bucket text instead of
+        // respecting the bucket tap / context-menu gestures.
+        style={{ ...style, WebkitTouchCallout: 'none' }}
       >
         <div
           className="absolute inset-0"
@@ -244,7 +248,7 @@ export function TimerBucket({
           className="absolute inset-0 origin-left transition-transform duration-300 ease-linear"
           style={{
             backgroundColor: color.vibrant,
-            transform: `scaleX(${1 - progress})`,
+            transform: `scaleX(${barScale})`,
           }}
         />
         {isActive && (
@@ -253,7 +257,7 @@ export function TimerBucket({
             <div className="absolute inset-0 animate-pulse rounded-lg border-2 border-white/30" />
           </>
         )}
-        {animPhase === 'success' && (
+        {showSuccess && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 animate-in fade-in zoom-in duration-300">
             <Check className="size-16 text-white drop-shadow-lg animate-bounce md:size-24" strokeWidth={3} />
           </div>
@@ -262,12 +266,17 @@ export function TimerBucket({
           <span className="text-lg font-bold text-white md:text-xl">
             {bucket.name}
           </span>
-          <span
-            className="text-2xl font-bold text-white md:text-4xl"
-            style={{ fontFeatureSettings: '"tnum"' }}
-          >
-            {formatTime(remainingSeconds)}
-          </span>
+          <div className="flex items-center gap-1.5">
+            {showGoalCheck && (
+              <Check className="size-5 text-white/80 md:size-6" strokeWidth={3} />
+            )}
+            <span
+              className="text-2xl font-bold text-white md:text-4xl"
+              style={{ fontFeatureSettings: '"tnum"' }}
+            >
+              {displayTime}
+            </span>
+          </div>
         </div>
       </div>
 
