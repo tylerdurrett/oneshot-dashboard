@@ -22,6 +22,13 @@ const LONG_PRESS_MOVE_THRESHOLD = 10;
 /** Duration (ms) for the success checkmark overlay when goal is reached. */
 const SUCCESS_OVERLAY_MS = 1200;
 
+/** Keep the active highlight inset so a running bucket feels brighter
+ *  without visually spilling into neighboring treemap cells. */
+const ACTIVE_BUCKET_GLOW =
+  'inset 0 0 0 1px rgba(255, 255, 255, 0.42), inset 0 0 0 3px rgba(255, 255, 255, 0.08), inset 0 0 28px rgba(255, 255, 255, 0.2), inset 0 -12px 24px rgba(255, 255, 255, 0.12)';
+const ACTIVE_BUCKET_GLOW_BACKGROUND =
+  'radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.12) 38%, rgba(255, 255, 255, 0.04) 62%, transparent 78%)';
+
 export type TimerBucketSizeTier = 'large' | 'small' | 'tiny';
 
 interface TimerBucketSizeClasses {
@@ -297,7 +304,6 @@ export function TimerBucket({
         className={cn(
           'touch-none relative select-none cursor-pointer rounded-lg overflow-hidden',
           'transition-[opacity,transform] duration-400',
-          isActive && 'ring-2 ring-white/40',
         )}
         // Prevent iOS long-press from selecting bucket text instead of
         // respecting the bucket tap / context-menu gestures.
@@ -315,10 +321,13 @@ export function TimerBucket({
           }}
         />
         {isActive && (
-          <>
-            <div className="absolute inset-0 animate-pulse bg-white opacity-20" />
-            <div className="absolute inset-0 animate-pulse rounded-lg border-2 border-white/30" />
-          </>
+          <div
+            className="pointer-events-none absolute inset-0 animate-pulse rounded-lg"
+            style={{
+              boxShadow: ACTIVE_BUCKET_GLOW,
+              background: ACTIVE_BUCKET_GLOW_BACKGROUND,
+            }}
+          />
         )}
         {showSuccess && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 animate-in fade-in zoom-in duration-300">

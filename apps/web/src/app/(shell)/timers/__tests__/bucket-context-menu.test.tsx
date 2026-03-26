@@ -385,6 +385,29 @@ describe('TimerBucket context menu integration', () => {
     expect(screen.getByRole('button').classList.contains('select-none')).toBe(true);
   });
 
+  it('uses an inset glow for the active state instead of an outer ring', () => {
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive
+        isGoalReached={false}
+        style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
+        onToggle={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+      />,
+    );
+
+    const bucketButton = screen.getByRole('button');
+    const activeGlow = bucketButton.querySelector('.pointer-events-none') as HTMLElement | null;
+
+    expect(bucketButton.className).not.toContain('ring-2');
+    expect(activeGlow).not.toBeNull();
+    expect(activeGlow?.style.boxShadow).toContain('inset');
+    expect(activeGlow?.style.background).toContain('radial-gradient');
+  });
+
   it('uses compact typography for tiny buckets', () => {
     render(
       <TimerBucket

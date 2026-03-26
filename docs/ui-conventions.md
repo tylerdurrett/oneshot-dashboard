@@ -63,6 +63,8 @@ Only use container queries when the component genuinely lives in contexts of var
 
 The app is dark-theme-first. All UI should be built and tested in dark mode. Use Tailwind's `dark:` variant if light mode is ever needed, but don't build for it until it's requested.
 
+For dense layouts like boards, grids, or treemaps, prefer inset active states (like inner glow or inset shadow) over outer borders/rings so the selected item stands out without crowding its neighbors.
+
 ## Process: When Building UI Features
 
 1. Check if relevant components already exist in `@repo/ui`
