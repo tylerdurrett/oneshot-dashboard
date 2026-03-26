@@ -1,23 +1,47 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { routes } from '../router';
 
-// Stub the ChatSocketProvider's context — real chat pages consume it.
-vi.mock('../app/(shell)/chat/chat-socket-context', () => ({
-  useChatSocketContext: () => ({
-    sendMessage: vi.fn(),
-    messages: [],
-    setMessages: vi.fn(),
-    isStreaming: false,
-    error: null,
-    clearError: vi.fn(),
-    connectionStatus: 'connected',
-  }),
-  ChatSocketProvider: ({ children }: { children: React.ReactNode }) => children,
+const providerLifecycle = vi.hoisted(() => ({
+  mounts: 0,
+  unmounts: 0,
 }));
+
+// Stub the ChatSocketProvider's context — real chat pages consume it.
+vi.mock('../app/(shell)/chat/chat-socket-context', async () => {
+  const React = await import('react');
+
+  return {
+    useChatSocketContext: () => ({
+      sendMessage: vi.fn(),
+      messages: [],
+      setMessages: vi.fn(),
+      isStreaming: false,
+      error: null,
+      setError: vi.fn(),
+      clearError: vi.fn(),
+      connectionStatus: 'connected',
+    }),
+    ChatSocketProvider: ({ children }: { children: React.ReactNode }) => {
+      React.useEffect(() => {
+        providerLifecycle.mounts += 1;
+        return () => {
+          providerLifecycle.unmounts += 1;
+        };
+      }, []);
+
+      return (
+        <>
+          <div data-testid="chat-socket-provider-marker" />
+          {children}
+        </>
+      );
+    },
+  };
+});
 
 // Stub browser APIs missing in jsdom — real page components use SSE and ResizeObserver.
 beforeAll(() => {
@@ -61,6 +85,11 @@ function renderRoute(initialPath: string) {
 
 afterEach(cleanup);
 
+beforeEach(() => {
+  providerLifecycle.mounts = 0;
+  providerLifecycle.unmounts = 0;
+});
+
 describe('router', () => {
   it('has a root redirect from / to /timers/remaining', async () => {
     // Exercise the loader directly to verify the redirect target.
@@ -97,6 +126,14 @@ describe('router', () => {
     renderRoute('/chat/test-thread');
     // Real ThreadPage renders with prompt input
     expect(screen.getByPlaceholderText('Type a message...')).toBeDefined();
+  });
+
+  it('provides the chat socket at the shell level so timers and chat share it', () => {
+    renderRoute('/timers/remaining');
+
+    expect(screen.getByTestId('chat-socket-provider-marker')).toBeDefined();
+    expect(providerLifecycle.mounts).toBe(1);
+    expect(providerLifecycle.unmounts).toBe(0);
   });
 
   it('renders /prototype page', () => {
