@@ -24,7 +24,7 @@ interface NavItem {
 // ---------------------------------------------------------------------------
 
 const NAV_ITEMS: NavItem[] = [
-  { href: '/timers', label: 'Timers', icon: Clock, matchType: 'exact', hasContextMenu: true },
+  { href: '/timers', label: 'Timers', icon: Clock, matchType: 'prefix', hasContextMenu: true },
   { href: '/chat', label: 'Chat', icon: MessageSquare, matchType: 'prefix' },
 ];
 

@@ -2,7 +2,9 @@ import { createBrowserRouter, Outlet, redirect } from 'react-router';
 
 import { AppShell } from '@/components/app-shell';
 import { RouteErrorBoundary } from '@/components/error-boundary';
+import TimersLayout from '@/app/(shell)/timers/layout';
 import TimersPage from '@/app/(shell)/timers/page';
+import TimersAllPage from '@/app/(shell)/timers/all-page';
 import ChatIndexPage from '@/app/(shell)/chat/page';
 import ThreadPage from '@/app/(shell)/chat/[threadId]/page';
 import ChatLayout from '@/app/(shell)/chat/layout';
@@ -37,12 +39,19 @@ function PrototypeLayout() {
 export const routes = [
   {
     path: '/',
-    loader: () => redirect('/timers'),
+    loader: () => redirect('/timers/remaining'),
   },
   {
     element: <ShellLayout />,
     children: [
-      { path: 'timers', element: <TimersPage /> },
+      {
+        element: <TimersLayout />,
+        children: [
+          { path: 'timers', loader: () => redirect('/timers/remaining') },
+          { path: 'timers/remaining', element: <TimersPage /> },
+          { path: 'timers/all', element: <TimersAllPage /> },
+        ],
+      },
       {
         element: <ChatLayout />,
         errorElement: <RouteErrorBoundary />,
