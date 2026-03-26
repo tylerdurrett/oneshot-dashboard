@@ -533,14 +533,16 @@ describe('useTimerState', () => {
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
-    // Initial: elapsed should be ~0
+    // Initial: elapsed should be ~0 in both views
     expect(result.current.allBuckets[0]!.elapsedSeconds).toBe(0);
+    expect(result.current.todaysBuckets[0]!.elapsedSeconds).toBe(0);
 
     // Advance 3 seconds — each tick forces re-render
     act(() => vi.advanceTimersByTime(3000));
 
-    // Should now show ~3 seconds elapsed (recalculated from startedAt)
+    // Both All and Remaining should now show ~3 seconds elapsed from startedAt.
     expect(result.current.allBuckets[0]!.elapsedSeconds).toBe(3);
+    expect(result.current.todaysBuckets[0]!.elapsedSeconds).toBe(3);
   });
 
   it('tick interval stops when no bucket is active', async () => {

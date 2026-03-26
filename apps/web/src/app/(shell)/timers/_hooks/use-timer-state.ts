@@ -143,20 +143,18 @@ export function useTimerState(): UseTimerStateReturn {
     });
   }, [baseBuckets, activeBucketId, serverBuckets, tick]);
 
-  // Filter criteria (daysOfWeek, goalReachedAt, startedAt) only change on
-  // server events, not per-tick — so no tick dependency here.
+  // Remaining renders todaysBuckets, so it must derive from the same
+  // live-updating bucket list as the All view. Filtering against the frozen
+  // server snapshot makes the active timer appear stuck until a refetch lands.
   const todaysBuckets = useMemo(() => {
-    const now = new Date();
-    return serverBuckets
-      .filter((sb) => {
-        if (!isBucketActiveToday(sb)) return false;
-        // Hide buckets that hit their goal and are stopped. Running timers
-        // past goal stay visible (showing negative remaining + check icon).
-        if (sb.goalReachedAt && !sb.startedAt) return false;
-        return true;
-      })
-      .map((sb) => serverBucketToTimeBucket(sb, now));
-  }, [serverBuckets]);
+    return allBuckets.filter((bucket) => {
+      if (!isBucketActiveToday(bucket)) return false;
+      // Hide buckets that hit their goal and are stopped. Running timers
+      // past goal stay visible (showing negative remaining + check icon).
+      if (bucket.goalReachedAt && !bucket.startedAt) return false;
+      return true;
+    });
+  }, [allBuckets]);
 
   // Goal-reached detection — when server data shows a bucket has goalReachedAt
   // set and it wasn't already in goalReachedBuckets, add it for chime/animation.
