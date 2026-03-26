@@ -161,6 +161,15 @@ function NavLinkWithContextMenu({
     }
   }, []);
 
+  // Prevent navigation when long-press was detected — the user intended to
+  // open the context menu, not follow the link.
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (isLongPressRef.current) {
+      e.preventDefault();
+      isLongPressRef.current = false;
+    }
+  }, []);
+
   // Click-outside and Escape dismissal for the context menu
   useEffect(() => {
     if (!menuOpen) return;
@@ -202,6 +211,7 @@ function NavLinkWithContextMenu({
       <Link
         to={item.href}
         data-active={isActive || undefined}
+        onClick={handleClick}
         onContextMenu={handleContextMenu}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -214,6 +224,8 @@ function NavLinkWithContextMenu({
             ? 'text-sidebar-foreground'
             : 'text-sidebar-foreground/50 hover:text-sidebar-foreground',
         )}
+        // Suppress iOS native link preview so our long-press context menu works
+        style={{ WebkitTouchCallout: 'none' }}
       >
         <div
           className={cn(
