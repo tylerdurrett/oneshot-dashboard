@@ -13,6 +13,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureHostTokenFresh } from './lib/host-token.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -123,6 +124,18 @@ function tryKeychainInjection() {
     creds = JSON.parse(raw);
   } catch {
     return false;
+  }
+
+  // Refresh host token if near expiry before injecting into sandbox.
+  // Only re-read credentials if a refresh was actually triggered.
+  const refreshed = ensureHostTokenFresh(creds);
+  if (refreshed) {
+    try {
+      raw = run('security find-generic-password -s "Claude Code-credentials" -w', { timeout: 10_000 });
+      creds = JSON.parse(raw);
+    } catch (err) {
+      console.log(`  [setup] Re-read after refresh failed, using original credentials: ${err.message}`);
+    }
   }
 
   // Strip refresh token — it never leaves the host

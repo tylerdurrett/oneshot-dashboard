@@ -115,6 +115,7 @@ export async function readKeychainCredentials(
       clearTimeout(timeout);
 
       if (code !== 0) {
+        console.warn(`[credentials] keychain read failed (exit ${code})`);
         resolveOnce({
           ok: false,
           phase: 'keychain',
@@ -127,6 +128,7 @@ export async function readKeychainCredentials(
       try {
         parsed = JSON.parse(stdout.trim());
       } catch {
+        console.warn('[credentials] keychain returned invalid JSON');
         resolveOnce({
           ok: false,
           phase: 'parse',
@@ -135,6 +137,7 @@ export async function readKeychainCredentials(
         return;
       }
 
+      console.log('[credentials] keychain read: success');
       resolveOnce({ ok: true, credentials: parsed });
     });
 
@@ -213,6 +216,7 @@ export async function injectCredentials(
       clearTimeout(timeout);
 
       if (code !== 0) {
+        console.warn(`[credentials] injection failed (exit ${code})`);
         resolveOnce({
           ok: false,
           phase: 'docker-exec',
@@ -221,6 +225,7 @@ export async function injectCredentials(
         return;
       }
 
+      console.log('[credentials] injection: success');
       resolveOnce({ ok: true, credentials: null });
     });
 
@@ -270,12 +275,15 @@ async function doEnsureHostTokenFresh(
   }
 
   const expiresAt = getHostTokenExpiresAt(keychainResult.credentials);
-  const now = Date.now();
+  const remainingMs = expiresAt !== null ? expiresAt - Date.now() : null;
+  console.log(`[credentials] host token check: remainingMs=${remainingMs}, threshold=${config.hostRefreshThresholdMs}`);
 
-  if (expiresAt === null || expiresAt - now > config.hostRefreshThresholdMs) {
+  if (remainingMs === null || remainingMs > config.hostRefreshThresholdMs) {
+    console.log('[credentials] host token is fresh, no refresh needed');
     return { fresh: true, expiresAt, credentials: keychainResult.credentials };
   }
 
+  console.log('[credentials] host token near expiry, triggering refresh via claude -p "."');
   return new Promise<HostTokenStatus>((resolve) => {
     let child: ReturnType<SpawnFn>;
     try {
@@ -312,8 +320,10 @@ async function doEnsureHostTokenFresh(
     child.on('close', (code) => {
       clearTimeout(timeout);
       if (code === 0 || code === null) {
+        console.log('[credentials] host token refresh succeeded');
         resolveOnce({ fresh: false, refreshed: true, message: 'Host token refreshed' });
       } else {
+        console.warn(`[credentials] host token refresh failed (code=${code})`);
         resolveOnce({
           fresh: false,
           refreshed: false,
@@ -341,14 +351,17 @@ async function doEnsureHostTokenFresh(
 export async function refreshAndInjectCredentials(
   spawnFn: SpawnFn = defaultSpawn,
 ): Promise<CredentialInjectionResult> {
+  console.log('[credentials] pipeline: starting refresh-and-inject');
   const hostStatus = await ensureHostTokenFresh(spawnFn);
 
   // Reuse credentials from the freshness check when no refresh was needed,
   // otherwise re-read since the host CLI may have rotated the token.
   let credentials: unknown;
   if (hostStatus.fresh) {
+    console.log('[credentials] pipeline: using cached credentials from freshness check');
     credentials = hostStatus.credentials;
   } else {
+    console.log('[credentials] pipeline: re-reading credentials after host refresh');
     const keychainResult = await readKeychainCredentials(spawnFn);
     if (!keychainResult.ok) return keychainResult;
     credentials = keychainResult.credentials;

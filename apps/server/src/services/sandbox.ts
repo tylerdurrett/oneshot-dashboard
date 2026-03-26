@@ -81,6 +81,12 @@ const AUTH_FAILURE_PATTERNS = [
   'authentication required',
   'oauth token has expired',
   'token has expired',
+  // 401 responses from the Anthropic API surface these strings in the CLI's
+  // NDJSON output and/or stderr. Without them, a stale-token 401 is classified
+  // as an unknown error and auth recovery never triggers.
+  'failed to authenticate',
+  'authentication_error',
+  'invalid authentication credentials',
 ];
 
 const RESUME_FAILURE_PATTERNS = [
@@ -165,6 +171,7 @@ export async function probeSandbox(
 
     function resolveOnce(result: SandboxProbeResult) {
       if (resolved) return;
+      console.log(`[sandbox] probe: status=${result.status}`);
       resolved = true;
       resolve(result);
     }
@@ -257,6 +264,7 @@ export async function preflightCheck(
   // Only auth_failed warrants recovery — unavailable means infrastructure is missing,
   // not fixable by credential injection.
   if (isCircuitOpen()) {
+    console.warn('[sandbox] preflight: circuit breaker open, blocking recovery');
     return {
       ok: false,
       status: 'auth_failed',
@@ -265,10 +273,12 @@ export async function preflightCheck(
     };
   }
 
+  console.log('[sandbox] preflight: auth_failed, attempting credential injection recovery');
   const injection = await refreshAndInjectCredentials(spawnFn);
   recordHealAttempt();
 
   if (!injection.ok) {
+    console.warn(`[sandbox] preflight: injection failed (phase=${injection.phase})`);
     return {
       ok: false,
       status: 'auth_failed',
@@ -278,11 +288,14 @@ export async function preflightCheck(
   }
 
   // Re-probe after injection to confirm recovery worked
+  console.log('[sandbox] preflight: injection succeeded, re-probing');
   const reProbe = await probeSandbox(spawnFn);
   if (reProbe.status === 'healthy') {
+    console.log('[sandbox] preflight: recovery successful');
     return { ok: true, status: 'healthy', message: reProbe.message, recoveryAttempted: true };
   }
 
+  console.warn(`[sandbox] preflight: recovery failed, sandbox still ${reProbe.status}`);
   return {
     ok: false,
     status: reProbe.status,
@@ -364,7 +377,12 @@ function parseResultFromOutput(stdout: string): ClaudeResult | null {
       if (
         obj.type === 'result' &&
         typeof obj.result === 'string' &&
-        typeof obj.session_id === 'string'
+        typeof obj.session_id === 'string' &&
+        // Error results (is_error: true) must not be treated as valid output.
+        // processStreamLine() already emitted them as errors during streaming.
+        // Returning them here would short-circuit the close handler, preventing
+        // auth recovery from triggering on 401 responses.
+        obj.is_error !== true
       ) {
         return { result: obj.result as string, sessionId: obj.session_id as string };
       }
@@ -525,6 +543,7 @@ function processStreamLine(line: string, emitter: EventEmitter): void {
       // Claude returns is_error: true for API/runtime errors — surface them
       // as errors instead of persisting as assistant messages.
       if (obj.is_error === true) {
+        console.warn(`[sandbox] stream: is_error result received: ${(obj.result as string).slice(0, 200)}`);
         emitter.emit('error', new Error(obj.result as string));
       } else {
         emitter.emit('result', {
@@ -628,12 +647,14 @@ function runInvocation(
     // Non-zero exit: try to parse valid output first (per reference doc gotcha #6)
     const parsed = parseResultFromOutput(stdout);
     if (parsed) {
+      console.log('[sandbox] invocation: non-zero exit but valid (non-error) result found, closing cleanly');
       // Result event was already emitted during streaming; just close cleanly
       emitter.emit('close');
       return;
     }
 
     const isAuthFailure = matchesPatterns(stderr, stdout, AUTH_FAILURE_PATTERNS);
+    console.log(`[sandbox] invocation: non-zero exit (code=${code}), isAuthFailure=${isAuthFailure}, isRecoveryRetry=${isRecoveryRetry}`);
 
     // Resume failure: retry without --resume (check auth first per ref doc)
     if (sessionId && !isAuthFailure && isResumeFailure(stderr, stdout)) {
@@ -648,18 +669,22 @@ function runInvocation(
       const authError = classifyInvocationError(stderr, stdout, code, sessionId);
 
       if (isCircuitOpen()) {
+        console.warn('[sandbox] invocation: auth recovery blocked by circuit breaker');
         emitter.emit('error', authError);
         emitter.emit('close');
         return;
       }
 
+      console.log('[sandbox] invocation: attempting auth recovery (credential injection + retry)');
       recordHealAttempt();
       refreshAndInjectCredentials(spawnFn)
         .then((injection) => {
           if (injection.ok) {
+            console.log('[sandbox] invocation: auth recovery succeeded, retrying');
             emitter.emit('auth_recovery');
             runInvocation(emitter, prompt, sessionId, spawnFn, inactivityTimeoutMs, true);
           } else {
+            console.warn(`[sandbox] invocation: auth recovery injection failed (phase=${injection.phase})`);
             emitter.emit('error', authError);
             emitter.emit('close');
           }

@@ -105,6 +105,30 @@ describe('probeSandbox', () => {
       expect(result.status).toBe('auth_failed');
       expect(result.message).toContain('not logged in');
     });
+
+    it('returns auth_failed when stderr contains "failed to authenticate" (401)', async () => {
+      const spawnFn = createFakeSpawn({
+        stderr: 'Failed to authenticate. API Error: 401',
+        exitCode: 1,
+      });
+
+      const result = await probeSandbox(spawnFn);
+
+      expect(result.status).toBe('auth_failed');
+      expect(result.message).toContain('failed to authenticate');
+    });
+
+    it('returns auth_failed when stdout contains "authentication_error" (401 JSON)', async () => {
+      const spawnFn = createFakeSpawn({
+        stdout: '{"type":"error","error":{"type":"authentication_error","message":"Invalid authentication credentials"}}',
+        exitCode: 1,
+      });
+
+      const result = await probeSandbox(spawnFn);
+
+      expect(result.status).toBe('auth_failed');
+      expect(result.message).toContain('authentication_error');
+    });
   });
 
   describe('sandbox unavailable', () => {
@@ -627,6 +651,40 @@ describe('invokeClaude', () => {
       expect(events.errors[0]!.message).toContain('unavailable');
     });
 
+    it('emits auth failure error for "failed to authenticate" stderr (401)', async () => {
+      const spawnFn = createFakeSpawn({
+        stderr: 'Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error"}}',
+        exitCode: 1,
+      });
+
+      const emitter = invokeClaude({
+        prompt: 'test',
+        spawnFn,
+        inactivityTimeoutMs: 5000,
+      });
+      const events = await collectEvents(emitter);
+
+      expect(events.errors).toHaveLength(1);
+      expect(events.errors[0]!.message).toContain('authentication failed');
+    });
+
+    it('emits auth failure error for "authentication_error" in stderr (401 JSON)', async () => {
+      const spawnFn = createFakeSpawn({
+        stderr: '{"type":"error","error":{"type":"authentication_error","message":"Invalid authentication credentials"}}',
+        exitCode: 1,
+      });
+
+      const emitter = invokeClaude({
+        prompt: 'test',
+        spawnFn,
+        inactivityTimeoutMs: 5000,
+      });
+      const events = await collectEvents(emitter);
+
+      expect(events.errors).toHaveLength(1);
+      expect(events.errors[0]!.message).toContain('authentication failed');
+    });
+
     it('emits error on spawn failure', async () => {
       const spawnFn = createFakeSpawn({
         error: new Error('spawn docker ENOENT'),
@@ -1064,5 +1122,75 @@ describe('invokeClaude auth recovery', () => {
     expect(events.errors).toHaveLength(1);
     expect(events.errors[0]!.message).toContain('authentication failed');
     expect(claudeCallCount).toBe(2);
+  });
+
+  it('recovers from 401 is_error NDJSON result with non-zero exit', async () => {
+    // This is the critical integration test for Bug 1 + Bug 2:
+    // - Bug 1: parseResultFromOutput must skip is_error results so the close
+    //   handler falls through to auth recovery instead of short-circuiting.
+    // - Bug 2: AUTH_FAILURE_PATTERNS must match "failed to authenticate" /
+    //   "authentication_error" from the 401 NDJSON result in stdout.
+    mockPlatform('darwin');
+    let claudeCallCount = 0;
+
+    const spawnFn = ((command: string, args: string[]) => {
+      if (command === 'docker' && args.includes('-p')) {
+        claudeCallCount++;
+        if (claudeCallCount === 1) {
+          // First call: 401 error as is_error NDJSON result with non-zero exit
+          return createFakeSpawn({
+            stdout: ndjson({
+              type: 'result',
+              result: 'Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"Invalid authentication credentials"}}',
+              session_id: 'sess-err',
+              is_error: true,
+              subtype: 'error',
+            }),
+            exitCode: 1,
+          })(command, args);
+        }
+        // Second call: success after recovery
+        return createFakeSpawn({
+          stdout: ndjson(
+            { type: 'result', result: 'recovered', session_id: 'sess-ok' },
+          ),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'security') {
+        return createFakeSpawn({
+          stdout: JSON.stringify({
+            claudeAiOauth: {
+              accessToken: 'fresh-token',
+              expiresAt: Date.now() + 7_200_000,
+              refreshToken: 'rt-secret',
+            },
+          }),
+          exitCode: 0,
+        })(command, args);
+      }
+
+      if (command === 'docker' && args.includes('-i')) {
+        return createFakeSpawn({ exitCode: 0 })(command, args);
+      }
+
+      return createFakeSpawn({ exitCode: 0 })(command, args);
+    }) as unknown as SpawnFn;
+
+    const emitter = invokeClaude({
+      prompt: 'test',
+      spawnFn,
+      inactivityTimeoutMs: 5000,
+    });
+    const events = await collectEvents(emitter);
+
+    // Before the fix: parseResultFromOutput found the is_error result line,
+    // returned it, and the close handler short-circuited with no recovery.
+    // After the fix: is_error results are skipped, auth patterns detect the 401,
+    // credentials are injected, and Claude is retried successfully.
+    expect(events.authRecovered).toBe(true);
+    expect(claudeCallCount).toBe(2);
+    expect(events.result).toEqual({ result: 'recovered', sessionId: 'sess-ok' });
   });
 });

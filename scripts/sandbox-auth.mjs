@@ -9,6 +9,7 @@
 import { execSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureHostTokenFresh } from './lib/host-token.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -85,6 +86,21 @@ function tryKeychainInjection(name) {
   } catch {
     console.log('  Keychain credentials are not valid JSON.');
     return false;
+  }
+
+  // Refresh host token if near expiry before injecting into sandbox.
+  // Only re-read credentials if a refresh was actually triggered.
+  const refreshed = ensureHostTokenFresh(creds);
+  if (refreshed) {
+    try {
+      raw = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
+        stdio: 'pipe',
+        timeout: 10_000,
+      }).toString().trim();
+      creds = JSON.parse(raw);
+    } catch (err) {
+      console.log(`  [setup] Re-read after refresh failed, using original credentials: ${err.message}`);
+    }
   }
 
   if (creds.claudeAiOauth && typeof creds.claudeAiOauth === 'object') {
