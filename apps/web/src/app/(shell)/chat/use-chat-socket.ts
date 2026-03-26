@@ -29,7 +29,7 @@ export interface UseChatSocketReturn {
 // ---------------------------------------------------------------------------
 
 const INITIAL_RECONNECT_DELAY = 1000;
-const MAX_RECONNECT_DELAY = 30_000;
+const MAX_RECONNECT_DELAY = 10_000;
 const BACKOFF_MULTIPLIER = 2;
 const CONNECT_TIMEOUT_MS = 10_000;
 const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -311,6 +311,46 @@ export function useChatSocket(): UseChatSocketReturn {
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
   }, [clearReconnectTimer, connect]);
+
+  // When the tab becomes visible again after being backgrounded, the OS or
+  // browser may have silently dropped the TCP connection. The regular
+  // heartbeat interval is throttled/paused while the tab is hidden, so it
+  // can take 15 s + 10 s pong-timeout + up to 30 s backoff before the
+  // client notices. This handler short-circuits that wait.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden || !mountedRef.current) return;
+
+      // Reset backoff so the next attempt is fast.
+      reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
+
+      const ws = wsRef.current;
+      if (!ws) {
+        // No socket — cancel any pending backoff timer and connect now.
+        clearReconnectTimer();
+        connect();
+      } else if (ws.readyState === WebSocket.OPEN) {
+        // Socket *looks* alive — send an immediate ping to verify.
+        clearHeartbeatTimeout();
+        try {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } catch {
+          failSocket(ws);
+          return;
+        }
+        heartbeatTimeoutRef.current = setTimeout(() => {
+          if (wsRef.current === ws) failSocket(ws);
+        }, HEARTBEAT_TIMEOUT_MS);
+      }
+      // If CONNECTING, the existing connect timeout will handle it.
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () =>
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [clearHeartbeatTimeout, clearReconnectTimer, connect, failSocket]);
 
   // -----------------------------------------------------------------------
   // Send

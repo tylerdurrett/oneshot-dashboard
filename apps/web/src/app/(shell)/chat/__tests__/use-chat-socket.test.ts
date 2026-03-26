@@ -485,7 +485,7 @@ describe('useChatSocket', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('caps backoff at 30 seconds', async () => {
+  it('caps backoff at 10 seconds', async () => {
     renderHook(() => useChatSocket());
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
@@ -493,18 +493,18 @@ describe('useChatSocket', () => {
 
     autoOpen = false;
 
-    // Close/reconnect cycle: 1s, 2s, 4s, 8s, 16s, 32s→30s(capped)
-    for (const delay of [1000, 2000, 4000, 8000, 16000]) {
+    // Close/reconnect cycle: 1s, 2s, 4s, 8s, 16s→10s(capped)
+    for (const delay of [1000, 2000, 4000, 8000]) {
       act(() => { getLastWs().simulateClose(); });
       await act(async () => { await vi.advanceTimersByTimeAsync(delay); });
     }
     const countBefore = MockWebSocket.instances.length;
 
-    // Next close — delay should be capped at 30s, not 32s
+    // Next close — delay should be capped at 10s, not 16s
     act(() => { getLastWs().simulateClose(); });
 
-    // At 30s it should reconnect
-    await act(async () => { await vi.advanceTimersByTimeAsync(29999); });
+    // At 10s it should reconnect
+    await act(async () => { await vi.advanceTimersByTimeAsync(9999); });
     expect(MockWebSocket.instances).toHaveLength(countBefore);
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
@@ -595,6 +595,104 @@ describe('useChatSocket', () => {
 
     expect(result.current.error).toBe('Failed to send message');
     expect(result.current.isStreaming).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Visibility change (tab wake-up) tests
+  // -------------------------------------------------------------------------
+
+  function simulateTabHidden() {
+    Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  function simulateTabVisible() {
+    Object.defineProperty(document, 'hidden', { value: false, configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  it('reconnects immediately when the tab becomes visible with no socket', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.connectionStatus).toBe('connected');
+
+    // Disconnect — socket is cleaned up, reconnect scheduled with 1s delay
+    autoOpen = false;
+    act(() => {
+      getLastWs().simulateClose();
+    });
+    expect(result.current.connectionStatus).toBe('disconnected');
+
+    const countBefore = MockWebSocket.instances.length;
+
+    // Tab becomes visible — should skip the pending backoff timer and connect now
+    act(() => {
+      simulateTabVisible();
+    });
+    expect(MockWebSocket.instances).toHaveLength(countBefore + 1);
+  });
+
+  it('sends immediate verification ping when tab becomes visible with open socket', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.connectionStatus).toBe('connected');
+
+    const ws = getLastWs();
+    const sentBefore = ws.sent.length;
+
+    // Tab hidden then visible
+    act(() => {
+      simulateTabHidden();
+    });
+    act(() => {
+      simulateTabVisible();
+    });
+
+    // Should have sent an immediate ping
+    const pings = ws.sent.slice(sentBefore).filter((s) => JSON.parse(s).type === 'ping');
+    expect(pings).toHaveLength(1);
+
+    // Respond with pong — socket stays alive
+    act(() => {
+      ws.simulateMessage({ type: 'pong' });
+    });
+    expect(result.current.connectionStatus).toBe('connected');
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('fails socket if verification ping gets no pong after tab wake-up', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const ws = getLastWs();
+
+    // Tab becomes visible — sends verification ping
+    act(() => {
+      simulateTabVisible();
+    });
+
+    // No pong arrives — after heartbeat timeout the socket should be recycled
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_001);
+    });
+
+    expect(ws.closed).toBe(true);
+    expect(result.current.connectionStatus).not.toBe('connected');
+
+    // After backoff fires, a new socket is created
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+    expect(MockWebSocket.instances.length).toBeGreaterThan(1);
   });
 
   it('allows setting messages externally for thread switching', async () => {
