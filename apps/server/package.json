@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --include '../../packages/db/src/**/*.ts' src/index.ts",
     "build": "tsc",
     "test": "vitest run",
     "lint": "eslint ."

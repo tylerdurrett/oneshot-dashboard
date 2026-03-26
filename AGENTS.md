@@ -16,7 +16,7 @@ When building UI, follow `docs/ui-conventions.md`. Key rules:
 
 ## Database Workflow
 
-Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (never `db:push`) for real work. For column renames, use a two-step migration (add new → drop old) — never hand-write migration files. See `docs/database.md`.
+Schema lives in `packages/db/src/schema.ts`. **Always use generate + migrate** (never `db:push`) for real work. For column renames, use a two-step migration (add new → drop old) — never hand-write migration files. After generating a migration, verify the `when` timestamp in `drizzle/meta/_journal.json` is **after** all previous entries — out-of-order timestamps cause migrations to silently skip. See `docs/database.md`.
 
 ## Environment Variables
 
@@ -35,6 +35,19 @@ Uses a two-file convention, applied consistently across all apps:
 ## Development Workflow
 
 Small changes are one-offs. Larger features use `_tasks/` with status folders: `_ideas`, `_planning`, `_ready-to-start`, `_in-progress`, `_complete`, `_icebox`, `_abandoned`. Move the feature folder between status folders as work progresses. See `docs/dev-cycle.md`.
+
+## Restarting Dev Servers
+
+The app runs via `pnpm launchd:install` (persistent launchd service) or `pnpm go` (foreground). The safe restart sequence:
+
+1. `pnpm launchd:uninstall` — stops launchd from auto-respawning old processes
+2. `pnpm stop` — kills processes on the configured ports
+3. Verify ports are free: `lsof -ti :4900,:4901,:4902` should return nothing
+4. `pnpm launchd:install` — starts fresh with new code
+
+**Do NOT** `kill` processes without first uninstalling launchd — it will immediately restart them with stale code, causing port conflicts. If you see `EADDRINUSE` errors, there are stale processes; use `pkill -9 -f "vite.*dev"; pkill -9 -f "tsx"` as a last resort.
+
+After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts the server. If the server is crashing after a migration, verify the migration actually applied: `sqlite3 packages/db/local.db "PRAGMA table_info(TABLE_NAME);"`.
 
 ## Remember
 
