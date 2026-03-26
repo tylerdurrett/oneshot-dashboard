@@ -21,11 +21,20 @@ import { getTimerBucketSizeTier, TimerBucket } from './timer-bucket';
 // Helpers
 // ---------------------------------------------------------------------------
 
+export function getAllPageElapsedBaselineMinutes(containerWidth: number): number {
+  if (containerWidth <= 360) return 10;
+  if (containerWidth <= 520) return 8;
+  return 4;
+}
+
 /** Treemap sized by elapsed (rounded to nearest minute for layout stability). */
-function bucketsToElapsedItems(buckets: TimeBucket[]): TreemapItem[] {
+export function bucketsToElapsedItems(
+  buckets: TimeBucket[],
+  baselineMinutes: number,
+): TreemapItem[] {
   return buckets.map((b) => ({
     id: b.id,
-    value: Math.max(1, Math.ceil(b.elapsedSeconds / 60)),
+    value: Math.max(1, Math.ceil(b.elapsedSeconds / 60) + baselineMinutes),
   }));
 }
 
@@ -66,12 +75,19 @@ export function AllTimerGrid() {
 
   const innerWidth = Math.max(0, size.width - GRID_PADDING * 2);
   const innerHeight = Math.max(0, size.height - GRID_PADDING * 2);
+  const elapsedBaselineMinutes = useMemo(
+    () => getAllPageElapsedBaselineMinutes(innerWidth),
+    [innerWidth],
+  );
   const treemapConstraints = useMemo(
     () => getResponsiveTreemapConstraints(innerWidth),
     [innerWidth],
   );
 
-  const items = useMemo(() => bucketsToElapsedItems(usedBuckets), [usedBuckets]);
+  const items = useMemo(
+    () => bucketsToElapsedItems(usedBuckets, elapsedBaselineMinutes),
+    [usedBuckets, elapsedBaselineMinutes],
+  );
   const rects = useMemo(
     () => squarify(items, innerWidth, innerHeight, treemapConstraints),
     [items, innerWidth, innerHeight, treemapConstraints],
