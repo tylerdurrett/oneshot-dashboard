@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { squarify, MIN_WIDTH, MIN_HEIGHT } from '../_lib/treemap';
+import {
+  getResponsiveTreemapConstraints,
+  squarify,
+  MIN_WIDTH,
+  MIN_HEIGHT,
+} from '../_lib/treemap';
 import type { TreemapItem } from '../_lib/treemap';
 
 // ---------------------------------------------------------------------------
@@ -39,8 +44,8 @@ describe('squarify — single item', () => {
   it('enforces minimum dimensions for small containers', () => {
     const result = squarify([{ id: 'a', value: 1 }], 50, 30);
     expect(result).toHaveLength(1);
-    expect(result[0]!.width).toBeGreaterThanOrEqual(MIN_WIDTH);
-    expect(result[0]!.height).toBeGreaterThanOrEqual(MIN_HEIGHT);
+    expect(result[0]!.width).toBe(50);
+    expect(result[0]!.height).toBe(30);
   });
 });
 
@@ -96,6 +101,21 @@ describe('squarify — two items', () => {
     // 75% of 800 = 600, 25% of 800 = 200
     expect(big.width).toBeCloseTo(600, 0);
     expect(small.width).toBeCloseTo(200, 0);
+  });
+
+  it('stacks two items into rows when the container is too narrow for two readable columns', () => {
+    const items: TreemapItem[] = [
+      { id: 'a', value: 50 },
+      { id: 'b', value: 50 },
+    ];
+    const constraints = getResponsiveTreemapConstraints(320);
+    const result = squarify(items, 320, 500, constraints);
+
+    expect(result).toHaveLength(2);
+    for (const rect of result) {
+      expect(rect.width).toBeCloseTo(320, 0);
+      expect(rect.height).toBeGreaterThanOrEqual(MIN_HEIGHT);
+    }
   });
 });
 
@@ -160,6 +180,26 @@ describe('squarify — multiple items', () => {
     for (const rect of result) {
       expect(rect.width).toBeGreaterThan(0);
       expect(rect.height).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps rectangles inside the container bounds with responsive minimums', () => {
+    const items: TreemapItem[] = [
+      { id: '1', value: 50 },
+      { id: '2', value: 30 },
+      { id: '3', value: 15 },
+      { id: '4', value: 5 },
+    ];
+    const containerW = 320;
+    const containerH = 500;
+    const constraints = getResponsiveTreemapConstraints(containerW);
+    const result = squarify(items, containerW, containerH, constraints);
+
+    for (const rect of result) {
+      expect(rect.x).toBeGreaterThanOrEqual(0);
+      expect(rect.y).toBeGreaterThanOrEqual(0);
+      expect(rect.x + rect.width).toBeLessThanOrEqual(containerW + 0.01);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(containerH + 0.01);
     }
   });
 
@@ -232,5 +272,28 @@ describe('squarify — zero-value items', () => {
       expect(rect.width).toBeGreaterThan(0);
       expect(rect.height).toBeGreaterThan(0);
     }
+  });
+});
+
+describe('getResponsiveTreemapConstraints', () => {
+  it('uses full-width stacking rules on very small screens', () => {
+    expect(getResponsiveTreemapConstraints(320)).toEqual({
+      minWidth: 320,
+      minHeight: MIN_HEIGHT,
+    });
+  });
+
+  it('uses roughly half-width buckets on small phones', () => {
+    expect(getResponsiveTreemapConstraints(375)).toEqual({
+      minWidth: 187.5,
+      minHeight: MIN_HEIGHT,
+    });
+  });
+
+  it('falls back to desktop defaults on wider layouts', () => {
+    expect(getResponsiveTreemapConstraints(900)).toEqual({
+      minWidth: MIN_WIDTH,
+      minHeight: MIN_HEIGHT,
+    });
   });
 });

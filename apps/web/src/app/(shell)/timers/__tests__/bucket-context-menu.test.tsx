@@ -401,8 +401,8 @@ describe('TimerBucket context menu integration', () => {
     );
 
     expect(screen.getByText('Test Bucket').className).toContain('truncate');
-    expect(screen.getByText('Test Bucket').className).toContain('text-sm');
-    expect(screen.getByText('45:00').className).toContain('text-lg');
+    expect(screen.getByText('Test Bucket').className).toContain('text-xs');
+    expect(screen.getByText('45:00').className).toContain('text-base');
   });
 
   it('keeps large typography for roomy buckets', () => {

@@ -51,7 +51,7 @@ Each bucket stores: id, name, totalMinutes, elapsedSeconds, colorIndex, and days
 
 ### Treemap layout
 
-A squarified treemap algorithm sorts buckets by remaining seconds (descending), recursively splits the available rectangle horizontally or vertically to keep sub-rectangles as close to square as possible. Bucket rectangles shrink as time elapses — completed buckets get minimal space (`Math.max(1, remaining)`). If all values are zero, an equal-sized grid fallback is used. Container has 8px padding and 4px gaps between buckets.
+A squarified treemap algorithm sorts buckets by remaining seconds (descending), recursively splits the available rectangle horizontally or vertically to keep sub-rectangles as close to square as possible. Bucket rectangles shrink as time elapses — completed buckets get minimal space (`Math.max(1, remaining)`). On narrow screens the layout also applies stronger minimum bucket width/height rules so each bucket can still show a title row plus a time row without collapsing into unreadable slivers. If all values are zero, an equal-sized grid fallback is used. Container has 8px padding and 4px gaps between buckets.
 
 ### Color system
 

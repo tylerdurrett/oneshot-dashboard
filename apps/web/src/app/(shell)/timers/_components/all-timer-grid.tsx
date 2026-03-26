@@ -7,7 +7,11 @@ import {
   isBucketActiveToday,
   type TimeBucket,
 } from '../_lib/timer-types';
-import { squarify, type TreemapItem } from '../_lib/treemap';
+import {
+  getResponsiveTreemapConstraints,
+  squarify,
+  type TreemapItem,
+} from '../_lib/treemap';
 import { useTimerState } from '../_hooks/use-timer-state';
 import { useContainerSize } from '../_hooks/use-container-size';
 import { BucketSettingsDialog } from './bucket-settings-dialog';
@@ -61,11 +65,15 @@ export function AllTimerGrid() {
 
   const innerWidth = Math.max(0, size.width - GRID_PADDING * 2);
   const innerHeight = Math.max(0, size.height - GRID_PADDING * 2);
+  const treemapConstraints = useMemo(
+    () => getResponsiveTreemapConstraints(innerWidth),
+    [innerWidth],
+  );
 
   const items = useMemo(() => bucketsToElapsedItems(usedBuckets), [usedBuckets]);
   const rects = useMemo(
-    () => squarify(items, innerWidth, innerHeight),
-    [items, innerWidth, innerHeight],
+    () => squarify(items, innerWidth, innerHeight, treemapConstraints),
+    [items, innerWidth, innerHeight, treemapConstraints],
   );
   const bucketMap = useMemo(
     () => new Map(usedBuckets.map((b) => [b.id, b])),

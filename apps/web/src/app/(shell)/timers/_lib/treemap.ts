@@ -23,15 +23,91 @@ export interface TreemapRect {
   height: number;
 }
 
+export interface TreemapConstraints {
+  minWidth?: number;
+  minHeight?: number;
+}
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /** Minimum width (px) a bucket rectangle can be assigned. */
-export const MIN_WIDTH = 120;
+export const MIN_WIDTH = 140;
 
 /** Minimum height (px) a bucket rectangle can be assigned. */
-export const MIN_HEIGHT = 80;
+export const MIN_HEIGHT = 96;
+
+// ---------------------------------------------------------------------------
+// Constraint helpers
+// ---------------------------------------------------------------------------
+
+function normalizeConstraints(
+  constraints: TreemapConstraints = {},
+): Required<TreemapConstraints> {
+  return {
+    minWidth: Math.max(1, constraints.minWidth ?? MIN_WIDTH),
+    minHeight: Math.max(1, constraints.minHeight ?? MIN_HEIGHT),
+  };
+}
+
+/**
+ * Buckets on narrow screens need stronger visibility guarantees than desktop.
+ * Small phones stack tiny buckets full-width; slightly larger phones allow
+ * roughly two columns; larger screens fall back to the default minimums.
+ */
+export function getResponsiveTreemapConstraints(
+  containerWidth: number,
+): Required<TreemapConstraints> {
+  if (containerWidth <= 360) {
+    return { minWidth: Math.max(1, containerWidth), minHeight: MIN_HEIGHT };
+  }
+
+  if (containerWidth <= 520) {
+    return {
+      minWidth: Math.max(160, containerWidth / 2),
+      minHeight: MIN_HEIGHT,
+    };
+  }
+
+  return { minWidth: MIN_WIDTH, minHeight: MIN_HEIGHT };
+}
+
+function chooseSplitAxis(
+  width: number,
+  height: number,
+  constraints: Required<TreemapConstraints>,
+): 'columns' | 'rows' {
+  const canSplitColumns = width >= constraints.minWidth * 2;
+  const canSplitRows = height >= constraints.minHeight * 2;
+
+  if (canSplitColumns && canSplitRows) {
+    return width >= height ? 'columns' : 'rows';
+  }
+
+  if (canSplitRows) return 'rows';
+  if (canSplitColumns) return 'columns';
+
+  return width >= height ? 'columns' : 'rows';
+}
+
+function splitLength(
+  totalLength: number,
+  ratio: number,
+  minSegment: number,
+): [number, number] {
+  if (totalLength < minSegment * 2) {
+    const first = totalLength * ratio;
+    return [first, totalLength - first];
+  }
+
+  const first = Math.min(
+    totalLength - minSegment,
+    Math.max(minSegment, totalLength * ratio),
+  );
+
+  return [first, totalLength - first];
+}
 
 // ---------------------------------------------------------------------------
 // Layout helpers (internal)
@@ -48,15 +124,16 @@ function layoutTwo(
   width: number,
   height: number,
   totalValue: number,
+  constraints: Required<TreemapConstraints>,
   out: TreemapRect[],
 ): void {
   const first = items[0]!;
   const second = items[1]!;
   const ratio = totalValue > 0 ? first.value / totalValue : 0.5;
+  const axis = chooseSplitAxis(width, height, constraints);
 
-  if (width >= height) {
-    const leftW = Math.max(width * ratio, MIN_WIDTH);
-    const rightW = Math.max(width - leftW, MIN_WIDTH);
+  if (axis === 'columns') {
+    const [leftW, rightW] = splitLength(width, ratio, constraints.minWidth);
     out.push(
       { id: first.id, x, y, width: leftW, height },
       { id: second.id, x: x + leftW, y, width: rightW, height },
@@ -64,8 +141,7 @@ function layoutTwo(
     return;
   }
 
-  const topH = Math.max(height * ratio, MIN_HEIGHT);
-  const bottomH = Math.max(height - topH, MIN_HEIGHT);
+  const [topH, bottomH] = splitLength(height, ratio, constraints.minHeight);
   out.push(
     { id: first.id, x, y, width, height: topH },
     { id: second.id, x, y: y + topH, width, height: bottomH },
@@ -84,6 +160,7 @@ function layoutRect(
   width: number,
   height: number,
   totalValue: number,
+  constraints: Required<TreemapConstraints>,
   out: TreemapRect[],
 ): void {
   if (items.length === 0) return;
@@ -94,14 +171,14 @@ function layoutRect(
       id: item.id,
       x,
       y,
-      width: Math.max(width, MIN_WIDTH),
-      height: Math.max(height, MIN_HEIGHT),
+      width,
+      height,
     });
     return;
   }
 
   if (items.length === 2) {
-    layoutTwo(items, x, y, width, height, totalValue, out);
+    layoutTwo(items, x, y, width, height, totalValue, constraints, out);
     return;
   }
 
@@ -130,16 +207,18 @@ function layoutRect(
   const groupAValue = bestSplitSum;
   const groupBValue = totalValue - groupAValue;
   const splitRatio = totalValue > 0 ? groupAValue / totalValue : 0.5;
+  const axis = chooseSplitAxis(width, height, constraints);
 
-  if (width >= height) {
-    const leftW = width * splitRatio;
-    layoutRect(groupA, x, y, leftW, height, groupAValue, out);
-    layoutRect(groupB, x + leftW, y, width - leftW, height, groupBValue, out);
-  } else {
-    const topH = height * splitRatio;
-    layoutRect(groupA, x, y, width, topH, groupAValue, out);
-    layoutRect(groupB, x, y + topH, width, height - topH, groupBValue, out);
+  if (axis === 'columns') {
+    const [leftW, rightW] = splitLength(width, splitRatio, constraints.minWidth);
+    layoutRect(groupA, x, y, leftW, height, groupAValue, constraints, out);
+    layoutRect(groupB, x + leftW, y, rightW, height, groupBValue, constraints, out);
+    return;
   }
+
+  const [topH, bottomH] = splitLength(height, splitRatio, constraints.minHeight);
+  layoutRect(groupA, x, y, width, topH, groupAValue, constraints, out);
+  layoutRect(groupB, x, y + topH, width, bottomH, groupBValue, constraints, out);
 }
 
 /**
@@ -152,8 +231,17 @@ function equalGrid(
   y: number,
   width: number,
   height: number,
+  constraints: Required<TreemapConstraints>,
 ): TreemapRect[] {
-  const cols = Math.ceil(Math.sqrt(items.length));
+  const maxCols = Math.max(1, Math.floor(width / constraints.minWidth));
+  let cols = Math.min(Math.ceil(Math.sqrt(items.length)), maxCols);
+
+  while (cols > 1) {
+    const rows = Math.ceil(items.length / cols);
+    if (height / rows >= constraints.minHeight) break;
+    cols -= 1;
+  }
+
   const rows = Math.ceil(items.length / cols);
   const cellW = width / cols;
   const cellH = height / rows;
@@ -187,10 +275,13 @@ export function squarify(
   items: TreemapItem[],
   containerWidth: number,
   containerHeight: number,
+  constraints?: TreemapConstraints,
 ): TreemapRect[] {
   if (items.length === 0 || containerWidth <= 0 || containerHeight <= 0) {
     return [];
   }
+
+  const normalizedConstraints = normalizeConstraints(constraints);
 
   // Sort descending by value so the largest items get the most square regions
   const sorted = [...items].sort((a, b) => b.value - a.value);
@@ -199,9 +290,25 @@ export function squarify(
   const out: TreemapRect[] = [];
 
   if (totalValue === 0) {
-    return equalGrid(sorted, 0, 0, containerWidth, containerHeight);
+    return equalGrid(
+      sorted,
+      0,
+      0,
+      containerWidth,
+      containerHeight,
+      normalizedConstraints,
+    );
   }
 
-  layoutRect(sorted, 0, 0, containerWidth, containerHeight, totalValue, out);
+  layoutRect(
+    sorted,
+    0,
+    0,
+    containerWidth,
+    containerHeight,
+    totalValue,
+    normalizedConstraints,
+    out,
+  );
   return out;
 }

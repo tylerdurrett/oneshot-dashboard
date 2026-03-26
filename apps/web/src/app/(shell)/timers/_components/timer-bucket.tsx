@@ -36,25 +36,25 @@ interface TimerBucketSizeClasses {
 const SIZE_CLASSES: Record<TimerBucketSizeTier, TimerBucketSizeClasses> = {
   large: {
     content: 'gap-1.5 px-4 py-3',
-    name: 'block w-full text-center text-lg font-bold text-white md:text-xl',
+    name: 'block w-full truncate text-center text-lg font-bold leading-tight text-white md:text-xl',
     timeRow: 'gap-1.5',
     time: 'text-2xl font-bold text-white leading-none whitespace-nowrap md:text-4xl',
     goalCheck: 'size-5 text-white/80 md:size-6',
     successCheck: 'size-16 text-white drop-shadow-lg animate-bounce md:size-24',
   },
   small: {
-    content: 'gap-1 px-3 py-2.5',
-    name: 'block w-full text-center text-base font-bold text-white md:text-lg',
+    content: 'gap-1 px-3 py-2',
+    name: 'block w-full truncate text-center text-sm font-bold leading-tight text-white md:text-base',
     timeRow: 'gap-1',
-    time: 'text-xl font-bold text-white leading-none whitespace-nowrap md:text-3xl',
+    time: 'text-lg font-bold text-white leading-none whitespace-nowrap md:text-2xl',
     goalCheck: 'size-4 text-white/80 md:size-5',
     successCheck: 'size-14 text-white drop-shadow-lg animate-bounce md:size-20',
   },
   tiny: {
-    content: 'gap-0.5 px-2 py-2',
-    name: 'block w-full truncate text-center text-sm font-bold text-white md:text-base',
-    timeRow: 'gap-1',
-    time: 'text-lg font-bold text-white leading-none whitespace-nowrap md:text-2xl',
+    content: 'gap-0.5 px-2 py-1.5',
+    name: 'block w-full truncate text-center text-xs font-bold leading-tight text-white md:text-sm',
+    timeRow: 'gap-0.5',
+    time: 'text-base font-bold text-white leading-none whitespace-nowrap md:text-lg',
     goalCheck: 'size-4 text-white/80 md:size-4',
     successCheck: 'size-12 text-white drop-shadow-lg animate-bounce md:size-16',
   },
@@ -71,11 +71,11 @@ export function getTimerBucketSizeTier(
     return 'large';
   }
 
-  if (width < 170 || height < 100) {
+  if (width < 180 || height < 120) {
     return 'tiny';
   }
 
-  if (width < 240 || height < 140) {
+  if (width < 260 || height < 170) {
     return 'small';
   }
 
@@ -327,14 +327,14 @@ export function TimerBucket({
         )}
         <div
           className={cn(
-            'relative z-10 flex h-full w-full flex-col items-center justify-center',
+            'relative z-10 flex h-full w-full min-w-0 flex-col items-center justify-center',
             sizeClasses.content,
           )}
         >
           <span className={sizeClasses.name} title={bucket.name}>
             {bucket.name}
           </span>
-          <div className={cn('flex items-center', sizeClasses.timeRow)}>
+          <div className={cn('flex items-center justify-center', sizeClasses.timeRow)}>
             {showGoalCheck && (
               <Check className={sizeClasses.goalCheck} strokeWidth={3} />
             )}
