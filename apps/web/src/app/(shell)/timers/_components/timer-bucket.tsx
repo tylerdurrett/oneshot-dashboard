@@ -22,6 +22,66 @@ const LONG_PRESS_MOVE_THRESHOLD = 10;
 /** Duration (ms) for the success checkmark overlay when goal is reached. */
 const SUCCESS_OVERLAY_MS = 1200;
 
+export type TimerBucketSizeTier = 'large' | 'small' | 'tiny';
+
+interface TimerBucketSizeClasses {
+  content: string;
+  name: string;
+  timeRow: string;
+  time: string;
+  goalCheck: string;
+  successCheck: string;
+}
+
+const SIZE_CLASSES: Record<TimerBucketSizeTier, TimerBucketSizeClasses> = {
+  large: {
+    content: 'gap-1.5 px-4 py-3',
+    name: 'block w-full text-center text-lg font-bold text-white md:text-xl',
+    timeRow: 'gap-1.5',
+    time: 'text-2xl font-bold text-white leading-none whitespace-nowrap md:text-4xl',
+    goalCheck: 'size-5 text-white/80 md:size-6',
+    successCheck: 'size-16 text-white drop-shadow-lg animate-bounce md:size-24',
+  },
+  small: {
+    content: 'gap-1 px-3 py-2.5',
+    name: 'block w-full text-center text-base font-bold text-white md:text-lg',
+    timeRow: 'gap-1',
+    time: 'text-xl font-bold text-white leading-none whitespace-nowrap md:text-3xl',
+    goalCheck: 'size-4 text-white/80 md:size-5',
+    successCheck: 'size-14 text-white drop-shadow-lg animate-bounce md:size-20',
+  },
+  tiny: {
+    content: 'gap-0.5 px-2 py-2',
+    name: 'block w-full truncate text-center text-sm font-bold text-white md:text-base',
+    timeRow: 'gap-1',
+    time: 'text-lg font-bold text-white leading-none whitespace-nowrap md:text-2xl',
+    goalCheck: 'size-4 text-white/80 md:size-4',
+    successCheck: 'size-12 text-white drop-shadow-lg animate-bounce md:size-16',
+  },
+};
+
+// Tiny treemap cells are still tappable, but their fixed large type was
+// overflowing. We tier the typography on both width and height so cramped
+// buckets stay readable without adding DOM measurement work.
+export function getTimerBucketSizeTier(
+  width: number,
+  height: number,
+): TimerBucketSizeTier {
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    return 'large';
+  }
+
+  if (width < 170 || height < 100) {
+    return 'tiny';
+  }
+
+  if (width < 240 || height < 140) {
+    return 'small';
+  }
+
+  return 'large';
+}
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -30,6 +90,7 @@ export interface TimerBucketProps {
   bucket: TimeBucket;
   isActive: boolean;
   isGoalReached: boolean;
+  sizeTier?: TimerBucketSizeTier;
   /** Display mode: 'remaining' counts down, 'elapsed' counts up. */
   mode?: 'remaining' | 'elapsed';
   style: CSSProperties;
@@ -47,6 +108,7 @@ export function TimerBucket({
   bucket,
   isActive,
   isGoalReached,
+  sizeTier = 'large',
   mode = 'remaining',
   style,
   onToggle,
@@ -58,6 +120,7 @@ export function TimerBucket({
   const remainingSeconds = totalSeconds - bucket.elapsedSeconds;
   const progress = totalSeconds > 0 ? bucket.elapsedSeconds / totalSeconds : 0;
   const color = BUCKET_COLORS[bucket.colorIndex] ?? BUCKET_COLORS[0]!;
+  const sizeClasses = SIZE_CLASSES[sizeTier];
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
@@ -259,19 +322,24 @@ export function TimerBucket({
         )}
         {showSuccess && (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/20 animate-in fade-in zoom-in duration-300">
-            <Check className="size-16 text-white drop-shadow-lg animate-bounce md:size-24" strokeWidth={3} />
+            <Check className={sizeClasses.successCheck} strokeWidth={3} />
           </div>
         )}
-        <div className="relative z-10 flex h-full flex-col items-center justify-center">
-          <span className="text-lg font-bold text-white md:text-xl">
+        <div
+          className={cn(
+            'relative z-10 flex h-full w-full flex-col items-center justify-center',
+            sizeClasses.content,
+          )}
+        >
+          <span className={sizeClasses.name} title={bucket.name}>
             {bucket.name}
           </span>
-          <div className="flex items-center gap-1.5">
+          <div className={cn('flex items-center', sizeClasses.timeRow)}>
             {showGoalCheck && (
-              <Check className="size-5 text-white/80 md:size-6" strokeWidth={3} />
+              <Check className={sizeClasses.goalCheck} strokeWidth={3} />
             )}
             <span
-              className="text-2xl font-bold text-white md:text-4xl"
+              className={sizeClasses.time}
               style={{ fontFeatureSettings: '"tnum"' }}
             >
               {displayTime}

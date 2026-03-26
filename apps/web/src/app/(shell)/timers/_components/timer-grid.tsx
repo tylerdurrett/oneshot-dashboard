@@ -3,6 +3,9 @@ import { Clock, Plus } from 'lucide-react';
 
 import { Button } from '@repo/ui';
 
+import { BucketSettingsDialog } from './bucket-settings-dialog';
+import { getTimerBucketSizeTier, TimerBucket } from './timer-bucket';
+
 import {
   ADD_BUCKET_EVENT,
   BUCKET_COLORS,
@@ -14,8 +17,6 @@ import {
 import { squarify, type TreemapItem } from '../_lib/treemap';
 import { useTimerState } from '../_hooks/use-timer-state';
 import { useContainerSize } from '../_hooks/use-container-size';
-import { BucketSettingsDialog } from './bucket-settings-dialog';
-import { TimerBucket } from './timer-bucket';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -164,6 +165,10 @@ export function TimerGrid() {
           width: rect.width - GRID_GAP,
           height: rect.height - GRID_GAP,
         };
+        const sizeTier = getTimerBucketSizeTier(
+          bucketStyle.width,
+          bucketStyle.height,
+        );
 
         return (
           <TimerBucket
@@ -171,6 +176,7 @@ export function TimerGrid() {
             bucket={bucket}
             isActive={activeBucketId === bucket.id}
             isGoalReached={goalReachedBuckets.has(bucket.id)}
+            sizeTier={sizeTier}
             mode="remaining"
             style={bucketStyle}
             onToggle={() => toggleBucket(bucket.id)}

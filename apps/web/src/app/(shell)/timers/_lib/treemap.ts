@@ -50,14 +50,16 @@ function layoutTwo(
   totalValue: number,
   out: TreemapRect[],
 ): void {
-  const ratio = totalValue > 0 ? items[0].value / totalValue : 0.5;
+  const first = items[0]!;
+  const second = items[1]!;
+  const ratio = totalValue > 0 ? first.value / totalValue : 0.5;
 
   if (width >= height) {
     const leftW = Math.max(width * ratio, MIN_WIDTH);
     const rightW = Math.max(width - leftW, MIN_WIDTH);
     out.push(
-      { id: items[0].id, x, y, width: leftW, height },
-      { id: items[1].id, x: x + leftW, y, width: rightW, height },
+      { id: first.id, x, y, width: leftW, height },
+      { id: second.id, x: x + leftW, y, width: rightW, height },
     );
     return;
   }
@@ -65,8 +67,8 @@ function layoutTwo(
   const topH = Math.max(height * ratio, MIN_HEIGHT);
   const bottomH = Math.max(height - topH, MIN_HEIGHT);
   out.push(
-    { id: items[0].id, x, y, width, height: topH },
-    { id: items[1].id, x, y: y + topH, width, height: bottomH },
+    { id: first.id, x, y, width, height: topH },
+    { id: second.id, x, y: y + topH, width, height: bottomH },
   );
 }
 
@@ -87,8 +89,9 @@ function layoutRect(
   if (items.length === 0) return;
 
   if (items.length === 1) {
+    const item = items[0]!;
     out.push({
-      id: items[0].id,
+      id: item.id,
       x,
       y,
       width: Math.max(width, MIN_WIDTH),
@@ -109,7 +112,7 @@ function layoutRect(
   let runningSum = 0;
 
   for (let i = 1; i < items.length; i++) {
-    runningSum += items[i - 1].value;
+    runningSum += items[i - 1]!.value;
     const areaRatio = totalValue > 0 ? runningSum / totalValue : i / items.length;
     const itemRatio = i / items.length;
     const cost =

@@ -30,7 +30,7 @@ All timer code lives within the existing `/timers` route inside the app shell (`
 ### Component breakdown
 
 - **TimerGrid** — measures available content area, runs the treemap algorithm, absolutely positions each bucket
-- **TimerBucket** — individual bucket with two-layer color progress, pointer events for tap and long-press, inline context menu, completion animation
+- **TimerBucket** — individual bucket with two-layer color progress, adaptive text sizing for small rectangles, pointer events for tap and long-press, inline context menu, completion animation
 - **BucketSettingsDialog** — modal form for editing name, duration (hours + minutes), color, and day-of-week schedule
 - **Treemap algorithm** — squarified treemap utility that takes items with weights and container dimensions, returns positioned rectangles
 - **useTimerState hook** — manages all state: bucket list, active timer, 1-second tick interval, localStorage persistence, daily reset, day-of-week filtering, time recovery on reload
@@ -95,6 +95,7 @@ Bucket color CSS variables added to `app/globals.css`.
 - **SSR hydration mismatch** — localStorage isn't available server-side; the `isHydrated` pattern (render nothing until client mount) handles this
 - **Touch event complexity** — long-press detection with pointer capture, movement cancellation, and tap prevention requires careful event handling to feel right on mobile
 - **Treemap readability at extremes** — a 5-minute bucket next to a 3-hour bucket will be tiny; minimum dimension constraints (120px wide, 80px tall) help but very lopsided configurations could still look odd
+- **Tiny-bucket typography** — very small rectangles need fewer, deliberate text-size steps instead of one fixed type scale; keep labels trimmed and prioritize readable time text
 
 ## Non-Goals / Future Iterations
 

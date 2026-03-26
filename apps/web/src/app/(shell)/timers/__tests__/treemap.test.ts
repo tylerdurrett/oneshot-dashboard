@@ -39,8 +39,8 @@ describe('squarify — single item', () => {
   it('enforces minimum dimensions for small containers', () => {
     const result = squarify([{ id: 'a', value: 1 }], 50, 30);
     expect(result).toHaveLength(1);
-    expect(result[0].width).toBeGreaterThanOrEqual(MIN_WIDTH);
-    expect(result[0].height).toBeGreaterThanOrEqual(MIN_HEIGHT);
+    expect(result[0]!.width).toBeGreaterThanOrEqual(MIN_WIDTH);
+    expect(result[0]!.height).toBeGreaterThanOrEqual(MIN_HEIGHT);
   });
 });
 
@@ -234,4 +234,3 @@ describe('squarify — zero-value items', () => {
     }
   });
 });
-

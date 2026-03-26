@@ -3,7 +3,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { TimeBucket } from '../_lib/timer-types';
 import { BucketContextMenu } from '../_components/bucket-context-menu';
-import { TimerBucket } from '../_components/timer-bucket';
+import {
+  getTimerBucketSizeTier,
+  TimerBucket,
+} from '../_components/timer-bucket';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -250,6 +253,19 @@ describe('BucketContextMenu', () => {
 // ---------------------------------------------------------------------------
 
 describe('TimerBucket context menu integration', () => {
+  it('classifies cramped rectangles as tiny buckets', () => {
+    expect(getTimerBucketSizeTier(160, 150)).toBe('tiny');
+    expect(getTimerBucketSizeTier(220, 96)).toBe('tiny');
+  });
+
+  it('classifies medium rectangles as small buckets', () => {
+    expect(getTimerBucketSizeTier(220, 130)).toBe('small');
+  });
+
+  it('classifies roomy rectangles as large buckets', () => {
+    expect(getTimerBucketSizeTier(280, 180)).toBe('large');
+  });
+
   it('opens context menu on right-click', () => {
     render(
       <TimerBucket
@@ -367,5 +383,44 @@ describe('TimerBucket context menu integration', () => {
     );
 
     expect(screen.getByRole('button').classList.contains('select-none')).toBe(true);
+  });
+
+  it('uses compact typography for tiny buckets', () => {
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        sizeTier="tiny"
+        style={{ position: 'absolute', left: 0, top: 0, width: 160, height: 96 }}
+        onToggle={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Test Bucket').className).toContain('truncate');
+    expect(screen.getByText('Test Bucket').className).toContain('text-sm');
+    expect(screen.getByText('45:00').className).toContain('text-lg');
+  });
+
+  it('keeps large typography for roomy buckets', () => {
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        sizeTier="large"
+        style={{ position: 'absolute', left: 0, top: 0, width: 280, height: 180 }}
+        onToggle={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Test Bucket').className).toContain('text-lg');
+    expect(screen.getByText('45:00').className).toContain('text-2xl');
   });
 });
