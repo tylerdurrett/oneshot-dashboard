@@ -146,9 +146,6 @@ export async function chatRoutes(
     let streaming = false;
 
     socket.on('message', async (raw: Buffer) => {
-      // Ignore messages while streaming
-      if (streaming) return;
-
       try {
         let msg: { type?: string; threadId?: string; content?: string };
         try {
@@ -157,6 +154,16 @@ export async function chatRoutes(
           sendError(socket, 'Invalid JSON');
           return;
         }
+
+        // Bug fix: health-check pings must bypass the streaming lock so the
+        // client can tell the socket is still alive during long responses.
+        if (msg.type === 'ping') {
+          sendJSON(socket, { type: 'pong' });
+          return;
+        }
+
+        // Ignore chat sends while streaming
+        if (streaming) return;
 
         if (msg.type !== 'message' || !msg.threadId || !msg.content) {
           sendError(socket, 'Invalid message format');

@@ -313,6 +313,23 @@ describe('chat WebSocket route', () => {
   // -----------------------------------------------------------------------
 
   describe('error scenarios', () => {
+    it('responds to ping health checks', async () => {
+      const spawnFn = createFakeSpawn({ stdout: '', exitCode: 0 });
+      server = buildServer({ logger: false, database: testDb, spawnFn });
+      await server.ready();
+
+      const ws = await server.injectWS('/chat');
+      const collecting = collectWsMessages(ws, { timeoutMs: 500 });
+
+      ws.send(JSON.stringify({ type: 'ping' }));
+      const msgs = await collecting;
+
+      expect(msgs).toHaveLength(1);
+      expect(msgs[0]!.type).toBe('pong');
+
+      ws.close();
+    });
+
     it('returns error for invalid JSON', async () => {
       const spawnFn = createFakeSpawn({ stdout: '', exitCode: 0 });
       server = buildServer({ logger: false, database: testDb, spawnFn });
@@ -405,6 +422,80 @@ describe('chat WebSocket route', () => {
   // -----------------------------------------------------------------------
 
   describe('streaming lock', () => {
+    it('responds to ping while streaming is in progress', async () => {
+      let invocationCount = 0;
+      const spawnFn = withHealthyPreflight((() => {
+        invocationCount++;
+
+        const child = new EventEmitter();
+        const stdoutEmitter = new EventEmitter();
+        const stderrEmitter = new EventEmitter();
+
+        Object.assign(child, {
+          stdout: stdoutEmitter,
+          stderr: stderrEmitter,
+          kill: () => {
+            process.nextTick(() => child.emit('close', null));
+          },
+        });
+
+        process.nextTick(() => {
+          const token = JSON.stringify({
+            type: 'content_block_delta',
+            delta: { type: 'text_delta', text: 'streaming...' },
+          }) + '\n';
+          stdoutEmitter.emit('data', Buffer.from(token));
+
+          setTimeout(() => {
+            const result = JSON.stringify({
+              type: 'result',
+              result: 'streaming...',
+              session_id: 'sid',
+            }) + '\n';
+            stdoutEmitter.emit('data', Buffer.from(result));
+            child.emit('close', 0);
+          }, 100);
+        });
+
+        return child;
+      }) as unknown as SpawnFn);
+
+      server = buildServer({ logger: false, database: testDb, spawnFn });
+      await server.ready();
+
+      const threadId = await createThread(server);
+      const ws = await server.injectWS('/chat');
+
+      const gotToken = new Promise<void>((resolve) => {
+        ws.on('message', (data: Buffer) => {
+          const msg = parseMsg(data);
+          if (msg.type === 'token') resolve();
+        });
+      });
+
+      const gotPong = new Promise<void>((resolve) => {
+        ws.on('message', (data: Buffer) => {
+          const msg = parseMsg(data);
+          if (msg.type === 'pong') resolve();
+        });
+      });
+
+      ws.send(
+        JSON.stringify({
+          type: 'message',
+          threadId,
+          content: 'First message',
+        }),
+      );
+
+      await gotToken;
+      ws.send(JSON.stringify({ type: 'ping' }));
+      await gotPong;
+      ws.close();
+
+      expect(invocationCount).toBe(1);
+    });
+
     it('ignores messages sent while streaming is in progress', async () => {
       // Use a spawn that emits a token first, then waits before the result,
       // giving us time to send a second message during streaming.

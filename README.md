@@ -35,6 +35,14 @@ pnpm sandbox
 
 It will create the sandbox, open a browser for login, and verify everything is working. The sandbox stays authenticated across restarts — you only need to do this once.
 
+If chat ever shows `Connecting...` or `Disconnected. Reconnecting...`, that means the live chat link between the web app and the local server dropped. The app now retries automatically, but if it keeps happening the usual causes are:
+
+- the local server was restarted
+- your laptop briefly lost network access or changed networks
+- the Docker sandbox is offline, so chat can connect but can’t finish a response
+
+The fastest recovery step is usually `pnpm go` in one terminal, then `pnpm sandbox` if the chat agent still says it is offline.
+
 ## How to build with Claude Code
 
 ### Small tasks

@@ -12,6 +12,7 @@ const defaultReturn: UseChatSocketReturn = {
   setMessages: vi.fn(),
   isStreaming: false,
   error: null,
+  setError: vi.fn(),
   clearError: vi.fn(),
   connectionStatus: 'connected',
 };

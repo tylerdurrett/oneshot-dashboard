@@ -31,6 +31,9 @@ export interface UseChatSocketReturn {
 const INITIAL_RECONNECT_DELAY = 1000;
 const MAX_RECONNECT_DELAY = 30_000;
 const BACKOFF_MULTIPLIER = 2;
+const CONNECT_TIMEOUT_MS = 10_000;
+const HEARTBEAT_INTERVAL_MS = 15_000;
+const HEARTBEAT_TIMEOUT_MS = 10_000;
 
 // ---------------------------------------------------------------------------
 // Hook
@@ -50,6 +53,9 @@ export function useChatSocket(): UseChatSocketReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
   const isStreamingRef = useRef(false);
   // Tracks the in-progress streaming assistant message id
@@ -62,25 +68,137 @@ export function useChatSocket(): UseChatSocketReturn {
   // Connection management
   // -----------------------------------------------------------------------
 
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
+
+  const clearConnectTimeout = useCallback(() => {
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current);
+      connectTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearHeartbeatInterval = useCallback(() => {
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current);
+      heartbeatIntervalRef.current = null;
+    }
+  }, []);
+
+  const clearHeartbeatTimeout = useCallback(() => {
+    if (heartbeatTimeoutRef.current) {
+      clearTimeout(heartbeatTimeoutRef.current);
+      heartbeatTimeoutRef.current = null;
+    }
+  }, []);
+
+  const clearSocketTimers = useCallback(() => {
+    clearConnectTimeout();
+    clearHeartbeatInterval();
+    clearHeartbeatTimeout();
+  }, [clearConnectTimeout, clearHeartbeatInterval, clearHeartbeatTimeout]);
+
+  const scheduleReconnect = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    clearReconnectTimer();
+
+    const delay = reconnectDelayRef.current;
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      if (mountedRef.current) connect();
+    }, delay);
+
+    reconnectDelayRef.current = Math.min(
+      delay * BACKOFF_MULTIPLIER,
+      MAX_RECONNECT_DELAY,
+    );
+  }, [clearReconnectTimer]);
+
+  const failSocket = useCallback(
+    (ws: WebSocket) => {
+      if (!mountedRef.current || wsRef.current !== ws) return;
+
+      wsRef.current = null;
+      clearSocketTimers();
+      setConnectionStatus('disconnected');
+
+      if (streamingIdRef.current) {
+        streamingIdRef.current = null;
+        setIsStreaming(false);
+        setError('Connection lost during response. Please try again.');
+      }
+
+      // Bug fix: browsers can keep a dead WebSocket looking "alive" after
+      // the server or network disappears. We recycle it so the retry loop
+      // can recover instead of waiting forever.
+      ws.onopen = null;
+      ws.onclose = null;
+      ws.onerror = null;
+      ws.onmessage = null;
+
+      try {
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      } catch {
+        // Ignore close failures — reconnect scheduling is already in motion.
+      }
+
+      scheduleReconnect();
+    },
+    [clearSocketTimers, scheduleReconnect],
+  );
+
   const connect = useCallback(() => {
     // Guard against connecting when unmounted
     if (!mountedRef.current) return;
+    if (wsRef.current) return;
 
     const url = getServerUrl();
     setConnectionStatus('connecting');
+    clearReconnectTimer();
 
     const ws = new WebSocket(url);
     wsRef.current = ws;
+    clearSocketTimers();
+
+    connectTimeoutRef.current = setTimeout(() => {
+      if (wsRef.current !== ws || ws.readyState === WebSocket.OPEN) return;
+      failSocket(ws);
+    }, CONNECT_TIMEOUT_MS);
 
     ws.onopen = () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || wsRef.current !== ws) return;
+      clearConnectTimeout();
       setConnectionStatus('connected');
       reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
+
+      heartbeatIntervalRef.current = setInterval(() => {
+        if (wsRef.current !== ws || ws.readyState !== WebSocket.OPEN) return;
+
+        try {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        } catch {
+          failSocket(ws);
+          return;
+        }
+
+        clearHeartbeatTimeout();
+        heartbeatTimeoutRef.current = setTimeout(() => {
+          failSocket(ws);
+        }, HEARTBEAT_TIMEOUT_MS);
+      }, HEARTBEAT_INTERVAL_MS);
     };
 
     ws.onclose = () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || wsRef.current !== ws) return;
       wsRef.current = null;
+      clearSocketTimers();
       setConnectionStatus('disconnected');
 
       // If we were streaming, mark it as interrupted with an error
@@ -90,15 +208,7 @@ export function useChatSocket(): UseChatSocketReturn {
         setError('Connection lost during response. Please try again.');
       }
 
-      // Schedule reconnect with exponential backoff
-      const delay = reconnectDelayRef.current;
-      reconnectTimerRef.current = setTimeout(() => {
-        if (mountedRef.current) connect();
-      }, delay);
-      reconnectDelayRef.current = Math.min(
-        delay * BACKOFF_MULTIPLIER,
-        MAX_RECONNECT_DELAY,
-      );
+      scheduleReconnect();
     };
 
     ws.onerror = () => {
@@ -144,6 +254,11 @@ export function useChatSocket(): UseChatSocketReturn {
           break;
         }
 
+        case 'pong': {
+          clearHeartbeatTimeout();
+          break;
+        }
+
         case 'error': {
           setError(data.message ?? 'Unknown error');
           streamingIdRef.current = null;
@@ -152,7 +267,14 @@ export function useChatSocket(): UseChatSocketReturn {
         }
       }
     };
-  }, []); // stable — no external deps needed
+  }, [
+    clearConnectTimeout,
+    clearHeartbeatTimeout,
+    clearReconnectTimer,
+    clearSocketTimers,
+    failSocket,
+    scheduleReconnect,
+  ]);
 
   // -----------------------------------------------------------------------
   // Lifecycle
@@ -164,14 +286,31 @@ export function useChatSocket(): UseChatSocketReturn {
 
     return () => {
       mountedRef.current = false;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      clearReconnectTimer();
+      clearSocketTimers();
       if (wsRef.current) {
         wsRef.current.onclose = null; // prevent reconnect on intentional close
         wsRef.current.close();
         wsRef.current = null;
       }
     };
-  }, [connect]);
+  }, [clearReconnectTimer, clearSocketTimers, connect]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = () => {
+      reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
+      clearReconnectTimer();
+
+      if (!wsRef.current) {
+        connect();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [clearReconnectTimer, connect]);
 
   // -----------------------------------------------------------------------
   // Send

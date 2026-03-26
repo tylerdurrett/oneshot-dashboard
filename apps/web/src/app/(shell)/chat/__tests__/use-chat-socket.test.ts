@@ -12,12 +12,13 @@ type WSListener = (event: { data: string }) => void;
 let autoOpen = true;
 
 class MockWebSocket {
+  static CONNECTING = 0;
   static OPEN = 1;
   static CLOSED = 3;
   static instances: MockWebSocket[] = [];
 
   url: string;
-  readyState = MockWebSocket.OPEN;
+  readyState = MockWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
@@ -29,7 +30,7 @@ class MockWebSocket {
     this.url = url;
     MockWebSocket.instances.push(this);
     if (autoOpen) {
-      queueMicrotask(() => this.onopen?.());
+      queueMicrotask(() => this.simulateOpen());
     }
   }
 
@@ -44,6 +45,7 @@ class MockWebSocket {
 
   // Test helpers
   simulateOpen() {
+    this.readyState = MockWebSocket.OPEN;
     this.onopen?.();
   }
 
@@ -356,6 +358,26 @@ describe('useChatSocket', () => {
     expect(MockWebSocket.instances).toHaveLength(4);
   });
 
+  it('retries when the socket gets stuck connecting', async () => {
+    autoOpen = false;
+    const { result } = renderHook(() => useChatSocket());
+
+    expect(result.current.connectionStatus).toBe('connecting');
+    expect(MockWebSocket.instances).toHaveLength(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(9_999);
+    });
+    expect(MockWebSocket.instances).toHaveLength(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_001);
+    });
+    expect(result.current.connectionStatus).toBe('connecting');
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(MockWebSocket.instances[0]!.closed).toBe(true);
+  });
+
   it('resets backoff delay after successful connection', async () => {
     renderHook(() => useChatSocket());
 
@@ -487,6 +509,72 @@ describe('useChatSocket', () => {
 
     await act(async () => { await vi.advanceTimersByTimeAsync(1); });
     expect(MockWebSocket.instances).toHaveLength(countBefore + 1);
+  });
+
+  it('reconnects when heartbeat pongs stop arriving', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(result.current.connectionStatus).toBe('connected');
+
+    const firstWs = getLastWs();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    expect(firstWs.sent).toContain(JSON.stringify({ type: 'ping' }));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(11_000);
+    });
+
+    expect(firstWs.closed).toBe(true);
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(result.current.connectionStatus).toBe('connected');
+  });
+
+  it('keeps the socket alive when heartbeat pongs arrive', async () => {
+    const { result } = renderHook(() => useChatSocket());
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    const ws = getLastWs();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15_000);
+    });
+    act(() => {
+      ws.simulateMessage({ type: 'pong' });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+
+    expect(ws.closed).toBe(false);
+    expect(result.current.connectionStatus).toBe('connected');
+    expect(MockWebSocket.instances).toHaveLength(1);
+  });
+
+  it('reconnects immediately when the browser comes back online', async () => {
+    autoOpen = false;
+    const { result } = renderHook(() => useChatSocket());
+
+    expect(result.current.connectionStatus).toBe('connecting');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_001);
+    });
+    expect(MockWebSocket.instances).toHaveLength(1);
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 
   it('handles ws.send() failure gracefully', async () => {
