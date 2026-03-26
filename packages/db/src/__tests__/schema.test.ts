@@ -158,9 +158,9 @@ describe('timerDailyProgress table', () => {
     expect(columns.startedAt.notNull).toBe(false);
   });
 
-  it('has completedAt column as nullable text', () => {
-    expect(columns.completedAt.dataType).toBe('string');
-    expect(columns.completedAt.notNull).toBe(false);
+  it('has goalReachedAt column as nullable text', () => {
+    expect(columns.goalReachedAt.dataType).toBe('string');
+    expect(columns.goalReachedAt.notNull).toBe(false);
   });
 });
 
