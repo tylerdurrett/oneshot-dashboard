@@ -18,6 +18,7 @@ import {
   resetProgress,
   setRemainingTime,
   computeGoalMs,
+  dismissBucket,
 } from '../services/timer-progress.js';
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ export const SSE_EVENTS = {
   TIMER_GOAL_REACHED: 'timer-goal-reached',
   TIMER_RESET: 'timer-reset',
   TIMER_UPDATED: 'timer-updated',
+  TIMER_DISMISSED: 'timer-dismissed',
   DAILY_RESET: 'daily-reset',
 } as const;
 
@@ -323,6 +325,31 @@ export async function timerRoutes(
         elapsedSeconds: result.elapsedSeconds,
         goalReachedAt: result.goalReachedAt,
       };
+    },
+  );
+
+  /** Dismiss a bucket for today — hides it until the next 3 AM reset. */
+  server.post<{ Params: { id: string } }>(
+    '/timers/buckets/:id/dismiss',
+    async (request, reply) => {
+      const { id } = request.params;
+
+      const bucket = await getBucket(id, db);
+      if (!bucket) {
+        return reply.status(404).send({ error: 'Bucket not found' });
+      }
+
+      const result = await dismissBucket(id, db);
+
+      // If the bucket was running, stop the goal job and notify clients.
+      if (result.wasStopped) {
+        scheduler?.cancelGoalJob(id);
+        broadcast(SSE_EVENTS.TIMER_STOPPED, { bucketId: id });
+      }
+
+      broadcast(SSE_EVENTS.TIMER_DISMISSED, { bucketId: id });
+
+      return { success: true, dismissedAt: result.dismissedAt };
     },
   );
 }

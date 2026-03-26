@@ -22,6 +22,7 @@ function makeBucket(overrides: Partial<TimeBucket> = {}): TimeBucket {
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
     startedAt: null,
     goalReachedAt: null,
+    dismissedAt: null,
     ...overrides,
   };
 }
@@ -46,7 +47,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('BucketContextMenu', () => {
-  it('renders three menu items', () => {
+  it('renders four menu items', () => {
     render(
       <BucketContextMenu
         bucket={makeBucket()}
@@ -54,6 +55,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -61,6 +63,7 @@ describe('BucketContextMenu', () => {
     expect(screen.getByText('Bucket Settings')).toBeTruthy();
     expect(screen.getByText('Set Remaining Time')).toBeTruthy();
     expect(screen.getByText('Reset for Today')).toBeTruthy();
+    expect(screen.getByText('Dismiss for Today')).toBeTruthy();
   });
 
   it('calls onOpenSettings and onClose when "Bucket Settings" is clicked', () => {
@@ -73,6 +76,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={onOpenSettings}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -92,12 +96,33 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={onResetForToday}
+        onDismissForToday={vi.fn()}
         onClose={onClose}
       />,
     );
 
     fireEvent.click(screen.getByText('Reset for Today'));
     expect(onResetForToday).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('calls onDismissForToday and onClose when "Dismiss for Today" is clicked', () => {
+    const onDismissForToday = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onResetForToday={vi.fn()}
+        onDismissForToday={onDismissForToday}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Dismiss for Today'));
+    expect(onDismissForToday).toHaveBeenCalledOnce();
     expect(onClose).toHaveBeenCalledOnce();
   });
 
@@ -109,6 +134,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -129,6 +155,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -148,6 +175,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -171,6 +199,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={onSetRemainingTime}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -195,6 +224,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -215,6 +245,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -237,6 +268,7 @@ describe('BucketContextMenu', () => {
         onOpenSettings={vi.fn()}
         onSetRemainingTime={vi.fn()}
         onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -277,6 +309,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -285,6 +318,7 @@ describe('TimerBucket context menu integration', () => {
     expect(screen.getByText('Bucket Settings')).toBeTruthy();
     expect(screen.getByText('Set Remaining Time')).toBeTruthy();
     expect(screen.getByText('Reset for Today')).toBeTruthy();
+    expect(screen.getByText('Dismiss for Today')).toBeTruthy();
   });
 
   it('does not toggle timer on right-click', () => {
@@ -299,6 +333,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -318,6 +353,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -339,6 +375,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={onResetForToday}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -347,6 +384,50 @@ describe('TimerBucket context menu integration', () => {
     fireEvent.click(screen.getByText('Reset'));
 
     expect(onResetForToday).toHaveBeenCalledOnce();
+  });
+
+  it('shows confirmation dialog when "Dismiss for Today" is selected from context menu', () => {
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
+        onToggle={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole('button'));
+    fireEvent.click(screen.getByText('Dismiss for Today'));
+
+    expect(screen.getByText('Dismiss bucket?')).toBeTruthy();
+  });
+
+  it('calls onDismissForToday when dismiss is confirmed', () => {
+    const onDismissForToday = vi.fn();
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
+        onToggle={vi.fn()}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onDismissForToday={onDismissForToday}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByRole('button'));
+    fireEvent.click(screen.getByText('Dismiss for Today'));
+    fireEvent.click(screen.getByText('Dismiss'));
+
+    expect(onDismissForToday).toHaveBeenCalledOnce();
   });
 
   it('toggles timer on keyboard Enter', () => {
@@ -361,6 +442,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -379,6 +461,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -396,6 +479,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -424,6 +508,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 
@@ -444,6 +529,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
       />,
     );
 

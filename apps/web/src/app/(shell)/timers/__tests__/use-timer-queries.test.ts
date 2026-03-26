@@ -105,6 +105,7 @@ const todayState = {
       elapsedSeconds: 120,
       startedAt: null,
       goalReachedAt: null,
+      dismissedAt: null,
     },
   ],
 };

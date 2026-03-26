@@ -17,6 +17,7 @@ export interface TodayBucketState {
   elapsedSeconds: number;
   startedAt: string | null;
   goalReachedAt: string | null;
+  dismissedAt: string | null;
 }
 
 /** Result of getTodayState(). */
@@ -110,6 +111,7 @@ export async function getTodayState(
       elapsedSeconds: progress?.elapsedSeconds ?? 0,
       startedAt: progress?.startedAt ?? null,
       goalReachedAt: progress?.goalReachedAt ?? null,
+      dismissedAt: progress?.dismissedAt ?? null,
     });
   }
 
@@ -409,4 +411,64 @@ export async function stopAllRunningTimers(
   }
 
   return stoppedBucketIds;
+}
+
+/** Result of dismissBucket(). */
+export interface DismissBucketResult {
+  dismissedAt: string;
+  /** True if the bucket had a running timer that was stopped. */
+  wasStopped: boolean;
+}
+
+/**
+ * Dismiss a bucket for today — hides it from the Remaining view until the
+ * next 3 AM reset. If the timer is running, stops it first (accumulating
+ * elapsed time). The bucket reappears automatically the next day because
+ * no progress row exists for the new date.
+ */
+export async function dismissBucket(
+  bucketId: string,
+  database: Database = defaultDb,
+  now: Date = new Date(),
+): Promise<DismissBucketResult> {
+  const date = getResetDate(now);
+  const dismissedAt = now.toISOString();
+  let wasStopped = false;
+
+  const existing = await database
+    .select()
+    .from(timerDailyProgress)
+    .where(
+      and(
+        eq(timerDailyProgress.bucketId, bucketId),
+        eq(timerDailyProgress.date, date),
+      ),
+    );
+
+  if (existing.length > 0) {
+    const row = existing[0]!;
+    let elapsedSeconds = row.elapsedSeconds;
+
+    // If the timer is running, accumulate elapsed and stop it.
+    if (row.startedAt) {
+      elapsedSeconds += elapsedSince(row.startedAt, now);
+      wasStopped = true;
+    }
+
+    await database
+      .update(timerDailyProgress)
+      .set({ elapsedSeconds, startedAt: null, dismissedAt })
+      .where(eq(timerDailyProgress.id, row.id));
+  } else {
+    await database.insert(timerDailyProgress).values({
+      id: crypto.randomUUID(),
+      bucketId,
+      date,
+      elapsedSeconds: 0,
+      startedAt: null,
+      dismissedAt,
+    });
+  }
+
+  return { dismissedAt, wasStopped };
 }

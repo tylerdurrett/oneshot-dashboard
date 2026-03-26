@@ -65,6 +65,7 @@ describe('isBucketActiveToday', () => {
     daysOfWeek,
     startedAt: null,
     goalReachedAt: null,
+    dismissedAt: null,
   });
 
   it('returns true when today is in the bucket daysOfWeek', () => {

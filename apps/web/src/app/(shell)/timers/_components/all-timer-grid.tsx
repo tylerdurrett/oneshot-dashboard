@@ -44,6 +44,7 @@ export function AllTimerGrid() {
     removeBucket,
     resetBucketForToday,
     setRemainingTime,
+    dismissBucketForToday,
   } = useTimerState();
 
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
@@ -131,6 +132,7 @@ export function AllTimerGrid() {
             onOpenSettings={() => setSelectedBucketId(bucket.id)}
             onResetForToday={() => resetBucketForToday(bucket.id)}
             onSetRemainingTime={(s) => setRemainingTime(bucket.id, s)}
+            onDismissForToday={() => dismissBucketForToday(bucket.id)}
           />
         );
       })}

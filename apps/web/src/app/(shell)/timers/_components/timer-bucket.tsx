@@ -107,6 +107,7 @@ export interface TimerBucketProps {
   onOpenSettings: () => void;
   onResetForToday: () => void;
   onSetRemainingTime: (remainingSeconds: number) => void;
+  onDismissForToday: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,6 +125,7 @@ export function TimerBucket({
   onOpenSettings,
   onResetForToday,
   onSetRemainingTime,
+  onDismissForToday,
 }: TimerBucketProps) {
   const totalSeconds = bucket.totalMinutes * 60;
   const remainingSeconds = totalSeconds - bucket.elapsedSeconds;
@@ -134,6 +136,7 @@ export function TimerBucket({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [confirmDismissOpen, setConfirmDismissOpen] = useState(false);
 
   // -- Goal-reached animation state --
   // Shows a brief success overlay when the goal is first reached.
@@ -368,6 +371,9 @@ export function TimerBucket({
           onResetForToday={() => {
             setConfirmResetOpen(true);
           }}
+          onDismissForToday={() => {
+            setConfirmDismissOpen(true);
+          }}
           onClose={closeMenu}
         />
       )}
@@ -383,6 +389,20 @@ export function TimerBucket({
         onConfirm={() => {
           onResetForToday();
           setConfirmResetOpen(false);
+        }}
+      />
+
+      <ConfirmationDialog
+        open={confirmDismissOpen}
+        onOpenChange={setConfirmDismissOpen}
+        title="Dismiss bucket?"
+        description={`This will hide "${bucket.name}" for today. It will reappear tomorrow.`}
+        confirmLabel="Dismiss"
+        cancelLabel="Cancel"
+        variant="default"
+        onConfirm={() => {
+          onDismissForToday();
+          setConfirmDismissOpen(false);
         }}
       />
     </>

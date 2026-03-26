@@ -13,6 +13,7 @@ import {
   useUpdateBucket as useUpdateBucketMutation,
   useResetTimer,
   useSetTimerTime,
+  useDismissBucket,
   timerKeys,
 } from './use-timer-queries';
 import { useTimerSSE } from './use-timer-sse';
@@ -29,6 +30,7 @@ export interface UseTimerStateReturn {
   updateBucket: (id: string, updates: Partial<TimeBucket>) => void;
   resetBucketForToday: (id: string) => void;
   setRemainingTime: (id: string, remainingSeconds: number) => void;
+  dismissBucketForToday: (id: string) => void;
 }
 
 /** Convert a ServerBucket to a TimeBucket for UI components.
@@ -52,6 +54,7 @@ function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
     daysOfWeek: sb.daysOfWeek,
     startedAt: sb.startedAt,
     goalReachedAt: sb.goalReachedAt,
+    dismissedAt: sb.dismissedAt,
   };
 }
 
@@ -78,6 +81,7 @@ export function useTimerState(): UseTimerStateReturn {
   const updateMutation = useUpdateBucketMutation();
   const resetMutation = useResetTimer();
   const setTimeMutation = useSetTimerTime();
+  const dismissMutation = useDismissBucket();
 
   // Session-only tracking of buckets that reached their goal during this
   // browser session. Used for chime/animation — should NOT include buckets
@@ -149,6 +153,8 @@ export function useTimerState(): UseTimerStateReturn {
   const todaysBuckets = useMemo(() => {
     return allBuckets.filter((bucket) => {
       if (!isBucketActiveToday(bucket)) return false;
+      // Hide buckets dismissed for today.
+      if (bucket.dismissedAt) return false;
       // Hide buckets that hit their goal and are stopped. Running timers
       // past goal stay visible (showing negative remaining + check icon).
       if (bucket.goalReachedAt && !bucket.startedAt) return false;
@@ -224,6 +230,7 @@ export function useTimerState(): UseTimerStateReturn {
     onTimerStopped: invalidateToday,
     onTimerReset: invalidateToday,
     onTimerUpdated: invalidateToday,
+    onTimerDismissed: invalidateToday,
   });
 
   const toggleBucket = useCallback(
@@ -289,6 +296,14 @@ export function useTimerState(): UseTimerStateReturn {
     [setTimeMutation],
   );
 
+  const dismissBucketForToday = useCallback(
+    (id: string) => {
+      dismissMutation.mutate(id);
+      removeFromSet(setGoalReachedBuckets, id);
+    },
+    [dismissMutation],
+  );
+
   return {
     isHydrated: todayQuery.isSuccess,
     allBuckets,
@@ -301,5 +316,6 @@ export function useTimerState(): UseTimerStateReturn {
     updateBucket: updateBucketFn,
     resetBucketForToday,
     setRemainingTime,
+    dismissBucketForToday,
   };
 }

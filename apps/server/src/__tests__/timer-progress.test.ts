@@ -10,6 +10,7 @@ import {
   setRemainingTime,
   markGoalReached,
   stopAllRunningTimers,
+  dismissBucket,
 } from '../services/timer-progress.js';
 import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
 
@@ -561,5 +562,96 @@ describe('stopAllRunningTimers', () => {
     // March 24 timer should still be running
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows[0]!.startedAt).toBe(startedAt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// dismissBucket
+// ---------------------------------------------------------------------------
+
+describe('dismissBucket', () => {
+  let testDb: Database;
+
+  beforeEach(() => {
+    testDb = createTimerTestDb();
+  });
+
+  it('creates a progress row with dismissedAt when none exists', async () => {
+    const bucket = await seedBucket(testDb);
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    const result = await dismissBucket(bucket.id, testDb, now);
+
+    expect(result.dismissedAt).toBe(now.toISOString());
+    expect(result.wasStopped).toBe(false);
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.dismissedAt).toBe(now.toISOString());
+    expect(rows[0]!.elapsedSeconds).toBe(0);
+    expect(rows[0]!.startedAt).toBeNull();
+  });
+
+  it('sets dismissedAt on an existing non-running progress row', async () => {
+    const bucket = await seedBucket(testDb);
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    // Pre-create a progress row with some elapsed time
+    await testDb.insert(timerDailyProgress).values({
+      id: crypto.randomUUID(),
+      bucketId: bucket.id,
+      date: '2026-03-24',
+      elapsedSeconds: 300,
+      startedAt: null,
+    });
+
+    const result = await dismissBucket(bucket.id, testDb, now);
+
+    expect(result.wasStopped).toBe(false);
+    expect(result.dismissedAt).toBe(now.toISOString());
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.dismissedAt).toBe(now.toISOString());
+    // Elapsed should be preserved
+    expect(rows[0]!.elapsedSeconds).toBe(300);
+  });
+
+  it('stops a running timer and sets dismissedAt', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const t1 = new Date(2026, 2, 24, 10, 0, 0);
+    await startTimer(bucket.id, testDb, t1);
+
+    // Dismiss 5 minutes later — timer should be stopped with elapsed accumulated
+    const t2 = new Date(2026, 2, 24, 10, 5, 0);
+    const result = await dismissBucket(bucket.id, testDb, t2);
+
+    expect(result.wasStopped).toBe(true);
+    expect(result.dismissedAt).toBe(t2.toISOString());
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows[0]!.startedAt).toBeNull();
+    expect(rows[0]!.elapsedSeconds).toBe(300); // 5 minutes accumulated
+    expect(rows[0]!.dismissedAt).toBe(t2.toISOString());
+  });
+
+  it('getTodayState includes dismissedAt', async () => {
+    const bucket = await seedBucket(testDb);
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+    await dismissBucket(bucket.id, testDb, now);
+
+    const state = await getTodayState(testDb, now);
+    expect(state.buckets[0]!.dismissedAt).toBe(now.toISOString());
+  });
+
+  it('dismissed bucket does not affect the next day', async () => {
+    const bucket = await seedBucket(testDb);
+    const today = new Date(2026, 2, 24, 10, 0, 0);
+    await dismissBucket(bucket.id, testDb, today);
+
+    // Next day — no progress row exists for March 25, so dismissedAt is null
+    const tomorrow = new Date(2026, 2, 25, 10, 0, 0);
+    const state = await getTodayState(testDb, tomorrow);
+    expect(state.buckets[0]!.dismissedAt).toBeNull();
   });
 });

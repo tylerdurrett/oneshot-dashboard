@@ -9,6 +9,7 @@ import {
   stopTimer,
   resetTimer,
   setTimerTime,
+  dismissBucket,
 } from '../_lib/timer-api';
 import type {
   TodayStateResponse,
@@ -121,6 +122,17 @@ export function useUpdateBucket() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: timerKeys.today });
       queryClient.invalidateQueries({ queryKey: timerKeys.buckets });
+    },
+  });
+}
+
+export function useDismissBucket() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (bucketId: string) => dismissBucket(bucketId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: timerKeys.today });
     },
   });
 }

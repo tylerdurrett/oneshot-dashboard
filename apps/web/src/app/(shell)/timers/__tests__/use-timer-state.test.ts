@@ -110,6 +110,7 @@ function makeServerBucket(overrides: Partial<ServerBucket> = {}): ServerBucket {
     elapsedSeconds: 0,
     startedAt: null,
     goalReachedAt: null,
+    dismissedAt: null,
     ...overrides,
   };
 }
@@ -364,6 +365,7 @@ describe('useTimerState', () => {
         daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
         startedAt: null,
         goalReachedAt: null,
+        dismissedAt: null,
       }),
     );
 

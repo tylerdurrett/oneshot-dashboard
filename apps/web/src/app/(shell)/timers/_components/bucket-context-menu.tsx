@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, RotateCcw, Settings } from 'lucide-react';
+import { Clock, EyeOff, RotateCcw, Settings } from 'lucide-react';
 
 import type { TimeBucket } from '../_lib/timer-types';
 
@@ -14,6 +14,7 @@ export interface BucketContextMenuProps {
   onOpenSettings: () => void;
   onSetRemainingTime: (remainingSeconds: number) => void;
   onResetForToday: () => void;
+  onDismissForToday: () => void;
   onClose: () => void;
 }
 
@@ -38,6 +39,7 @@ export function BucketContextMenu({
   onOpenSettings,
   onSetRemainingTime,
   onResetForToday,
+  onDismissForToday,
   onClose,
 }: BucketContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -158,6 +160,17 @@ export function BucketContextMenu({
           >
             <RotateCcw className="size-4" />
             Reset for Today
+          </button>
+          <button
+            role="menuitem"
+            className={MENU_ITEM_CLASS}
+            onClick={() => {
+              onDismissForToday();
+              onClose();
+            }}
+          >
+            <EyeOff className="size-4" />
+            Dismiss for Today
           </button>
         </>
       )}

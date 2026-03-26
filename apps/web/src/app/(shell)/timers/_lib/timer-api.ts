@@ -16,6 +16,7 @@ export interface ServerBucket {
   elapsedSeconds: number;
   startedAt: string | null;
   goalReachedAt: string | null;
+  dismissedAt: string | null;
 }
 
 /** Response from GET /timers/today. */
@@ -172,4 +173,13 @@ export async function setTimerTime(
   );
   if (!res.ok) throw new Error(`Failed to set timer time: ${res.status}`);
   return res.json() as Promise<StopTimerResponse>;
+}
+
+/** Dismiss a bucket for today — hides it until the next 3 AM reset. */
+export async function dismissBucket(bucketId: string): Promise<void> {
+  const res = await fetch(
+    `${getBaseUrl()}/timers/buckets/${bucketId}/dismiss`,
+    { method: 'POST' },
+  );
+  if (!res.ok) throw new Error(`Failed to dismiss bucket: ${res.status}`);
 }

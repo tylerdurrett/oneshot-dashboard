@@ -1,0 +1,1 @@
+ALTER TABLE `timer_daily_progress` ADD `dismissed_at` text;

@@ -67,6 +67,7 @@ export function TimerGrid() {
     removeBucket,
     resetBucketForToday,
     setRemainingTime,
+    dismissBucketForToday,
   } = useTimerState();
 
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
@@ -92,6 +93,7 @@ export function TimerGrid() {
       daysOfWeek: ALL_DAYS,
       startedAt: null,
       goalReachedAt: null,
+      dismissedAt: null,
     };
     addBucket(newBucket);
     setSelectedBucketId(newBucket.id);
@@ -191,6 +193,7 @@ export function TimerGrid() {
             onOpenSettings={() => setSelectedBucketId(bucket.id)}
             onResetForToday={() => resetBucketForToday(bucket.id)}
             onSetRemainingTime={(s) => setRemainingTime(bucket.id, s)}
+            onDismissForToday={() => dismissBucketForToday(bucket.id)}
           />
         );
       })}

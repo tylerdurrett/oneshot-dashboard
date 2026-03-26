@@ -12,6 +12,7 @@ export const SSE_EVENTS = {
   TIMER_GOAL_REACHED: 'timer-goal-reached',
   TIMER_RESET: 'timer-reset',
   TIMER_UPDATED: 'timer-updated',
+  TIMER_DISMISSED: 'timer-dismissed',
   DAILY_RESET: 'daily-reset',
 } as const;
 
@@ -42,12 +43,17 @@ export interface TimerUpdatedData {
   goalReachedAt: string | null;
 }
 
+export interface TimerDismissedData {
+  bucketId: string;
+}
+
 export interface TimerSSEHandlers {
   onTimerStarted?: (data: TimerStartedData) => void;
   onTimerStopped?: (data: TimerStoppedData) => void;
   onGoalReached?: (data: TimerGoalReachedData) => void;
   onTimerReset?: (data: TimerResetData) => void;
   onTimerUpdated?: (data: TimerUpdatedData) => void;
+  onTimerDismissed?: (data: TimerDismissedData) => void;
   onDailyReset?: () => void;
 }
 
@@ -103,6 +109,11 @@ export function useTimerSSE(handlers: TimerSSEHandlers): void {
     es.addEventListener(SSE_EVENTS.TIMER_UPDATED, (e) => {
       const data = safeParse<TimerUpdatedData>(e.data);
       if (data) handlersRef.current.onTimerUpdated?.(data);
+    });
+
+    es.addEventListener(SSE_EVENTS.TIMER_DISMISSED, (e) => {
+      const data = safeParse<TimerDismissedData>(e.data);
+      if (data) handlersRef.current.onTimerDismissed?.(data);
     });
 
     es.addEventListener(SSE_EVENTS.DAILY_RESET, () => {

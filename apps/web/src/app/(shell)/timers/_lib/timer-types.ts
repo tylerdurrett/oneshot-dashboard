@@ -21,6 +21,8 @@ export interface TimeBucket {
   startedAt: string | null;
   /** ISO timestamp when elapsed first reached totalMinutes goal, null if not yet reached. */
   goalReachedAt: string | null;
+  /** ISO timestamp when the user dismissed this bucket for today, null if not dismissed. */
+  dismissedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
