@@ -90,12 +90,15 @@ function NavLink({ item, isMobile, isActive }: { item: NavItem; isMobile: boolea
       to={item.href}
       data-active={isActive || undefined}
       className={cn(
-        'flex flex-col items-center justify-center gap-1 transition-colors',
+        'flex flex-col items-center justify-center gap-1 transition-colors select-none',
         isMobile ? 'flex-1 py-2' : 'w-full px-3 py-3',
         isActive
           ? 'text-sidebar-foreground'
           : 'text-sidebar-foreground/50 hover:text-sidebar-foreground',
       )}
+      // Keep nav taps feeling like navigation on iOS instead of opening
+      // text-selection/callout affordances.
+      style={{ WebkitTouchCallout: 'none' }}
     >
       <div
         className={cn(
@@ -256,7 +259,7 @@ function NavLinkWithContextMenu({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
         className={cn(
-          'flex flex-col items-center justify-center gap-1 transition-colors touch-none',
+          'flex flex-col items-center justify-center gap-1 transition-colors touch-none select-none',
           isMobile ? 'flex-1 py-2' : 'w-full px-3 py-3',
           isActive
             ? 'text-sidebar-foreground'
@@ -360,10 +363,11 @@ function MoreButton({ isMobile }: { isMobile: boolean }) {
     <button
       type="button"
       className={cn(
-        'flex flex-col items-center justify-center gap-1 transition-colors text-sidebar-foreground/50 hover:text-sidebar-foreground',
+        'flex flex-col items-center justify-center gap-1 transition-colors text-sidebar-foreground/50 hover:text-sidebar-foreground select-none',
         isMobile ? 'flex-1 py-2' : 'w-full px-3 py-3',
       )}
       aria-label="More options"
+      style={{ WebkitTouchCallout: 'none' }}
     >
       <div className="p-1.5 rounded-lg">
         <Menu className="size-5" />
@@ -411,7 +415,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Desktop sidebar */}
       <nav
         aria-label="Sidebar navigation"
-        className="hidden md:flex flex-col w-16 shrink-0 bg-sidebar border-r border-sidebar-border"
+        className="hidden md:flex flex-col w-16 shrink-0 bg-sidebar border-r border-sidebar-border select-none"
       >
         <div className="flex-1 flex flex-col items-center py-4 gap-1">
           {NAV_ITEMS.map((item) =>
@@ -429,7 +433,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile bottom nav */}
       <nav
         aria-label="Bottom navigation"
-        className="app-shell-mobile-nav flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb"
+        className="app-shell-mobile-nav flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb select-none"
       >
         {/* Keep the iPhone standalone safe-area inset on the nav itself.
             Installed iOS PWAs also pin the nav to the viewport bottom via CSS,

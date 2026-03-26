@@ -52,6 +52,23 @@ describe('AppShell', () => {
     expect(screen.getByRole('navigation', { name: 'Bottom navigation' })).toBeDefined();
   });
 
+  it('keeps shell navs non-selectable', () => {
+    renderWithRouter('/timers');
+
+    expect(
+      screen.getByRole('navigation', { name: 'Sidebar navigation' }).classList.contains('select-none'),
+    ).toBe(true);
+    expect(
+      screen.getByRole('navigation', { name: 'Bottom navigation' }).classList.contains('select-none'),
+    ).toBe(true);
+
+    const timerLink = screen.getAllByText('Timers')[0]!.closest('a');
+    expect(timerLink?.classList.contains('select-none')).toBe(true);
+
+    const moreButton = screen.getAllByRole('button', { name: 'More options' })[0]!;
+    expect(moreButton.classList.contains('select-none')).toBe(true);
+  });
+
   it('renders Timers and Chat nav links', () => {
     renderWithRouter('/timers');
     const timerLinks = screen.getAllByText('Timers');

@@ -15,7 +15,7 @@ export default function TimersLayout() {
       {/* Sub-nav: horizontal bar at top on mobile, vertical sidebar on desktop */}
       <nav
         aria-label="Timer views"
-        className="timers-sub-nav shrink-0 flex md:flex-col bg-sidebar border-b md:border-b-0 md:border-r border-sidebar-border md:w-16"
+        className="timers-sub-nav shrink-0 flex md:flex-col bg-sidebar border-b md:border-b-0 md:border-r border-sidebar-border md:w-16 select-none"
       >
         {SUB_NAV_TABS.map((tab) => {
           const isActive = pathname === tab.href;
@@ -24,12 +24,14 @@ export default function TimersLayout() {
               key={tab.href}
               to={tab.href}
               className={cn(
-                'timers-sub-nav-item flex flex-col items-center justify-center gap-1 transition-colors',
+                'timers-sub-nav-item flex flex-col items-center justify-center gap-1 transition-colors select-none',
                 'flex-1 py-2 md:flex-none md:w-full md:px-3 md:py-3',
                 isActive
                   ? 'text-sidebar-foreground'
                   : 'text-sidebar-foreground/50 hover:text-sidebar-foreground',
               )}
+              // Keep tab presses from falling into text selection on touch devices.
+              style={{ WebkitTouchCallout: 'none' }}
             >
               <div
                 className={cn(

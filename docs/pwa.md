@@ -38,4 +38,6 @@ The app also uses a standalone-only mobile workaround: when launched from the ho
 
 The timers screen has one extra standalone-only adjustment: its content wrapper adds a small bottom gutter. That keeps the timer buckets from sitting flush against the fixed bottom nav without creating an oversized gap above it.
 
+Navigation bars and timer buckets also avoid text selection on touch devices, so pressing and long-pressing feels like using controls instead of highlighting labels.
+
 The iPhone home-screen app uses the `black` status bar style instead of `black-translucent`, so content stays below the system status area instead of rendering underneath the clock and indicators.
