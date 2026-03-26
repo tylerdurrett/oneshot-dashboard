@@ -36,4 +36,6 @@ On iPhone home-screen mode, iOS reserves space for the home indicator at the bot
 
 The app also uses a standalone-only mobile workaround: when launched from the home screen, the bottom nav is pinned to the viewport bottom and the main content reserves the bar's base height above it. On some iPhone PWA layouts, Safari already offsets a fixed bottom bar for the home indicator, so adding extra bottom safe-area padding can create a second dead strip.
 
+The timers screen has one extra standalone-only adjustment: its content wrapper adds a small bottom gutter. That keeps the timer buckets from sitting flush against the fixed bottom nav without creating an oversized gap above it.
+
 The iPhone home-screen app uses the `black` status bar style instead of `black-translucent`, so content stays below the system status area instead of rendering underneath the clock and indicators.

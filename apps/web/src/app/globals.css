@@ -222,6 +222,14 @@
     padding-bottom: var(--mobile-bottom-nav-height);
   }
 
+  .app-shell-standalone .timers-content {
+    /* Installed iPhone PWAs can lift the fixed bottom nav above the home
+       indicator, which makes full-bleed timer grids look flush against the
+       bar. Keep a small fixed gutter here so the timer grid still breathes
+       above the nav without adding the full safe-area inset twice. */
+    padding-bottom: 8px;
+  }
+
   .app-shell-standalone .app-shell-mobile-nav {
     position: fixed;
     left: 0;

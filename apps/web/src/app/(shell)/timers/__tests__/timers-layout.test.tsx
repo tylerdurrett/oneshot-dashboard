@@ -81,4 +81,9 @@ describe('TimersLayout', () => {
     // Inactive tab has /50 opacity
     expect(allLink?.className).toContain('text-sidebar-foreground/50');
   });
+
+  it('keeps a dedicated timers content wrapper for standalone PWA spacing fixes', () => {
+    const { container } = renderTimersRoute('/timers/remaining');
+    expect(container.querySelector('.timers-content')).toBeTruthy();
+  });
 });
