@@ -23,6 +23,12 @@ function makeBucket(overrides: Partial<TimeBucket> = {}): TimeBucket {
   };
 }
 
+async function waitForMenuListeners() {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Setup / Teardown
 // ---------------------------------------------------------------------------
@@ -131,6 +137,27 @@ describe('BucketContextMenu', () => {
     expect((minutesInput as HTMLInputElement).value).toBe('45');
   });
 
+  it('keeps remaining-time inputs at iPhone-safe font size on mobile', () => {
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onResetForToday={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Set Remaining Time'));
+
+    const inputs = screen.getAllByRole('spinbutton') as HTMLInputElement[];
+    const hoursInput = inputs[0]!;
+    const minutesInput = inputs[1]!;
+    expect(hoursInput.className).toContain('text-base');
+    expect(minutesInput.className).toContain('text-base');
+  });
+
   it('calls onSetRemainingTime with correct seconds and onClose when "Set" is clicked', () => {
     const onSetRemainingTime = vi.fn();
     const onClose = vi.fn();
@@ -174,6 +201,47 @@ describe('BucketContextMenu', () => {
 
     fireEvent.click(screen.getByText('Back'));
     expect(screen.getByText('Bucket Settings')).toBeTruthy();
+  });
+
+  it('keeps the set-time editor open when mobile focus scrolling fires', async () => {
+    const onClose = vi.fn();
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onResetForToday={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Set Remaining Time'));
+    await waitForMenuListeners();
+    fireEvent.scroll(document);
+
+    expect(screen.getByText('Hours')).toBeTruthy();
+    expect(screen.getByText('Minutes')).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still closes the anchored menu on page scroll before editing time', async () => {
+    const onClose = vi.fn();
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onResetForToday={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    await waitForMenuListeners();
+    fireEvent.scroll(document);
+
+    expect(onClose).toHaveBeenCalledOnce();
   });
 });
 

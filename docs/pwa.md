@@ -40,4 +40,8 @@ The timers screen has one extra standalone-only adjustment: its content wrapper 
 
 Navigation bars and timer buckets also avoid text selection on touch devices, so pressing and long-pressing feels like using controls instead of highlighting labels.
 
+Floating timer editors also keep their number inputs at a 16px mobile font size. On iPhone Safari, smaller focused inputs can trigger automatic page zoom, which is especially disruptive for long-press menus anchored to a specific spot on the screen.
+
+Those editors also stay open if iPhone Safari nudges the page while bringing up the keyboard. That focus-time scroll is a normal mobile browser behavior and should not kick you back to the timers grid.
+
 The iPhone home-screen app uses the `black` status bar style instead of `black-translucent`, so content stays below the system status area instead of rendering underneath the clock and indicators.

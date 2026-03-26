@@ -25,6 +25,8 @@ const VIEWPORT_MARGIN = 8;
 const OFFSET_BELOW = 10;
 const MENU_ITEM_CLASS =
   'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground hover:bg-accent';
+const TIME_INPUT_CLASS =
+  'w-16 rounded border border-border bg-input/30 px-2 py-1 text-base text-popover-foreground md:text-sm';
 
 // ---------------------------------------------------------------------------
 // Component
@@ -43,8 +45,10 @@ export function BucketContextMenu({
   // every time the parent re-renders with a new callback reference.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const viewRef = useRef<'menu' | 'setTime'>('menu');
 
   const [view, setView] = useState<'menu' | 'setTime'>('menu');
+  viewRef.current = view;
   const [adjusted, setAdjusted] = useState({ x: position.x, y: position.y + OFFSET_BELOW });
 
   // Pre-populate time inputs from bucket's remaining time
@@ -86,9 +90,11 @@ export function BucketContextMenu({
         onCloseRef.current();
       }
     };
-    // Close on scroll anywhere in the page (capture phase catches scrolls
-    // inside nested containers before they bubble).
+    // Close on page scroll while browsing the anchored action list. Mobile
+    // keyboards can trigger a scroll when focusing the time inputs, so keep
+    // the editor open once the user is in the "set time" view.
     const handleScroll = () => {
+      if (viewRef.current === 'setTime') return;
       onCloseRef.current();
     };
 
@@ -168,7 +174,9 @@ export function BucketContextMenu({
                 max={23}
                 value={hours}
                 onChange={(e) => setHours(Number(e.target.value))}
-                className="w-16 rounded border border-border bg-input/30 px-2 py-1 text-sm text-popover-foreground"
+                // Keep mobile inputs at 16px so iOS Safari does not auto-zoom
+                // and strand this fixed-position menu off-screen after focus.
+                className={TIME_INPUT_CLASS}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -179,7 +187,7 @@ export function BucketContextMenu({
                 max={59}
                 value={minutes}
                 onChange={(e) => setMinutes(Number(e.target.value))}
-                className="w-16 rounded border border-border bg-input/30 px-2 py-1 text-sm text-popover-foreground"
+                className={TIME_INPUT_CLASS}
               />
             </label>
           </div>
