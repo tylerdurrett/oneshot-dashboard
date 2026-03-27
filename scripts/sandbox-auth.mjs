@@ -255,7 +255,7 @@ function main() {
   console.log(`  Workspace: ${workspace}`);
   console.log(`  Auth:      first-party OAuth`);
   console.log('');
-  console.log('  Run `pnpm dev` to start building!');
+  console.log('  Run `pnpm go` to start building!');
   console.log('');
 }
 

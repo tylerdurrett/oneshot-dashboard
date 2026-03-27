@@ -5,9 +5,9 @@ set -euo pipefail
 # Usage:
 #   ./scripts/install-launchd.sh
 #
-# The service runs `pnpm dev` at the repo root, which starts both the
+# The service runs `pnpm go` at the repo root, which starts both the
 # Vite web app and the Fastify server with hot reload via Turbo.
-# Pre-dev hooks (migrations, setup checks) run automatically on each start.
+# Pre-go hooks (migrations, sandbox, setup checks) run automatically on each start.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -53,7 +53,7 @@ cat >"${LAUNCHD_PLIST_PATH}" <<PLIST
   <key>ProgramArguments</key>
   <array>
     <string>${PNPM_BIN}</string>
-    <string>dev</string>
+    <string>go</string>
   </array>
 
   <key>WorkingDirectory</key>

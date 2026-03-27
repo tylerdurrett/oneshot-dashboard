@@ -23,7 +23,7 @@ These commands automatically detect your platform and use the right backend (lau
 
 ## How It Works
 
-The service runs `pnpm dev` at the repo root, which starts both the **Vite web app** and the **Fastify server** via Turbo. **Hot reload** works exactly like normal dev — edit a file, see it update. Pre-dev hooks (database migrations, setup checks) run on each start.
+The service runs `pnpm go` at the repo root, which starts both the **Vite web app** and the **Fastify server** via Turbo. **Hot reload** works exactly like normal dev — edit a file, see it update. Pre-go hooks (database migrations, sandbox, setup checks) run on each start.
 
 ### macOS (launchd)
 

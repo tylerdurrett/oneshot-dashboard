@@ -113,7 +113,7 @@ async function main() {
   }
 
   console.log('');
-  console.log('  Setup complete! Run `pnpm dev` to start developing.');
+  console.log('  Setup complete! Run `pnpm go` to start developing.');
   console.log('');
 }
 

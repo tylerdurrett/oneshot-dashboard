@@ -13,7 +13,7 @@
     "predev": "node scripts/check-setup.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "prestudio": "node scripts/check-setup.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "studio": "turbo run studio",
-    "go": "turbo run dev studio",
+    "go": "turbo run dev",
     "stop": "node scripts/stop-dev-processes.mjs",
     "prego": "node scripts/check-setup.mjs && node scripts/ensure-sandbox.mjs && node scripts/backup-db.mjs && pnpm --filter @repo/db db:migrate",
     "new-video": "node scripts/new-video.mjs",

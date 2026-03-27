@@ -5,9 +5,9 @@ set -euo pipefail
 # Usage:
 #   ./scripts/install-systemd.sh
 #
-# The service runs `pnpm dev` at the repo root, which starts both the
+# The service runs `pnpm go` at the repo root, which starts both the
 # Vite web app and the Fastify server with hot reload via Turbo.
-# Pre-dev hooks (migrations, setup checks) run automatically on each start.
+# Pre-go hooks (migrations, sandbox, setup checks) run automatically on each start.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -65,7 +65,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${REPO_ROOT}
-ExecStart=${PNPM_BIN} dev
+ExecStart=${PNPM_BIN} go
 Restart=always
 RestartSec=3
 Environment=NODE_ENV=development

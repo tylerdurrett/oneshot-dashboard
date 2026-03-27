@@ -413,7 +413,7 @@ See reference documentation for advanced patterns and complete API coverage.
 
 ### Dashboard Verification Workflow
 
-**Always read the port from `project.config.json`** — never hardcode it. Dev server: `pnpm dev`.
+**Always read the port from `project.config.json`** — never hardcode it. Dev server: `pnpm go`.
 
 ```bash
 # Read port first
