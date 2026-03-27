@@ -1,6 +1,5 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 import { CHAT_TITLE } from '@/app/route-metadata';
 import { Plus } from 'lucide-react';
@@ -22,10 +21,9 @@ import {
   Spinner,
 } from '@repo/ui';
 import { ChatErrorBanner } from './chat-error-banner';
-import { useChatSocketContext } from './chat-socket-context';
+import { useChatRunContext } from './chat-run-context';
 import { ScrollOnStream } from './scroll-on-stream';
-import { useDeleteThread, useThreads, threadKeys } from './use-threads';
-import { createThread } from './api';
+import { useDeleteThread, useThreads } from './use-threads';
 import { ThreadSelector } from './thread-selector';
 
 /**
@@ -35,11 +33,18 @@ import { ThreadSelector } from './thread-selector';
  */
 export default function ChatIndexPage() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   useDocumentTitle(CHAT_TITLE);
 
-  const { messages, sendMessage, isStreaming, error, setError, clearError, connectionStatus } =
-    useChatSocketContext();
+  const {
+    messages,
+    sendMessage,
+    isStreaming,
+    streamState,
+    error,
+    setError,
+    clearError,
+    setVisibleThreadId,
+  } = useChatRunContext();
   const threadsQuery = useThreads();
   const deleteThreadMutation = useDeleteThread();
 
@@ -48,6 +53,10 @@ export default function ChatIndexPage() {
   // ---------------------------------------------------------------------------
   // Thread switching — navigate via URL
   // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    setVisibleThreadId(null);
+  }, [setVisibleThreadId]);
 
   const handleSelectThread = useCallback(
     (threadId: string) => {
@@ -75,17 +84,11 @@ export default function ChatIndexPage() {
       const text = message.text.trim();
       if (!text || creatingRef.current) return;
 
-      // Don't create a thread if the WebSocket isn't connected —
-      // sendMessage would silently fail, leaving an empty thread.
-      if (connectionStatus !== 'connected') return;
-
       creatingRef.current = true;
 
       try {
-        const thread = await createThread();
-        queryClient.invalidateQueries({ queryKey: threadKeys.all });
-        sendMessage(thread.id, text);
-        navigate(`/chat/${thread.id}`, { replace: true });
+        const run = await sendMessage(null, text);
+        navigate(`/chat/${run.threadId}`, { replace: true });
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'Failed to send message';
@@ -98,7 +101,7 @@ export default function ChatIndexPage() {
         creatingRef.current = false;
       }
     },
-    [sendMessage, setError, navigate, queryClient, connectionStatus],
+    [sendMessage, setError, navigate],
   );
 
   // ---------------------------------------------------------------------------
@@ -146,7 +149,7 @@ export default function ChatIndexPage() {
                       {msg.role === 'assistant' && isStreaming && (
                         <div className={`flex items-center gap-2 text-sm text-muted-foreground${msg.content ? ' hidden' : ''}`}>
                           <Spinner className="size-4" />
-                          Thinking...
+                          {streamState === 'finishing' ? 'Finishing response...' : 'Thinking...'}
                         </div>
                       )}
                     </MessageContent>
@@ -159,17 +162,6 @@ export default function ChatIndexPage() {
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
-
-          {connectionStatus !== 'connected' && (
-            <div
-              role="status"
-              className="border-t border-border bg-muted px-4 py-2 text-center text-xs text-muted-foreground"
-            >
-              {connectionStatus === 'connecting'
-                ? 'Connecting...'
-                : 'Disconnected. Reconnecting...'}
-            </div>
-          )}
           <div className="border-t border-border p-4">
             <PromptInput onSubmit={handleSubmit}>
               <PromptInputBody>

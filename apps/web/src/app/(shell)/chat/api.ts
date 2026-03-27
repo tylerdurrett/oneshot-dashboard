@@ -18,6 +18,47 @@ export interface ThreadMessage {
   createdAt: number;
 }
 
+export interface ChatRunError {
+  code: string;
+  message: string;
+}
+
+export interface ChatRunSnapshot {
+  runId: string;
+  threadId: string | null;
+  status: 'preparing' | 'running' | 'completed' | 'failed';
+  accepted: boolean;
+  completed: boolean;
+  createdThread: boolean;
+  userMessageId: string | null;
+  assistantPreview: string;
+  assistantMessageId: string | null;
+  error: ChatRunError | null;
+}
+
+export type ChatRunEvent =
+  | {
+      type: 'ready';
+      runId: string;
+      threadId: string;
+      createdThread: boolean;
+      userMessageId: string;
+    }
+  | { type: 'token'; text: string }
+  | { type: 'done'; assistantMessageId: string; sessionId: string }
+  | { type: 'error'; code: string; message: string };
+
+export interface StartChatRunParams {
+  threadId?: string;
+  content: string;
+  clientRequestId: string;
+  signal?: AbortSignal;
+}
+
+export interface ChatRunConflict extends ChatRunSnapshot {
+  code: string;
+}
+
 // ---------------------------------------------------------------------------
 // Base URL
 // ---------------------------------------------------------------------------
@@ -62,4 +103,24 @@ export async function deleteThread(threadId: string): Promise<void> {
     method: 'DELETE',
   });
   if (!res.ok) throw new Error(`Failed to delete thread: ${res.status}`);
+}
+
+export async function startChatRun({
+  threadId,
+  content,
+  clientRequestId,
+  signal,
+}: StartChatRunParams): Promise<Response> {
+  return fetch(`${getBaseUrl()}/chat/runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ threadId, content, clientRequestId }),
+    signal,
+  });
+}
+
+export async function fetchChatRun(runId: string): Promise<ChatRunSnapshot> {
+  const res = await fetch(`${getBaseUrl()}/chat/runs/${runId}`);
+  if (!res.ok) throw new Error(`Failed to fetch chat run: ${res.status}`);
+  return res.json();
 }

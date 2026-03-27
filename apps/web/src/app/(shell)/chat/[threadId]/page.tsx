@@ -22,11 +22,11 @@ import {
   Spinner,
 } from '@repo/ui';
 import { ChatErrorBanner } from '../chat-error-banner';
-import { useChatSocketContext } from '../chat-socket-context';
+import { useChatRunContext } from '../chat-run-context';
 import { ScrollOnStream } from '../scroll-on-stream';
 import { useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../use-threads';
 import { ThreadSelector } from '../thread-selector';
-import type { ChatMessage } from '../use-chat-socket';
+import type { ChatMessage } from '../use-chat-run';
 
 export default function ThreadPage() {
   // React Router's useParams returns string | undefined; threadId is always
@@ -35,8 +35,16 @@ export default function ThreadPage() {
   const navigate = useNavigate();
   useDocumentTitle(CHAT_TITLE);
 
-  const { messages, sendMessage, setMessages, isStreaming, error, clearError, connectionStatus } =
-    useChatSocketContext();
+  const {
+    messages,
+    sendMessage,
+    setMessages,
+    isStreaming,
+    streamState,
+    error,
+    clearError,
+    setVisibleThreadId,
+  } = useChatRunContext();
   const deleteThreadMutation = useDeleteThread();
   const threadsQuery = useThreads();
   const queryClient = useQueryClient();
@@ -46,6 +54,11 @@ export default function ThreadPage() {
   // ---------------------------------------------------------------------------
 
   const threadMessagesQuery = useThreadMessages(threadId);
+
+  useEffect(() => {
+    setVisibleThreadId(threadId);
+    return () => setVisibleThreadId(null);
+  }, [threadId, setVisibleThreadId]);
 
   // Thread not found: the messages query failed with a 404
   const threadNotFound =
@@ -135,10 +148,10 @@ export default function ThreadPage() {
   // ---------------------------------------------------------------------------
 
   const handleSubmit = useCallback(
-    (message: { text: string }) => {
+    async (message: { text: string }) => {
       const text = message.text.trim();
       if (!text) return;
-      sendMessage(threadId, text);
+      await sendMessage(threadId, text);
     },
     [sendMessage, threadId],
   );
@@ -207,7 +220,7 @@ export default function ThreadPage() {
                         {msg.role === 'assistant' && isStreaming && (
                           <div className={`flex items-center gap-2 text-sm text-muted-foreground${msg.content ? ' hidden' : ''}`}>
                             <Spinner className="size-4" />
-                            Thinking...
+                            {streamState === 'finishing' ? 'Finishing response...' : 'Thinking...'}
                           </div>
                         )}
                       </MessageContent>
@@ -220,17 +233,6 @@ export default function ThreadPage() {
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
-
-          {connectionStatus !== 'connected' && (
-            <div
-              role="status"
-              className="border-t border-border bg-muted px-4 py-2 text-center text-xs text-muted-foreground"
-            >
-              {connectionStatus === 'connecting'
-                ? 'Connecting...'
-                : 'Disconnected. Reconnecting...'}
-            </div>
-          )}
           <div className="border-t border-border p-4">
             <PromptInput onSubmit={handleSubmit}>
               <PromptInputBody>

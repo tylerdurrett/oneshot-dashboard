@@ -1,7 +1,13 @@
 import { spawn as defaultSpawn } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { config } from '../config.js';
-import { refreshAndInjectCredentials } from './credentials.js';
+import {
+  ensureHostTokenFresh,
+  injectCredentials,
+  readKeychainCredentials,
+  stripRefreshToken,
+  refreshAndInjectCredentials,
+} from './credentials.js';
 
 /** Possible states a sandbox probe can return. */
 export type SandboxStatus = 'healthy' | 'auth_failed' | 'unavailable';
@@ -20,6 +26,16 @@ export interface PreflightResult {
   message: string;
   recoveryAttempted: boolean;
 }
+
+export type PrepareSandboxFailureCode =
+  | 'auth_unavailable'
+  | 'sandbox_unavailable'
+  | 'host_refresh_failed'
+  | 'verification_failed';
+
+export type PrepareSandboxResult =
+  | { ok: true; message: string }
+  | { ok: false; code: PrepareSandboxFailureCode; message: string };
 
 /** Minimal interface for the spawn function dependency (for DI in tests). */
 export type SpawnFn = typeof defaultSpawn;
@@ -50,8 +66,13 @@ function isCircuitOpen(): boolean {
 }
 
 /** Record a recovery attempt (call after every injection, success or failure). */
-function recordHealAttempt(): void {
+function recordHealFailure(): void {
   circuitBreaker.attempts.push(Date.now());
+}
+
+/** Clear breaker history after a healthy readiness cycle. */
+function resetHealFailures(): void {
+  circuitBreaker.attempts = [];
 }
 
 /** Clear circuit breaker state. Exported for test isolation. */
@@ -275,9 +296,9 @@ export async function preflightCheck(
 
   console.log('[sandbox] preflight: auth_failed, attempting credential injection recovery');
   const injection = await refreshAndInjectCredentials(spawnFn);
-  recordHealAttempt();
 
   if (!injection.ok) {
+    recordHealFailure();
     console.warn(`[sandbox] preflight: injection failed (phase=${injection.phase})`);
     return {
       ok: false,
@@ -292,15 +313,90 @@ export async function preflightCheck(
   const reProbe = await probeSandbox(spawnFn);
   if (reProbe.status === 'healthy') {
     console.log('[sandbox] preflight: recovery successful');
+    resetHealFailures();
     return { ok: true, status: 'healthy', message: reProbe.message, recoveryAttempted: true };
   }
 
+  recordHealFailure();
   console.warn(`[sandbox] preflight: recovery failed, sandbox still ${reProbe.status}`);
   return {
     ok: false,
     status: reProbe.status,
     message: `Auth recovery injected credentials but sandbox still unhealthy: ${reProbe.message}`,
     recoveryAttempted: true,
+  };
+}
+
+/** Inject fresh credentials at point-of-use, then verify immediately. */
+export async function prepareSandboxForPrompt(
+  spawnFn: SpawnFn = defaultSpawn,
+): Promise<PrepareSandboxResult> {
+  if (isCircuitOpen()) {
+    return {
+      ok: false,
+      code: 'verification_failed',
+      message: 'Chat agent recovery is cooling down after repeated failures. Try again in a moment.',
+    };
+  }
+
+  const hostStatus = await ensureHostTokenFresh(spawnFn);
+  if (!hostStatus.fresh && !hostStatus.refreshed) {
+    recordHealFailure();
+    return {
+      ok: false,
+      code: 'host_refresh_failed',
+      message: 'The host could not refresh the chat agent login.',
+    };
+  }
+
+  let credentials: unknown;
+  if (hostStatus.fresh) {
+    credentials = hostStatus.credentials;
+  } else {
+    const keychainResult = await readKeychainCredentials(spawnFn);
+    if (!keychainResult.ok) {
+      recordHealFailure();
+      return {
+        ok: false,
+        code: keychainResult.phase === 'keychain' ? 'auth_unavailable' : 'host_refresh_failed',
+        message: 'The host could not read the chat agent credentials.',
+      };
+    }
+    credentials = keychainResult.credentials;
+  }
+
+  const injection = await injectCredentials(
+    JSON.stringify(stripRefreshToken(credentials)),
+    spawnFn,
+  );
+  if (!injection.ok) {
+    recordHealFailure();
+    return {
+      ok: false,
+      code: 'sandbox_unavailable',
+      message: 'The chat agent sandbox is offline or unavailable.',
+    };
+  }
+
+  const verification = await probeSandbox(spawnFn);
+  if (verification.status === 'healthy') {
+    resetHealFailures();
+    return { ok: true, message: verification.message };
+  }
+
+  recordHealFailure();
+  if (verification.status === 'unavailable') {
+    return {
+      ok: false,
+      code: 'sandbox_unavailable',
+      message: 'The chat agent sandbox is offline or unavailable.',
+    };
+  }
+
+  return {
+    ok: false,
+    code: 'verification_failed',
+    message: 'The chat agent could not verify its login after refresh.',
   };
 }
 
@@ -676,20 +772,22 @@ function runInvocation(
       }
 
       console.log('[sandbox] invocation: attempting auth recovery (credential injection + retry)');
-      recordHealAttempt();
       refreshAndInjectCredentials(spawnFn)
         .then((injection) => {
           if (injection.ok) {
             console.log('[sandbox] invocation: auth recovery succeeded, retrying');
+            resetHealFailures();
             emitter.emit('auth_recovery');
             runInvocation(emitter, prompt, sessionId, spawnFn, inactivityTimeoutMs, true);
           } else {
+            recordHealFailure();
             console.warn(`[sandbox] invocation: auth recovery injection failed (phase=${injection.phase})`);
             emitter.emit('error', authError);
             emitter.emit('close');
           }
         })
         .catch(() => {
+          recordHealFailure();
           emitter.emit('error', authError);
           emitter.emit('close');
         });

@@ -4,13 +4,20 @@ import { config } from '../config.js';
 import {
   extractTextFromStreamLine,
   invokeClaude,
+  prepareSandboxForPrompt,
   preflightCheck,
   probeSandbox,
   resetCircuitBreaker,
   type ClaudeResult,
   type SpawnFn,
 } from '../services/sandbox.js';
-import { createFakeSpawn, mockPlatform, ndjson, restorePlatform } from './helpers.js';
+import {
+  createFakeSpawn,
+  createRoutingSpawn,
+  mockPlatform,
+  ndjson,
+  restorePlatform,
+} from './helpers.js';
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -938,6 +945,125 @@ describe('preflightCheck', () => {
         vi.useRealTimers();
       }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// prepareSandboxForPrompt
+// ---------------------------------------------------------------------------
+
+describe('prepareSandboxForPrompt', () => {
+  beforeEach(() => {
+    resetCircuitBreaker();
+    mockPlatform('darwin');
+  });
+
+  afterEach(() => {
+    restorePlatform();
+  });
+
+  it('injects fresh credentials and verifies readiness on the happy path', async () => {
+    const creds = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'tok',
+        expiresAt: Date.now() + 3_600_000,
+        refreshToken: 'rt-secret',
+      },
+    });
+    const spawnFn = createRoutingSpawn({
+      security: { stdout: creds, exitCode: 0 },
+      auth: {
+        stdout: JSON.stringify({
+          loggedIn: true,
+          authMethod: 'firstPartyOauth',
+          apiProvider: 'firstParty',
+        }),
+        exitCode: 0,
+      },
+      docker: { exitCode: 0 },
+    });
+
+    const result = await prepareSandboxForPrompt(spawnFn);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns host_refresh_failed when the host token cannot be refreshed', async () => {
+    const spawnFn = createRoutingSpawn({
+      security: { stderr: 'missing creds', exitCode: 44 },
+    });
+
+    const result = await prepareSandboxForPrompt(spawnFn);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('host_refresh_failed');
+    }
+  });
+
+  it('returns sandbox_unavailable when credential injection fails', async () => {
+    const creds = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'tok',
+        expiresAt: Date.now() + 3_600_000,
+        refreshToken: 'rt-secret',
+      },
+    });
+    const spawnFn = ((command: string, args: string[]) => {
+      if (command === 'security') {
+        return createFakeSpawn({ stdout: creds, exitCode: 0 })(command, args);
+      }
+      if (command === 'docker' && args.includes('-i')) {
+        return createFakeSpawn({ stderr: 'sandbox down', exitCode: 1 })(command, args);
+      }
+      if (command === 'docker' && args.includes('auth') && args.includes('status')) {
+        return createFakeSpawn({
+          stdout: JSON.stringify({
+            loggedIn: true,
+            authMethod: 'firstPartyOauth',
+            apiProvider: 'firstParty',
+          }),
+          exitCode: 0,
+        })(command, args);
+      }
+      return createFakeSpawn({ exitCode: 0 })(command, args);
+    }) as SpawnFn;
+
+    const result = await prepareSandboxForPrompt(spawnFn);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('sandbox_unavailable');
+    }
+  });
+
+  it('returns verification_failed when auth still looks wrong after injection', async () => {
+    const creds = JSON.stringify({
+      claudeAiOauth: {
+        accessToken: 'tok',
+        expiresAt: Date.now() + 3_600_000,
+        refreshToken: 'rt-secret',
+      },
+    });
+    const spawnFn = createRoutingSpawn({
+      security: { stdout: creds, exitCode: 0 },
+      auth: {
+        stdout: JSON.stringify({
+          loggedIn: true,
+          authMethod: 'api_key',
+          apiProvider: 'apiKey',
+        }),
+        exitCode: 0,
+      },
+      docker: { exitCode: 0 },
+    });
+
+    const result = await prepareSandboxForPrompt(spawnFn);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.code).toBe('verification_failed');
+    }
   });
 });
 

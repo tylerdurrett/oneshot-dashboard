@@ -10,23 +10,23 @@ const providerLifecycle = vi.hoisted(() => ({
   unmounts: 0,
 }));
 
-// Stub the ChatSocketProvider's context — real chat pages consume it.
-vi.mock('../app/(shell)/chat/chat-socket-context', async () => {
+// Stub the ChatRunProvider's context — real chat pages consume it.
+vi.mock('../app/(shell)/chat/chat-run-context', async () => {
   const React = await import('react');
 
   return {
-    useChatSocketContext: () => ({
-      sendMessage: vi.fn(),
+    useChatRunContext: () => ({
+      sendMessage: vi.fn(async () => ({ threadId: 'thread-1' })),
       messages: [],
       setMessages: vi.fn(),
       isStreaming: false,
+      streamState: 'idle',
       error: null,
       setError: vi.fn(),
       clearError: vi.fn(),
-      connectionStatus: 'connected',
+      setVisibleThreadId: vi.fn(),
     }),
-    useActivateChatSocket: () => vi.fn(),
-    ChatSocketProvider: ({ children }: { children: React.ReactNode }) => {
+    ChatRunProvider: ({ children }: { children: React.ReactNode }) => {
       React.useEffect(() => {
         providerLifecycle.mounts += 1;
         return () => {
@@ -36,7 +36,7 @@ vi.mock('../app/(shell)/chat/chat-socket-context', async () => {
 
       return (
         <>
-          <div data-testid="chat-socket-provider-marker" />
+          <div data-testid="chat-run-provider-marker" />
           {children}
         </>
       );
@@ -132,7 +132,7 @@ describe('router', () => {
   it('provides the chat socket at the shell level so timers and chat share it', () => {
     renderRoute('/timers/remaining');
 
-    expect(screen.getByTestId('chat-socket-provider-marker')).toBeDefined();
+    expect(screen.getByTestId('chat-run-provider-marker')).toBeDefined();
     expect(providerLifecycle.mounts).toBe(1);
     expect(providerLifecycle.unmounts).toBe(0);
   });

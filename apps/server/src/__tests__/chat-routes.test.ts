@@ -2,17 +2,12 @@ import { EventEmitter } from 'node:events';
 import { createClient } from '@libsql/client';
 import { drizzle } from 'drizzle-orm/libsql';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { threads, messages } from '@repo/db';
+import { messages, threads } from '@repo/db';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
 import type { SpawnFn } from '../services/sandbox.js';
-import { createFakeSpawn, mockPlatform, restorePlatform, withHealthyPreflight, ndjson } from './helpers.js';
+import { createFakeSpawn, ndjson } from './helpers.js';
 
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
-
-/** Create a fresh in-memory database with the schema applied. */
 function createTestDb(): Database {
   const client = createClient({ url: ':memory:' });
   const testDb = drizzle(client, { schema: { threads, messages } });
@@ -38,55 +33,112 @@ function createTestDb(): Database {
   return testDb as unknown as Database;
 }
 
-/** Parse a WebSocket message buffer as JSON. */
-function parseMsg(data: Buffer): Record<string, unknown> {
-  return JSON.parse(data.toString());
+function healthySpawnForInvocation(invocationSpawn: SpawnFn): SpawnFn {
+  const healthyAuth = JSON.stringify({
+    loggedIn: true,
+    authMethod: 'firstPartyOauth',
+    apiProvider: 'firstParty',
+  });
+  const creds = JSON.stringify({
+    claudeAiOauth: {
+      accessToken: 'fresh-token',
+      expiresAt: Date.now() + 3_600_000,
+      refreshToken: 'rt-secret',
+    },
+  });
+
+  return ((command: string, args: string[]) => {
+    if (command === 'security') {
+      return createFakeSpawn({ stdout: creds, exitCode: 0 })(command, args);
+    }
+
+    if (command === 'docker' && args.includes('-i')) {
+      return createFakeSpawn({ exitCode: 0 })(command, args);
+    }
+
+    if (command === 'docker' && args.includes('auth') && args.includes('status')) {
+      return createFakeSpawn({ stdout: healthyAuth, exitCode: 0 })(command, args);
+    }
+
+    if (command === 'docker' && args.includes('-p')) {
+      return invocationSpawn(command, args);
+    }
+
+    return createFakeSpawn({ exitCode: 1, stderr: `Unhandled command: ${command}` })(
+      command,
+      args,
+    );
+  }) as SpawnFn;
 }
 
-/** Create a thread via HTTP and return its ID. */
-async function createThread(
-  server: ReturnType<typeof buildServer>,
-  title = 'Test thread',
-): Promise<string> {
-  const res = await server.inject({
+async function startServer(server: ReturnType<typeof buildServer>): Promise<string> {
+  const address = await server.listen({ port: 0, host: '127.0.0.1' });
+  return address;
+}
+
+async function createThread(baseUrl: string, title = 'Test thread') {
+  const response = await fetch(`${baseUrl}/threads`, {
     method: 'POST',
-    url: '/threads',
-    payload: { title },
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
   });
-  return res.json().thread.id;
+  const body = await response.json();
+  return body.thread as { id: string };
 }
 
-/**
- * Collect all WebSocket messages until a `done` or `error` event,
- * or until the timeout expires.
- */
-function collectWsMessages(
-  ws: Awaited<ReturnType<ReturnType<typeof buildServer>['injectWS']>>,
-  opts?: { timeoutMs?: number },
+async function readRunStream(
+  response: Response,
+  opts?: { stopOn?: 'ready' | 'done' | 'error' },
 ): Promise<Record<string, unknown>[]> {
-  const timeout = opts?.timeoutMs ?? 5000;
+  const reader = response.body?.getReader();
+  if (!reader) return [];
 
-  return new Promise((resolve) => {
-    const msgs: Record<string, unknown>[] = [];
-    const timer = setTimeout(() => resolve(msgs), timeout);
+  const decoder = new TextDecoder();
+  let buffer = '';
+  const events: Record<string, unknown>[] = [];
 
-    ws.on('message', (data: Buffer) => {
-      const msg = parseMsg(data);
-      msgs.push(msg);
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-      if (msg.type === 'done' || msg.type === 'error') {
-        clearTimeout(timer);
-        resolve(msgs);
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const event = JSON.parse(trimmed) as Record<string, unknown>;
+      events.push(event);
+
+      if (opts?.stopOn && event.type === opts.stopOn) {
+        await reader.cancel();
+        return events;
       }
-    });
-  });
+    }
+  }
+
+  if (buffer.trim()) {
+    events.push(JSON.parse(buffer.trim()) as Record<string, unknown>);
+  }
+
+  return events;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+async function waitForRunCompletion(baseUrl: string, runId: string) {
+  for (let i = 0; i < 50; i++) {
+    const response = await fetch(`${baseUrl}/chat/runs/${runId}`);
+    const body = await response.json();
+    if (body.completed) {
+      return body;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 
-describe('chat WebSocket route', () => {
+  throw new Error('Run did not complete in time');
+}
+
+describe('chat run routes', () => {
   let testDb: Database;
   let server: ReturnType<typeof buildServer>;
 
@@ -98,852 +150,302 @@ describe('chat WebSocket route', () => {
     await server?.close();
   });
 
-  // -----------------------------------------------------------------------
-  // Happy path
-  // -----------------------------------------------------------------------
-
-  describe('happy path', () => {
-    it('streams tokens and sends done after successful Claude invocation', async () => {
-      const spawnFn = withHealthyPreflight(createFakeSpawn({
+  it('creates a draft thread on the server and streams a completed response', async () => {
+    const spawnFn = healthySpawnForInvocation(
+      createFakeSpawn({
         stdout: ndjson(
-          {
-            type: 'content_block_delta',
-            delta: { type: 'text_delta', text: 'Hello' },
-          },
-          {
-            type: 'content_block_delta',
-            delta: { type: 'text_delta', text: ' world' },
-          },
+          { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hello' } },
+          { type: 'content_block_delta', delta: { type: 'text_delta', text: ' world' } },
           { type: 'result', result: 'Hello world', session_id: 'sess-1' },
         ),
         exitCode: 0,
-      }));
+      }),
+    );
 
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
+    server = buildServer({ logger: false, database: testDb, spawnFn });
+    const baseUrl = await startServer(server);
 
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'Hi Claude' }),
-      );
-
-      const msgs = await collecting;
-
-      const tokens = msgs.filter((m) => m.type === 'token');
-      const done = msgs.find((m) => m.type === 'done');
-
-      expect(tokens).toHaveLength(2);
-      expect(tokens[0]!.text).toBe('Hello');
-      expect(tokens[1]!.text).toBe(' world');
-      expect(done).toBeDefined();
-      expect(done!.messageId).toBeDefined();
-
-      ws.close();
+    const response = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Hi Claude', clientRequestId: 'draft-1' }),
     });
+    const events = await readRunStream(response);
 
-    it('persists user and assistant messages to the database', async () => {
-      const spawnFn = withHealthyPreflight(createFakeSpawn({
-        stdout: ndjson({
-          type: 'result',
-          result: 'Bot reply',
-          session_id: 'sess-2',
-        }),
-        exitCode: 0,
-      }));
+    expect(events[0]?.type).toBe('ready');
+    expect(events[1]?.type).toBe('token');
+    expect(events[2]?.type).toBe('token');
+    expect(events[3]?.type).toBe('done');
 
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
+    const ready = events[0]!;
+    const threadId = ready.threadId as string;
 
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
+    const messagesResponse = await fetch(`${baseUrl}/threads/${threadId}/messages`);
+    const messagesBody = await messagesResponse.json();
+    expect(messagesBody.messages).toHaveLength(2);
+    expect(messagesBody.messages[0].role).toBe('user');
+    expect(messagesBody.messages[1].role).toBe('assistant');
 
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'User says hi',
-        }),
-      );
-      await collecting;
-      ws.close();
-
-      // Verify messages via HTTP endpoint
-      const res = await server.inject({
-        method: 'GET',
-        url: `/threads/${threadId}/messages`,
-      });
-      const body = res.json();
-
-      expect(body.messages).toHaveLength(2);
-      expect(body.messages[0].role).toBe('user');
-      expect(body.messages[0].content).toBe('User says hi');
-      expect(body.messages[1].role).toBe('assistant');
-      expect(body.messages[1].content).toBe('Bot reply');
-    });
-
-    it("updates the thread's claudeSessionId after response", async () => {
-      const spawnFn = withHealthyPreflight(createFakeSpawn({
-        stdout: ndjson({
-          type: 'result',
-          result: 'ok',
-          session_id: 'new-session-abc',
-        }),
-        exitCode: 0,
-      }));
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'test' }),
-      );
-      await collecting;
-      ws.close();
-
-      // Check the thread's session ID via the service layer
-      const { getThread } = await import('../services/thread.js');
-      const thread = await getThread(threadId, testDb);
-
-      expect(thread?.claudeSessionId).toBe('new-session-abc');
-    });
+    const threadsResponse = await fetch(`${baseUrl}/threads`);
+    const threadsBody = await threadsResponse.json();
+    expect(threadsBody.threads[0].title).toBe('Hi Claude');
+    expect(threadsBody.threads[0].claudeSessionId).toBe('sess-1');
   });
 
-  // -----------------------------------------------------------------------
-  // Thread title auto-generation
-  // -----------------------------------------------------------------------
-
-  describe('thread title auto-generation', () => {
-    it('updates thread title from first user message', async () => {
-      const spawnFn = withHealthyPreflight(createFakeSpawn({
-        stdout: ndjson({
-          type: 'result',
-          result: 'ok',
-          session_id: 'sid',
-        }),
-        exitCode: 0,
-      }));
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      // Create a thread with the default "New conversation" title
-      const threadId = await createThread(server, 'New conversation');
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'What is the weather today?',
-        }),
-      );
-      await collecting;
-      ws.close();
-
-      // Verify the thread title was updated
-      const { getThread } = await import('../services/thread.js');
-      const thread = await getThread(threadId, testDb);
-
-      expect(thread?.title).toBe('What is the weather today?');
-    });
-
-    it('does not overwrite title on subsequent messages', async () => {
-      // We need a spawnFn that can handle two invocations
-      let callCount = 0;
-      const spawnFn = withHealthyPreflight(((_cmd: string, _args: string[]) => {
-        callCount++;
-        const inner = createFakeSpawn({
-          stdout: ndjson({
-            type: 'result',
-            result: `reply ${callCount}`,
-            session_id: `sid-${callCount}`,
-          }),
-          exitCode: 0,
-        });
-        return inner(_cmd, _args);
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server, 'New conversation');
-      const ws = await server.injectWS('/chat');
-
-      // First message — sets the title
-      const first = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'First message sets title',
-        }),
-      );
-      await first;
-
-      // Second message — should NOT change title
-      const second = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'Second message should not change title',
-        }),
-      );
-      await second;
-      ws.close();
-
-      const { getThread } = await import('../services/thread.js');
-      const thread = await getThread(threadId, testDb);
-
-      expect(thread?.title).toBe('First message sets title');
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Error scenarios
-  // -----------------------------------------------------------------------
-
-  describe('error scenarios', () => {
-    it('responds to ping health checks', async () => {
-      const spawnFn = createFakeSpawn({ stdout: '', exitCode: 0 });
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws, { timeoutMs: 500 });
-
-      ws.send(JSON.stringify({ type: 'ping' }));
-      const msgs = await collecting;
-
-      expect(msgs).toHaveLength(1);
-      expect(msgs[0]!.type).toBe('pong');
-
-      ws.close();
-    });
-
-    it('returns error for invalid JSON', async () => {
-      const spawnFn = createFakeSpawn({ stdout: '', exitCode: 0 });
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send('not valid json {{{');
-      const msgs = await collecting;
-
-      expect(msgs).toHaveLength(1);
-      expect(msgs[0]!.type).toBe('error');
-      expect(msgs[0]!.message).toBe('Invalid JSON');
-
-      ws.close();
-    });
-
-    it('returns error for invalid message format (missing fields)', async () => {
-      const spawnFn = createFakeSpawn({ stdout: '', exitCode: 0 });
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      // Missing content field
-      ws.send(JSON.stringify({ type: 'message', threadId: 'some-id' }));
-      const msgs = await collecting;
-
-      expect(msgs).toHaveLength(1);
-      expect(msgs[0]!.type).toBe('error');
-      expect(msgs[0]!.message).toBe('Invalid message format');
-
-      ws.close();
-    });
-
-    it('returns error for nonexistent thread ID', async () => {
-      const spawnFn = createFakeSpawn({ stdout: '', exitCode: 0 });
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId: 'nonexistent-thread',
-          content: 'Hello',
-        }),
-      );
-      const msgs = await collecting;
-
-      expect(msgs).toHaveLength(1);
-      expect(msgs[0]!.type).toBe('error');
-      expect(msgs[0]!.message).toBe('Thread not found');
-
-      ws.close();
-    });
-
-    it('forwards sandbox errors to the client', async () => {
-      const spawnFn = createFakeSpawn({
-        stderr: "Error: sandbox 'my-sandbox' does not exist",
-        exitCode: 1,
-      });
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'Hello' }),
-      );
-      const msgs = await collecting;
-
-      const errorMsg = msgs.find((m) => m.type === 'error');
-      expect(errorMsg).toBeDefined();
-      expect(errorMsg!.message).toBeDefined();
-
-      ws.close();
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Streaming lock
-  // -----------------------------------------------------------------------
-
-  describe('streaming lock', () => {
-    it('responds to ping while streaming is in progress', async () => {
-      let invocationCount = 0;
-      const spawnFn = withHealthyPreflight((() => {
-        invocationCount++;
-
-        const child = new EventEmitter();
-        const stdoutEmitter = new EventEmitter();
-        const stderrEmitter = new EventEmitter();
-
-        Object.assign(child, {
-          stdout: stdoutEmitter,
-          stderr: stderrEmitter,
-          kill: () => {
-            process.nextTick(() => child.emit('close', null));
-          },
-        });
-
-        process.nextTick(() => {
-          const token = JSON.stringify({
-            type: 'content_block_delta',
-            delta: { type: 'text_delta', text: 'streaming...' },
-          }) + '\n';
-          stdoutEmitter.emit('data', Buffer.from(token));
-
-          setTimeout(() => {
-            const result = JSON.stringify({
-              type: 'result',
-              result: 'streaming...',
-              session_id: 'sid',
-            }) + '\n';
-            stdoutEmitter.emit('data', Buffer.from(result));
-            child.emit('close', 0);
-          }, 100);
-        });
-
-        return child;
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-
-      const gotToken = new Promise<void>((resolve) => {
-        ws.on('message', (data: Buffer) => {
-          const msg = parseMsg(data);
-          if (msg.type === 'token') resolve();
-        });
-      });
-
-      const gotPong = new Promise<void>((resolve) => {
-        ws.on('message', (data: Buffer) => {
-          const msg = parseMsg(data);
-          if (msg.type === 'pong') resolve();
-        });
-      });
-
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'First message',
-        }),
-      );
-
-      await gotToken;
-      ws.send(JSON.stringify({ type: 'ping' }));
-      await gotPong;
-      ws.close();
-
-      expect(invocationCount).toBe(1);
-    });
-
-    it('ignores messages sent while streaming is in progress', async () => {
-      // Use a spawn that emits a token first, then waits before the result,
-      // giving us time to send a second message during streaming.
-      let invocationCount = 0;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const spawnFn = withHealthyPreflight(((_cmd: string, _args: string[]) => {
-        invocationCount++;
-
-        const child = new EventEmitter();
-        const stdoutEmitter = new EventEmitter();
-        const stderrEmitter = new EventEmitter();
-
-        Object.assign(child, {
-          stdout: stdoutEmitter,
-          stderr: stderrEmitter,
-          kill: () => {
-            process.nextTick(() => child.emit('close', null));
-          },
-        });
-
-        process.nextTick(() => {
-          // Emit first token immediately
-          const token = JSON.stringify({
-            type: 'content_block_delta',
-            delta: { type: 'text_delta', text: 'streaming...' },
-          }) + '\n';
-          stdoutEmitter.emit('data', Buffer.from(token));
-
-          // Delay the result to keep the streaming lock active
-          setTimeout(() => {
-            const result = JSON.stringify({
-              type: 'result',
-              result: 'streaming...',
-              session_id: 'sid',
-            }) + '\n';
-            stdoutEmitter.emit('data', Buffer.from(result));
-            child.emit('close', 0);
-          }, 100);
-        });
-
-        return child;
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-
-      // Wait for the first token to confirm streaming lock is active
-      const firstToken = new Promise<void>((resolve) => {
-        ws.on('message', (data: Buffer) => {
-          const msg = parseMsg(data);
-          if (msg.type === 'token') resolve();
-        });
-      });
-
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'First message',
-        }),
-      );
-
-      await firstToken;
-
-      // Now send second message — streaming lock should reject it
-      ws.send(
-        JSON.stringify({
-          type: 'message',
-          threadId,
-          content: 'Second message (ignored)',
-        }),
-      );
-
-      // Wait for the done event
-      await new Promise<void>((resolve) => {
-        ws.on('message', (data: Buffer) => {
-          const msg = parseMsg(data);
-          if (msg.type === 'done') resolve();
-        });
-      });
-      ws.close();
-
-      // Only one invocation should have occurred
-      expect(invocationCount).toBe(1);
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Session resume
-  // -----------------------------------------------------------------------
-
-  describe('session resume', () => {
-    it('passes --resume flag when thread has a claudeSessionId', async () => {
-      let capturedArgs: string[] = [];
-      let callCount = 0;
-
-      const spawnFn = withHealthyPreflight(((cmd: string, args: string[]) => {
-        callCount++;
-        capturedArgs = [...args];
-        const inner = createFakeSpawn({
-          stdout: ndjson({
-            type: 'result',
-            result: 'ok',
-            session_id: `sid-${callCount}`,
-          }),
-          exitCode: 0,
-        });
-        return inner(cmd, args);
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-
-      // First message: no session ID yet, so no --resume
-      const first = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'msg 1' }),
-      );
-      await first;
-
-      // Second message: thread now has a session ID from first response
-      capturedArgs = [];
-      const second = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'msg 2' }),
-      );
-      await second;
-      ws.close();
-
-      // The second invocation should have used --resume
-      expect(capturedArgs).toContain('--resume');
-      expect(capturedArgs).toContain('sid-1');
-    });
-
-    it('uses correct session ID per thread in multi-thread scenario', async () => {
-      const calls: { threadContent: string; args: string[] }[] = [];
-      let callCount = 0;
-
-      const spawnFn = withHealthyPreflight(((cmd: string, args: string[]) => {
-        callCount++;
-        // Track which content was sent with which args
-        const promptIdx = args.indexOf('-p');
-        const promptContent = promptIdx >= 0 ? args[promptIdx + 1] : '';
-        calls.push({ threadContent: promptContent ?? '', args: [...args] });
-
-        const inner = createFakeSpawn({
-          stdout: ndjson({
-            type: 'result',
-            result: `reply-${callCount}`,
-            session_id: `sid-${callCount}`,
-          }),
-          exitCode: 0,
-        });
-        return inner(cmd, args);
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      // Create two threads
-      const threadId1 = await createThread(server, 'Thread 1');
-      const threadId2 = await createThread(server, 'Thread 2');
-
-      const ws = await server.injectWS('/chat');
-
-      // Send message in thread 1 → gets sid-1
-      const first = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId: threadId1, content: 'msg in thread 1' }),
-      );
-      await first;
-
-      // Send message in thread 2 → gets sid-2
-      const second = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId: threadId2, content: 'msg in thread 2' }),
-      );
-      await second;
-
-      // Send another message in thread 1 — should resume with sid-1, NOT sid-2
-      const third = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId: threadId1, content: 'follow-up in thread 1' }),
-      );
-      await third;
-      ws.close();
-
-      // The third invocation should have used --resume with thread 1's session ID
-      expect(calls).toHaveLength(3);
-      const thirdCall = calls[2]!;
-      expect(thirdCall.args).toContain('--resume');
-      expect(thirdCall.args).toContain('sid-1'); // Thread 1's session ID, not sid-2
-    });
-
-    it('loads full message history for resumed thread via HTTP', async () => {
-      let callCount = 0;
-      const spawnFn = withHealthyPreflight(((_cmd: string, _args: string[]) => {
-        callCount++;
-        const inner = createFakeSpawn({
-          stdout: ndjson({
-            type: 'result',
-            result: `reply-${callCount}`,
-            session_id: `sid-${callCount}`,
-          }),
-          exitCode: 0,
-        });
-        return inner(_cmd, _args);
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-
-      // Send two messages to build up history
-      const first = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'First question' }),
-      );
-      await first;
-
-      const second = collectWsMessages(ws);
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'Second question' }),
-      );
-      await second;
-      ws.close();
-
-      // Fetch message history via HTTP (simulates what frontend does on thread switch)
-      const res = await server.inject({
-        method: 'GET',
-        url: `/threads/${threadId}/messages`,
-      });
-      const body = res.json();
-
-      // Should have 4 messages: user, assistant, user, assistant
-      expect(body.messages).toHaveLength(4);
-      expect(body.messages[0].role).toBe('user');
-      expect(body.messages[0].content).toBe('First question');
-      expect(body.messages[1].role).toBe('assistant');
-      expect(body.messages[1].content).toBe('reply-1');
-      expect(body.messages[2].role).toBe('user');
-      expect(body.messages[2].content).toBe('Second question');
-      expect(body.messages[3].role).toBe('assistant');
-      expect(body.messages[3].content).toBe('reply-2');
-    });
-
-    it('handles resume failure by retrying without --resume', async () => {
-      const calls: string[][] = [];
-
-      const spawnFn = withHealthyPreflight(((cmd: string, args: string[]) => {
-        calls.push([...args]);
-        const isResume = args.includes('--resume');
-
-        if (isResume) {
-          // Resume failure
-          const inner = createFakeSpawn({
-            stderr: 'Error: session not found',
-            exitCode: 1,
-          });
-          return inner(cmd, args);
-        }
-        // Success without resume
-        const inner = createFakeSpawn({
-          stdout: ndjson({
-            type: 'result',
-            result: 'fresh',
-            session_id: 'new-sid',
-          }),
-          exitCode: 0,
-        });
-        return inner(cmd, args);
-      }) as unknown as SpawnFn);
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      // Create thread and manually set a stale session ID
-      const threadId = await createThread(server);
-      const { updateThreadSessionId } = await import('../services/thread.js');
-      await updateThreadSessionId(threadId, 'stale-sid', testDb);
-
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'test' }),
-      );
-
-      const msgs = await collecting;
-      ws.close();
-
-      // Should have received a done (not just an error)
-      const done = msgs.find((m) => m.type === 'done');
-      expect(done).toBeDefined();
-
-      // Should have made two spawn calls: first with --resume, then without
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-      expect(calls[0]).toContain('--resume');
-      expect(calls[0]).toContain('stale-sid');
-      // The retry call should NOT contain --resume
-      const retryCall = calls.find((c) => !c.includes('--resume'));
-      expect(retryCall).toBeDefined();
-
-      // Session ID should be updated to the new one
-      const { getThread } = await import('../services/thread.js');
-      const thread = await getThread(threadId, testDb);
-      expect(thread?.claudeSessionId).toBe('new-sid');
-    });
-  });
-
-  // -----------------------------------------------------------------------
-  // Preflight integration
-  // -----------------------------------------------------------------------
-
-  describe('preflight integration', () => {
-    afterEach(() => {
-      restorePlatform();
-    });
-
-    it('returns error when sandbox auth fails and recovery is unavailable', async () => {
-      mockPlatform('darwin');
-      let claudeInvoked = false;
-
-      const spawnFn = ((command: string, args: string[]) => {
-        if (args.includes('auth') && args.includes('status')) {
-          return createFakeSpawn({
-            stdout: JSON.stringify({ loggedIn: false }),
+  it('uses the thread session id when continuing an existing thread', async () => {
+    let firstInvocation = true;
+    const spawnFn = healthySpawnForInvocation(((command: string, args: string[]) => {
+      const result = firstInvocation
+        ? createFakeSpawn({
+            stdout: ndjson({ type: 'result', result: 'First reply', session_id: 'sess-1' }),
+            exitCode: 0,
+          })(command, args)
+        : createFakeSpawn({
+            stdout: ndjson({ type: 'result', result: 'Second reply', session_id: 'sess-2' }),
             exitCode: 0,
           })(command, args);
-        }
+      firstInvocation = false;
+      return result;
+    }) as SpawnFn);
 
-        if (command === 'security') {
-          return createFakeSpawn({
-            stderr: 'The specified item could not be found in the keychain.',
-            exitCode: 44,
-          })(command, args);
-        }
+    server = buildServer({ logger: false, database: testDb, spawnFn });
+    const baseUrl = await startServer(server);
 
-        if (args.includes('-p')) {
-          claudeInvoked = true;
-        }
-
-        return createFakeSpawn({ exitCode: 1 })(command, args);
-      }) as unknown as SpawnFn;
-
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'Hello' }),
-      );
-
-      const msgs = await collecting;
-      ws.close();
-
-      const errorMsg = msgs.find((m) => m.type === 'error');
-      expect(errorMsg).toBeDefined();
-      expect(errorMsg!.message).toContain('Sandbox not ready');
-      expect(claudeInvoked).toBe(false);
+    const firstResponse = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'First', clientRequestId: 'existing-1' }),
     });
+    const firstEvents = await readRunStream(firstResponse);
+    const threadId = firstEvents[0]!.threadId as string;
 
-    it('recovers from auth failure and proceeds to Claude invocation', async () => {
-      mockPlatform('darwin');
-      let probeCount = 0;
+    let capturedArgs: string[] = [];
+    const captureSpawn = healthySpawnForInvocation(((command: string, args: string[]) => {
+      capturedArgs = [...args];
+      return createFakeSpawn({
+        stdout: ndjson({ type: 'result', result: 'Continued', session_id: 'sess-2' }),
+        exitCode: 0,
+      })(command, args);
+    }) as SpawnFn);
 
-      const spawnFn = ((command: string, args: string[]) => {
-        if (args.includes('auth') && args.includes('status')) {
-          probeCount++;
-          if (probeCount === 1) {
-            return createFakeSpawn({
-              stdout: JSON.stringify({ loggedIn: false }),
-              exitCode: 0,
-            })(command, args);
-          }
-          return createFakeSpawn({
-            stdout: JSON.stringify({
-              loggedIn: true,
-              authMethod: 'oauth',
-              apiProvider: 'firstParty',
-            }),
-            exitCode: 0,
-          })(command, args);
-        }
+    await server.close();
+    server = buildServer({ logger: false, database: testDb, spawnFn: captureSpawn });
+    const newBaseUrl = await startServer(server);
 
-        if (command === 'security') {
-          return createFakeSpawn({
-            stdout: JSON.stringify({
-              claudeAiOauth: {
-                accessToken: 'test-token',
-                expiresAt: Date.now() + 3_600_000,
-                refreshToken: 'secret-refresh',
-              },
-            }),
-            exitCode: 0,
-          })(command, args);
-        }
+    const secondResponse = await fetch(`${newBaseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId,
+        content: 'Second',
+        clientRequestId: 'existing-2',
+      }),
+    });
+    await readRunStream(secondResponse);
 
-        if (args.includes('-i') && args.includes('sh')) {
-          return createFakeSpawn({ exitCode: 0 })(command, args);
-        }
+    expect(capturedArgs).toContain('--resume');
+    expect(capturedArgs).toContain('sess-1');
+  });
 
-        return createFakeSpawn({
-          stdout: ndjson({
-            type: 'result',
-            result: 'Recovered reply',
-            session_id: 'sess-recovered',
-          }),
-          exitCode: 0,
-        })(command, args);
-      }) as unknown as SpawnFn;
+  it('returns a busy-thread conflict when a second client targets an active thread', async () => {
+    const delayedSpawn = healthySpawnForInvocation((() => {
+      const child = new EventEmitter();
+      const stdoutEmitter = new EventEmitter();
+      const stderrEmitter = new EventEmitter();
 
-      server = buildServer({ logger: false, database: testDb, spawnFn });
-      await server.ready();
-
-      const threadId = await createThread(server);
-      const ws = await server.injectWS('/chat');
-      const collecting = collectWsMessages(ws);
-
-      ws.send(
-        JSON.stringify({ type: 'message', threadId, content: 'Hello after recovery' }),
-      );
-
-      const msgs = await collecting;
-      ws.close();
-
-      const done = msgs.find((m) => m.type === 'done');
-      expect(done).toBeDefined();
-      expect(done!.messageId).toBeDefined();
-
-      const res = await server.inject({
-        method: 'GET',
-        url: `/threads/${threadId}/messages`,
+      Object.assign(child, {
+        stdout: stdoutEmitter,
+        stderr: stderrEmitter,
+        kill: () => {
+          process.nextTick(() => child.emit('close', null));
+        },
       });
-      const body = res.json();
-      expect(body.messages).toHaveLength(2);
-      expect(body.messages[1].content).toBe('Recovered reply');
+
+      process.nextTick(() => {
+        stdoutEmitter.emit(
+          'data',
+          Buffer.from(
+            `${JSON.stringify({
+              type: 'content_block_delta',
+              delta: { type: 'text_delta', text: 'streaming...' },
+            })}\n`,
+          ),
+        );
+
+        setTimeout(() => {
+          stdoutEmitter.emit(
+            'data',
+            Buffer.from(
+              `${JSON.stringify({
+                type: 'result',
+                result: 'streaming...',
+                session_id: 'sess-busy',
+              })}\n`,
+            ),
+          );
+          child.emit('close', 0);
+        }, 150);
+      });
+
+      return child;
+    }) as unknown as SpawnFn);
+
+    server = buildServer({ logger: false, database: testDb, spawnFn: delayedSpawn });
+    const baseUrl = await startServer(server);
+    const thread = await createThread(baseUrl);
+    const controller = new AbortController();
+
+    const firstResponse = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId: thread.id,
+        content: 'First message',
+        clientRequestId: 'busy-1',
+      }),
+      signal: controller.signal,
     });
+    const readyEvents = await readRunStream(firstResponse, { stopOn: 'ready' });
+    const runId = readyEvents[0]!.runId as string;
+    controller.abort();
+
+    const conflictResponse = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        threadId: thread.id,
+        content: 'Second message',
+        clientRequestId: 'busy-2',
+      }),
+    });
+    const conflict = await conflictResponse.json();
+
+    expect(conflictResponse.status).toBe(409);
+    expect(conflict.code).toBe('thread_busy');
+    expect(conflict.runId).toBe(runId);
+
+    const completed = await waitForRunCompletion(baseUrl, runId);
+    expect(completed.status).toBe('completed');
+  });
+
+  it('keeps the run going after the client disconnects and exposes completion via run status', async () => {
+    const delayedSpawn = healthySpawnForInvocation((() => {
+      const child = new EventEmitter();
+      const stdoutEmitter = new EventEmitter();
+      const stderrEmitter = new EventEmitter();
+
+      Object.assign(child, {
+        stdout: stdoutEmitter,
+        stderr: stderrEmitter,
+        kill: () => {
+          process.nextTick(() => child.emit('close', null));
+        },
+      });
+
+      process.nextTick(() => {
+        setTimeout(() => {
+          stdoutEmitter.emit(
+            'data',
+            Buffer.from(
+              `${JSON.stringify({
+                type: 'content_block_delta',
+                delta: { type: 'text_delta', text: 'done soon' },
+              })}\n`,
+            ),
+          );
+          stdoutEmitter.emit(
+            'data',
+            Buffer.from(
+              `${JSON.stringify({
+                type: 'result',
+                result: 'done soon',
+                session_id: 'sess-bg',
+              })}\n`,
+            ),
+          );
+          child.emit('close', 0);
+        }, 100);
+      });
+
+      return child;
+    }) as unknown as SpawnFn);
+
+    server = buildServer({ logger: false, database: testDb, spawnFn: delayedSpawn });
+    const baseUrl = await startServer(server);
+
+    const controller = new AbortController();
+    const response = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Keep going', clientRequestId: 'bg-1' }),
+      signal: controller.signal,
+    });
+    const readyEvents = await readRunStream(response, { stopOn: 'ready' });
+    const runId = readyEvents[0]!.runId as string;
+    controller.abort();
+
+    const completed = await waitForRunCompletion(baseUrl, runId);
+    expect(completed.status).toBe('completed');
+    expect(completed.assistantPreview).toBe('done soon');
+
+    const threadId = readyEvents[0]!.threadId as string;
+    const messagesResponse = await fetch(`${baseUrl}/threads/${threadId}/messages`);
+    const messagesBody = await messagesResponse.json();
+    expect(messagesBody.messages[1].content).toBe('done soon');
+  });
+
+  it('returns a stream error before acceptance when sandbox preparation fails', async () => {
+    const failingSpawn = ((command: string, args: string[]) => {
+      if (command === 'security') {
+        return createFakeSpawn({ stderr: 'missing creds', exitCode: 44 })(command, args);
+      }
+      return createFakeSpawn({ exitCode: 1 })(command, args);
+    }) as SpawnFn;
+
+    server = buildServer({ logger: false, database: testDb, spawnFn: failingSpawn });
+    const baseUrl = await startServer(server);
+
+    const response = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Will fail', clientRequestId: 'fail-1' }),
+    });
+    const events = await readRunStream(response);
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.type).toBe('error');
+
+    const threadsResponse = await fetch(`${baseUrl}/threads`);
+    const threadsBody = await threadsResponse.json();
+    expect(threadsBody.threads).toHaveLength(0);
+  });
+
+  it('includes the CORS header on streamed chat responses', async () => {
+    const spawnFn = healthySpawnForInvocation(
+      createFakeSpawn({
+        stdout: ndjson({ type: 'result', result: 'Hello', session_id: 'sess-cors' }),
+        exitCode: 0,
+      }),
+    );
+
+    server = buildServer({ logger: false, database: testDb, spawnFn });
+    const baseUrl = await startServer(server);
+
+    const response = await fetch(`${baseUrl}/chat/runs`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'http://127.0.0.1:4900',
+      },
+      body: JSON.stringify({ content: 'Hello', clientRequestId: 'cors-1' }),
+    });
+
+    expect(response.headers.get('access-control-allow-origin')).toBe(
+      'http://127.0.0.1:4900',
+    );
+    expect(response.headers.get('vary')).toContain('Origin');
+
+    const events = await readRunStream(response);
+    expect(events.at(-1)?.type).toBe('done');
   });
 });

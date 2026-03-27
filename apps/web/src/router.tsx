@@ -8,7 +8,7 @@ import TimersAllPage from '@/app/(shell)/timers/all-page';
 import ChatIndexPage from '@/app/(shell)/chat/page';
 import ThreadPage from '@/app/(shell)/chat/[threadId]/page';
 import ChatLayout from '@/app/(shell)/chat/layout';
-import { ChatSocketProvider } from '@/app/(shell)/chat/chat-socket-context';
+import { ChatRunProvider } from '@/app/(shell)/chat/chat-run-context';
 import PrototypeIndex from '@/app/prototype/page';
 import ChatPrototype from '@/app/prototype/chat/page';
 import VideoPage from '@/app/video/page';
@@ -19,13 +19,11 @@ import VideoPage from '@/app/video/page';
 
 function ShellLayout() {
   return (
-    <ChatSocketProvider>
-      {/* Keep chat connected across shell tab switches so mobile navigation
-          does not tear down and recreate the socket on every visit. */}
+    <ChatRunProvider>
       <AppShell>
         <Outlet />
       </AppShell>
-    </ChatSocketProvider>
+    </ChatRunProvider>
   );
 }
 

@@ -35,13 +35,25 @@ pnpm sandbox
 
 It will create the sandbox, open a browser for login, and verify everything is working. The sandbox stays authenticated across restarts — you only need to do this once.
 
-If chat ever shows `Connecting...` or `Disconnected. Reconnecting...`, that means the live chat link between the web app and the local server dropped. The app now retries automatically, but if it keeps happening the usual causes are:
+## How Chat Reliability Works
 
-- the local server was restarted
-- your laptop briefly lost network access or changed networks
-- the Docker sandbox is offline, so chat can connect but can’t finish a response
+The chat page no longer depends on keeping an idle live socket open all the time. Instead, each message prepares the sandbox right before Claude runs, starts one streamed request, and can finish in the background if your phone briefly disconnects over Tailscale or sleep/wake.
 
-The fastest recovery step is usually `pnpm go` in one terminal, then `pnpm sandbox` if the chat agent still says it is offline.
+Two important mental-model updates:
+
+- The host browser being logged into Claude is **not** the source of truth for chat auth.
+- The real source of truth is the host machine's Claude credentials plus the fresh access-token-only credentials injected into the sandbox right before a prompt runs.
+
+That means brief mobile network hiccups should usually recover on their own while a response is finishing.
+Sending from another device on your LAN or over Tailscale uses that same streamed browser path, so it should behave the same way as the local desktop page instead of failing just because the host name changed.
+
+## Quick Troubleshooting
+
+If chat still fails, there are usually only two buckets:
+
+- **Sandbox setup problem**: the local server or sandbox is offline, or the host needs a fresh Claude login. The fastest recovery step is usually `pnpm go`, then `pnpm sandbox` if needed.
+- **Response still finishing**: the page may reconnect and catch up from the saved run state. Give it a moment before retrying.
+- **Immediate "load failed" on another device**: that usually points to a stale server build or a browser-origin mismatch. Restart the app with the normal launchd-safe flow if it comes back after an update.
 
 ## How to build with Claude Code
 

@@ -1,25 +1,51 @@
-import type { FastifyInstance } from 'fastify';
-import type { WebSocket } from 'ws';
+import type { FastifyInstance, FastifyReply } from 'fastify';
+import { config, isAllowedOrigin } from '../config.js';
 import {
+  addMessage,
+  createThread,
   getThread,
   getThreadMessages,
-  addMessage,
   updateThreadSessionId,
   updateThreadTitle,
   type Database,
 } from '../services/thread.js';
 import {
   invokeClaude,
-  preflightCheck,
+  prepareSandboxForPrompt,
   type SpawnFn,
   type ClaudeResult,
-  type InvokeClaudeOptions,
 } from '../services/sandbox.js';
+import {
+  ChatRunRegistry,
+  type ChatRunError,
+  type ChatRunRecord,
+  type ChatRunSnapshot,
+} from '../services/chat-run.js';
 
 export interface ChatRoutesOptions {
   database?: Database;
   spawnFn?: SpawnFn;
 }
+
+interface ChatRunBody {
+  threadId?: string;
+  content?: string;
+  clientRequestId?: string;
+}
+
+type ChatRunEvent =
+  | {
+      type: 'ready';
+      runId: string;
+      threadId: string;
+      createdThread: boolean;
+      userMessageId: string;
+    }
+  | { type: 'token'; text: string }
+  | { type: 'done'; assistantMessageId: string; sessionId: string }
+  | { type: 'error'; code: string; message: string };
+
+const runRegistry = new ChatRunRegistry();
 
 /**
  * Generate a thread title from the user's first message.
@@ -39,102 +65,243 @@ export function generateTitle(content: string): string {
     return truncated.slice(0, lastSpace) + '...';
   }
 
-  // Single long word with no spaces — just truncate
   return truncated + '...';
 }
 
-/** Send a JSON message to the WebSocket client. Silently ignores closed sockets. */
-function sendJSON(socket: WebSocket, data: Record<string, unknown>): void {
-  if (socket.readyState === socket.OPEN) {
-    socket.send(JSON.stringify(data));
+function toRunSnapshot(run: ChatRunSnapshot) {
+  return {
+    runId: run.runId,
+    threadId: run.threadId,
+    status: run.status,
+    accepted: run.accepted,
+    completed: run.completed,
+    createdThread: run.createdThread,
+    userMessageId: run.userMessageId,
+    assistantPreview: run.assistantPreview,
+    assistantMessageId: run.assistantMessageId,
+    error: run.error,
+  };
+}
+
+function sendConflict(reply: FastifyReply, run: ChatRunRecord, code: string) {
+  return reply.status(409).send({
+    code,
+    ...toRunSnapshot({ ...run }),
+  });
+}
+
+function getAllowedOrigin(origin: string | undefined): string {
+  if (origin && isAllowedOrigin(origin)) {
+    return origin;
+  }
+
+  return `http://localhost:${config.webPort}`;
+}
+
+/** Send a single NDJSON event to the client. Returns false once the stream is gone. */
+function writeEvent(
+  reply: FastifyReply,
+  streamState: { closed: boolean },
+  event: ChatRunEvent,
+): boolean {
+  if (streamState.closed || reply.raw.writableEnded || reply.raw.destroyed) {
+    return false;
+  }
+
+  try {
+    reply.raw.write(`${JSON.stringify(event)}\n`);
+    return true;
+  } catch {
+    streamState.closed = true;
+    return false;
   }
 }
 
-/** Send an error message to the WebSocket client. */
-function sendError(socket: WebSocket, message: string): void {
-  sendJSON(socket, { type: 'error', message });
+/** Close the stream when it is still open. */
+function endStream(
+  reply: FastifyReply,
+  streamState: { closed: boolean },
+): void {
+  if (streamState.closed || reply.raw.writableEnded || reply.raw.destroyed) {
+    return;
+  }
+
+  try {
+    reply.raw.end();
+  } catch {
+    streamState.closed = true;
+  }
 }
 
-/** Handle a single chat message: persist, invoke Claude, stream response. */
-async function handleChatMessage(
-  socket: WebSocket,
+function buildUserFacingRunError(code: string): ChatRunError {
+  switch (code) {
+    case 'auth_unavailable':
+      return {
+        code,
+        message: 'The host could not load the chat login. Run `pnpm sandbox` on the host if this keeps happening.',
+      };
+    case 'sandbox_unavailable':
+      return {
+        code,
+        message: 'The chat agent sandbox is offline on the host.',
+      };
+    case 'host_refresh_failed':
+      return {
+        code,
+        message: 'The host could not refresh the chat login.',
+      };
+    case 'verification_failed':
+      return {
+        code,
+        message: 'The chat agent could not verify its login after refresh.',
+      };
+    default:
+      return {
+        code,
+        message: 'The chat response could not be completed.',
+      };
+  }
+}
+
+async function maybeUpdateThreadTitle(
   threadId: string,
   content: string,
   db: Database | undefined,
-  spawnFn: SpawnFn | undefined,
-  setStreaming: (v: boolean) => void,
 ): Promise<void> {
-  // Step 1: Validate threadId exists
-  const thread = await getThread(threadId, db);
-  if (!thread) {
-    sendError(socket, 'Thread not found');
-    return;
-  }
-
-  // Step 2: Preflight — verify sandbox is healthy before persisting the message,
-  // so a failed preflight doesn't leave orphaned user messages with no response.
-  const preflight = await preflightCheck(spawnFn);
-  if (!preflight.ok) {
-    sendError(socket, `Sandbox not ready: ${preflight.message}`);
-    return;
-  }
-
-  // Step 3: Persist the user message
-  await addMessage(threadId, 'user', content, db);
-
-  // Step 4: Auto-generate title on first message
   const existingMessages = await getThreadMessages(threadId, db);
   if (existingMessages.length === 1) {
     const title = generateTitle(content);
     await updateThreadTitle(threadId, title, db);
   }
+}
 
-  // Step 5: Look up claudeSessionId
-  const sessionId = thread.claudeSessionId ?? undefined;
+async function processChatRun(
+  run: ChatRunRecord,
+  body: { threadId?: string; content: string },
+  db: Database | undefined,
+  spawnFn: SpawnFn | undefined,
+  reply: FastifyReply,
+  streamState: { closed: boolean },
+): Promise<void> {
+  const finishFailure = (error: ChatRunError, keepRun: boolean) => {
+    runRegistry.fail(run.runId, error);
+    writeEvent(reply, streamState, { type: 'error', code: error.code, message: error.message });
+    if (!keepRun) {
+      runRegistry.remove(run.runId);
+    }
+    endStream(reply, streamState);
+  };
 
-  // Step 6: Set streaming lock and invoke Claude
-  setStreaming(true);
+  const readiness = await prepareSandboxForPrompt(spawnFn);
+  if (!readiness.ok) {
+    finishFailure(buildUserFacingRunError(readiness.code), false);
+    return;
+  }
 
-  const invokeOpts: InvokeClaudeOptions = { prompt: content, sessionId };
-  if (spawnFn) invokeOpts.spawnFn = spawnFn;
+  if (streamState.closed && !run.accepted) {
+    runRegistry.remove(run.runId);
+    endStream(reply, streamState);
+    return;
+  }
 
-  const emitter = invokeClaude(invokeOpts);
-  let resultReceived = false;
+  let thread = body.threadId ? await getThread(body.threadId, db) : null;
+  if (body.threadId && !thread) {
+    runRegistry.remove(run.runId);
+    endStream(reply, streamState);
+    return;
+  }
 
-  // Forward text tokens to client
+  if (!thread) {
+    thread = await createThread('New conversation', db);
+    runRegistry.updateThread(run.runId, thread.id, true);
+    if (!runRegistry.claimThread(thread.id, run.runId)) {
+      runRegistry.remove(run.runId);
+      endStream(reply, streamState);
+      return;
+    }
+  }
+
+  const userMessage = await addMessage(thread.id, 'user', body.content, db);
+  await maybeUpdateThreadTitle(thread.id, body.content, db);
+  runRegistry.markAccepted(run.runId, userMessage.id);
+
+  // Mark acceptance only after the user message exists so reconnects can
+  // safely reattach to the same run instead of creating duplicates.
+  writeEvent(reply, streamState, {
+    type: 'ready',
+    runId: run.runId,
+    threadId: thread.id,
+    createdThread: run.createdThread,
+    userMessageId: userMessage.id,
+  });
+
+  const emitter = invokeClaude({
+    prompt: body.content,
+    sessionId: thread.claudeSessionId ?? undefined,
+    spawnFn,
+  });
+  let settled = false;
+  let resultInFlight = false;
+
   emitter.on('text', (text: string) => {
-    sendJSON(socket, { type: 'token', text });
+    runRegistry.appendPreview(run.runId, text);
+    writeEvent(reply, streamState, { type: 'token', text });
   });
 
-  // On result: persist assistant message, update session ID, send done
   emitter.on('result', async (result: ClaudeResult) => {
-    resultReceived = true;
-    const assistantMessage = await addMessage(
-      threadId,
-      'assistant',
-      result.result,
-      db,
-    );
-    await updateThreadSessionId(threadId, result.sessionId, db);
-    sendJSON(socket, { type: 'done', messageId: assistantMessage.id });
-    setStreaming(false);
+    if (settled) return;
+    resultInFlight = true;
+    try {
+      const assistantMessage = await addMessage(
+        thread.id,
+        'assistant',
+        result.result,
+        db,
+      );
+      await updateThreadSessionId(thread.id, result.sessionId, db);
+      runRegistry.complete(run.runId, assistantMessage.id, result.sessionId);
+      writeEvent(reply, streamState, {
+        type: 'done',
+        assistantMessageId: assistantMessage.id,
+        sessionId: result.sessionId,
+      });
+    } catch {
+      const error = buildUserFacingRunError('invocation_failed');
+      runRegistry.fail(run.runId, error);
+      writeEvent(reply, streamState, {
+        type: 'error',
+        code: error.code,
+        message: error.message,
+      });
+    } finally {
+      settled = true;
+      resultInFlight = false;
+      endStream(reply, streamState);
+    }
   });
 
-  // On error: send error to client, release lock
   emitter.on('error', (err: Error) => {
-    sendError(socket, err.message);
-    setStreaming(false);
+    if (settled) return;
+    void err;
+    const error = buildUserFacingRunError('invocation_failed');
+    runRegistry.fail(run.runId, error);
+    writeEvent(reply, streamState, {
+      type: 'error',
+      code: error.code,
+      message: error.message,
+    });
+    settled = true;
+    endStream(reply, streamState);
   });
 
-  // Safety net: release lock if close fires without result or error
   emitter.on('close', () => {
-    if (!resultReceived) {
-      setStreaming(false);
+    if (!settled && !resultInFlight) {
+      endStream(reply, streamState);
     }
   });
 }
 
-/** Fastify plugin that registers the /chat WebSocket route. */
+/** Fastify plugin that registers request-scoped chat routes. */
 export async function chatRoutes(
   server: FastifyInstance,
   opts: ChatRoutesOptions,
@@ -142,51 +309,96 @@ export async function chatRoutes(
   const db = opts.database;
   const spawnFn = opts.spawnFn;
 
-  server.get('/chat', { websocket: true }, (socket: WebSocket) => {
-    let streaming = false;
-
-    socket.on('message', async (raw: Buffer) => {
-      try {
-        let msg: { type?: string; threadId?: string; content?: string };
-        try {
-          msg = JSON.parse(raw.toString());
-        } catch {
-          sendError(socket, 'Invalid JSON');
-          return;
-        }
-
-        // Bug fix: health-check pings must bypass the streaming lock so the
-        // client can tell the socket is still alive during long responses.
-        if (msg.type === 'ping') {
-          sendJSON(socket, { type: 'pong' });
-          return;
-        }
-
-        // Ignore chat sends while streaming
-        if (streaming) return;
-
-        if (msg.type !== 'message' || !msg.threadId || !msg.content) {
-          sendError(socket, 'Invalid message format');
-          return;
-        }
-
-        await handleChatMessage(
-          socket,
-          msg.threadId,
-          msg.content,
-          db,
-          spawnFn,
-          (v: boolean) => {
-            streaming = v;
-          },
-        );
-      } catch (err) {
-        sendError(
-          socket,
-          err instanceof Error ? err.message : 'Internal server error',
-        );
-        streaming = false;
+  server.get<{ Params: { runId: string } }>(
+    '/chat/runs/:runId',
+    async (request, reply) => {
+      const run = runRegistry.snapshot(request.params.runId);
+      if (!run) {
+        return reply.status(404).send({ error: 'Run not found' });
       }
-    });
-  });
+
+      return toRunSnapshot(run);
+    },
+  );
+
+  server.post<{ Body: ChatRunBody }>(
+    '/chat/runs',
+    async (request, reply) => {
+      const threadId = request.body?.threadId?.trim();
+      const content = request.body?.content?.trim();
+      const clientRequestId = request.body?.clientRequestId?.trim();
+
+      if (!content || !clientRequestId) {
+        return reply.status(400).send({ error: 'Invalid request body' });
+      }
+
+      const existingByRequest = runRegistry.getByClientRequestId(clientRequestId);
+      if (existingByRequest) {
+        return sendConflict(reply, existingByRequest, 'run_exists');
+      }
+
+      if (threadId) {
+        const existingThread = await getThread(threadId, db);
+        if (!existingThread) {
+          return reply.status(404).send({ error: 'Thread not found' });
+        }
+
+        const activeRunId = runRegistry.getActiveRunIdForThread(threadId);
+        if (activeRunId) {
+          const activeRun = runRegistry.getByRunId(activeRunId);
+          if (activeRun) {
+            return sendConflict(reply, activeRun, 'thread_busy');
+          }
+        }
+      }
+
+      const run = runRegistry.createPending(clientRequestId, threadId ?? null);
+      if (threadId && !runRegistry.claimThread(threadId, run.runId)) {
+        const activeRun = runRegistry.getByRunId(
+          runRegistry.getActiveRunIdForThread(threadId)!,
+        );
+        runRegistry.remove(run.runId);
+        if (activeRun) {
+          return sendConflict(reply, activeRun, 'thread_busy');
+        }
+        return reply.status(409).send({ code: 'thread_busy' });
+      }
+
+      const allowedOrigin = getAllowedOrigin(request.headers.origin);
+
+      // reply.hijack() skips Fastify's normal response pipeline, so we must
+      // write CORS headers here or browser fetch treats the stream as failed.
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        'Content-Type': 'application/x-ndjson; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'Access-Control-Allow-Origin': allowedOrigin,
+        Vary: 'Origin',
+      });
+
+      const streamState = { closed: false };
+      reply.raw.on('close', () => {
+        streamState.closed = true;
+      });
+
+      void processChatRun(
+        run,
+        { threadId, content },
+        db,
+        spawnFn,
+        reply,
+        streamState,
+      ).catch((err) => {
+        server.log.error(err);
+        const error = buildUserFacingRunError('invocation_failed');
+        runRegistry.fail(run.runId, error);
+        writeEvent(reply, streamState, {
+          type: 'error',
+          code: error.code,
+          message: error.message,
+        });
+        endStream(reply, streamState);
+      });
+    },
+  );
 }
