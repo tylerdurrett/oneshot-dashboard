@@ -10,7 +10,7 @@
  *   Falls back to prompting the user to run `pnpm sandbox` for interactive auth.
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { execSync, spawnSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
@@ -75,22 +75,59 @@ function startSandbox() {
  * Create the sandbox non-interactively (no TTY).
  * `docker sandbox run` with no -it flag creates and starts the sandbox,
  * then Claude exits immediately since there's no prompt.
+ *
+ * On WSL2, `docker sandbox run` spawns docker.exe on the Windows side which
+ * ignores SIGTERM, causing spawnSync's timeout to block indefinitely.
+ * We use async spawn + polling to detect when the sandbox is up and move on.
  */
 function createSandbox() {
   console.log(`  Creating sandbox "${SANDBOX_NAME}"...`);
-  const result = spawnSync('docker', ['sandbox', 'run', '--name', SANDBOX_NAME, 'claude', SANDBOX_WORKSPACE], {
-    stdio: 'pipe',
-    timeout: 60_000,
+  return new Promise((resolve) => {
+    const child = spawn('docker', ['sandbox', 'run', '--name', SANDBOX_NAME, 'claude', SANDBOX_WORKSPACE], {
+      stdio: 'pipe',
+      detached: true,
+    });
+
+    let settled = false;
+    const finish = (success) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poller);
+      clearTimeout(deadline);
+      // Kill the process tree — SIGKILL because SIGTERM doesn't work on WSL2
+      try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+      child.unref();
+      resolve(success);
+    };
+
+    child.on('error', () => finish(false));
+    child.on('exit', (code) => {
+      if (code === 0 || code === null) {
+        console.log('  ✓ Sandbox created');
+        finish(true);
+      } else {
+        const stderr = child.stderr?.read()?.toString() ?? '';
+        console.log(`  ✗ Sandbox creation failed: ${stderr.slice(0, 200)}`);
+        finish(false);
+      }
+    });
+
+    // Poll for sandbox existence — handles the WSL2 case where the process hangs
+    // but the sandbox is actually created in the background.
+    const poller = setInterval(() => {
+      const state = getSandboxState();
+      if (state.exists && state.status === 'running') {
+        console.log('  ✓ Sandbox created');
+        finish(true);
+      }
+    }, 2_000);
+
+    // Hard deadline so we don't hang forever
+    const deadline = setTimeout(() => {
+      console.log('  ✗ Sandbox creation timed out');
+      finish(false);
+    }, 60_000);
   });
-
-  if (result.status !== 0 && result.status !== null) {
-    const stderr = result.stderr?.toString() ?? '';
-    console.log(`  ✗ Sandbox creation failed: ${stderr.slice(0, 200)}`);
-    return false;
-  }
-
-  console.log('  ✓ Sandbox created');
-  return true;
 }
 
 function checkAuth() {
@@ -187,7 +224,7 @@ function ensureProxyCACert() {
 
 // ── Main ────────────────────────────────────────────────
 
-function main() {
+async function main() {
   // Skip entirely if Docker sandbox plugin isn't available
   if (!isSandboxPluginAvailable()) {
     console.log('');
@@ -225,7 +262,7 @@ function main() {
       return;
     }
   } else if (!state.exists) {
-    if (!createSandbox()) {
+    if (!(await createSandbox())) {
       console.log('');
       console.log('  ⚠ Could not create sandbox. Run `pnpm sandbox` for interactive setup.');
       console.log('');
