@@ -46,6 +46,7 @@
 
 :root {
   --mobile-bottom-nav-height: 57px;
+  --mobile-bottom-nav-gutter: 8px;
   --background: 0 0% 100%;
   --foreground: 240 10% 3.9%;
   --card: 0 0% 100%;
@@ -219,15 +220,11 @@
   }
 
   .app-shell-standalone .app-shell-main {
-    padding-bottom: var(--mobile-bottom-nav-height);
-  }
-
-  .app-shell-standalone .timers-content {
-    /* Installed iPhone PWAs can lift the fixed bottom nav above the home
-       indicator, which makes full-bleed timer grids look flush against the
-       bar. Keep a small fixed gutter here so the timer grid still breathes
-       above the nav without adding the full safe-area inset twice. */
-    padding-bottom: 8px;
+    /* Keep one shared gutter above the fixed standalone bottom nav so pages
+       with bottom-aligned controls do not need their own PWA-only spacing
+       patches. This replaces the older timers-only workaround and keeps chat
+       composers from feeling pinned to the nav. */
+    padding-bottom: calc(var(--mobile-bottom-nav-height) + var(--mobile-bottom-nav-gutter));
   }
 
   .app-shell-standalone .app-shell-mobile-nav {

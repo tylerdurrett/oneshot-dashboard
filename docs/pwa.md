@@ -36,7 +36,7 @@ On iPhone home-screen mode, iOS reserves space for the home indicator at the bot
 
 The app also uses a standalone-only mobile workaround: when launched from the home screen, the bottom nav is pinned to the viewport bottom and the main content reserves the bar's base height above it. On some iPhone PWA layouts, Safari already offsets a fixed bottom bar for the home indicator, so adding extra bottom safe-area padding can create a second dead strip.
 
-The timers screen has one extra standalone-only adjustment: its content wrapper adds a small bottom gutter. That keeps the timer buckets from sitting flush against the fixed bottom nav without creating an oversized gap above it.
+The app shell also adds one small shared gutter above the fixed standalone bottom nav. That keeps bottom-aligned content, like timer grids and the chat composer, from sitting flush against the nav. Because that spacing lives in the shell, future shell pages inherit it automatically instead of needing page-specific PWA fixes.
 
 Navigation bars and timer buckets also avoid text selection on touch devices, so pressing and long-pressing feels like using controls instead of highlighting labels.
 
