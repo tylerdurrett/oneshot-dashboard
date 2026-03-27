@@ -10,11 +10,12 @@
  *   Falls back to prompting the user to run `pnpm sandbox` for interactive auth.
  */
 
-import { execSync, spawnSync, spawn } from 'node:child_process';
+import { execFileSync, execSync, spawnSync, spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
 import { readHostCredentials } from './lib/read-host-credentials.mjs';
+import { buildSandboxExecArgs } from './lib/sandbox-exec.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -132,10 +133,15 @@ function createSandbox() {
 
 function checkAuth() {
   try {
-    const output = run(
-      `docker sandbox exec -w ${SANDBOX_WORKSPACE} ${SANDBOX_NAME} claude auth status --json`,
+    const output = execFileSync(
+      'docker',
+      buildSandboxExecArgs({
+        name: SANDBOX_NAME,
+        workspace: SANDBOX_WORKSPACE,
+        command: ['claude', 'auth', 'status', '--json'],
+      }),
       { timeout: 30_000 },
-    );
+    ).toString().trim();
     const parsed = JSON.parse(output);
     return parsed.loggedIn === true;
   } catch {

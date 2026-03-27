@@ -34,6 +34,7 @@ pnpm sandbox
 ```
 
 It will create the sandbox, open a browser for login, and verify everything is working. The sandbox stays authenticated across restarts — you only need to do this once.
+On WSL2, the setup scripts keep Docker's own sandbox workspace path automatically, so you should not need to hand-tune sandbox paths.
 
 ## How Chat Reliability Works
 
@@ -52,6 +53,7 @@ Sending from another device on your LAN or over Tailscale uses that same streame
 If chat still fails, there are usually only two buckets:
 
 - **Sandbox setup problem**: the local server or sandbox is offline, or the host needs a fresh Claude login. The fastest recovery step is usually `pnpm go`, then `pnpm sandbox` if needed.
+- **WSL2 chat says "Agent is offline" right after startup**: restart with `pnpm stop` then `pnpm go` after pulling the latest code so the server picks up the Docker sandbox connection fix.
 - **Response still finishing**: the page may reconnect and catch up from the saved run state. Give it a moment before retrying.
 - **Immediate "load failed" on another device**: that usually points to a stale server build or a browser-origin mismatch. Restart the app with `pnpm service:uninstall && pnpm stop && pnpm service:install` if it comes back after an update.
 

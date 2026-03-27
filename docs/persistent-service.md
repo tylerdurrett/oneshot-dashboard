@@ -34,6 +34,7 @@ A **launchd user agent** runs the service. It starts on login and auto-restarts 
 A **systemd user service** runs the service. It auto-restarts on crash and stays running as long as the Linux environment is active.
 
 **Important for WSL2 users:** The service is persistent while your WSL environment is running, but does not survive a full `wsl --shutdown`. This is different from macOS, where launchd survives reboots. If WSL is restarted, run `pnpm service:install` again (it's safe to re-run).
+The service also needs the normal WSL Docker interop environment, so if chat stops reaching the sandbox after an update, restart the service with `pnpm service:uninstall && pnpm stop && pnpm service:install`.
 
 **WSL2 prerequisite:** systemd must be enabled. If `pnpm service:install` fails with a "systemd user session is not available" error, add this to `/etc/wsl.conf`:
 

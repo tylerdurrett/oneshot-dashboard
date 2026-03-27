@@ -161,11 +161,12 @@ export async function probeSandbox(
   timeoutMs: number = DEFAULT_PROBE_TIMEOUT_MS,
 ): Promise<SandboxProbeResult> {
   return new Promise((resolve) => {
+    // Omit -w flag: docker sandbox exec defaults CWD to the workspace directory.
+    // The host path (config.sandboxWorkspace) may not match the internal sandbox path
+    // (e.g. /home/agent/workspace on WSL2), causing "no such file or directory" errors.
     const args = [
       'sandbox',
       'exec',
-      '-w',
-      config.sandboxWorkspace,
       config.sandboxName,
       'claude',
       'auth',
@@ -500,11 +501,12 @@ function isResumeFailure(stderr: string, stdout: string): boolean {
 
 /** Build the docker sandbox exec args for a Claude invocation. */
 function buildClaudeArgs(prompt: string, sessionId?: string): string[] {
+  // Omit -w flag: docker sandbox exec defaults CWD to the workspace directory.
+  // The host path (config.sandboxWorkspace) may not match the internal sandbox path
+  // (e.g. /home/agent/workspace on WSL2), causing "no such file or directory" errors.
   const args = [
     'sandbox',
     'exec',
-    '-w',
-    config.sandboxWorkspace,
     config.sandboxName,
     'claude',
   ];

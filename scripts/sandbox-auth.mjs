@@ -6,11 +6,12 @@
  * Run with: pnpm sandbox
  */
 
-import { execSync, spawnSync } from 'node:child_process';
+import { execFileSync, execSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
 import { readHostCredentials } from './lib/read-host-credentials.mjs';
+import { buildSandboxExecArgs } from './lib/sandbox-exec.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -36,8 +37,13 @@ function isSandboxPluginAvailable() {
 
 function sandboxExists(name, workspace) {
   try {
-    execSync(
-      `docker sandbox exec -w ${workspace} ${name} echo ok`,
+    execFileSync(
+      'docker',
+      buildSandboxExecArgs({
+        name,
+        workspace,
+        command: ['echo', 'ok'],
+      }),
       { stdio: 'pipe', timeout: 10_000 },
     );
     return true;
@@ -48,8 +54,13 @@ function sandboxExists(name, workspace) {
 
 function checkAuthStatus(name, workspace) {
   try {
-    const output = execSync(
-      `docker sandbox exec -w ${workspace} ${name} claude auth status --json`,
+    const output = execFileSync(
+      'docker',
+      buildSandboxExecArgs({
+        name,
+        workspace,
+        command: ['claude', 'auth', 'status', '--json'],
+      }),
       { stdio: 'pipe', timeout: 30_000 },
     ).toString();
     return JSON.parse(output);
@@ -234,7 +245,15 @@ function main() {
     console.log('');
     console.log('  Logging out and re-authenticating...');
     try {
-      execSync(`docker sandbox exec -w ${workspace} ${name} claude auth logout`, { stdio: 'pipe', timeout: 10_000 });
+      execFileSync(
+        'docker',
+        buildSandboxExecArgs({
+          name,
+          workspace,
+          command: ['claude', 'auth', 'logout'],
+        }),
+        { stdio: 'pipe', timeout: 10_000 },
+      );
     } catch {
       // Ignore logout errors
     }
