@@ -1,8 +1,5 @@
-import { TIMERS_TITLE } from '@/app/route-metadata';
-import { useDocumentTitle } from '@/hooks/use-document-title';
-import { TimerGrid } from './_components/timer-grid';
+import { RemainingTimersView } from './_components/timer-views';
 
 export default function TimersPage() {
-  useDocumentTitle(TIMERS_TITLE);
-  return <TimerGrid />;
+  return <RemainingTimersView />;
 }

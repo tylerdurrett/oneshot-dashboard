@@ -19,7 +19,7 @@ import {
   squarify,
   type TreemapItem,
 } from '../_lib/treemap';
-import { useTimerState } from '../_hooks/use-timer-state';
+import { useTimerState, type UseTimerStateReturn } from '../_hooks/use-timer-state';
 import { useContainerSize } from '../_hooks/use-container-size';
 
 // ---------------------------------------------------------------------------
@@ -54,7 +54,7 @@ function nextAvailableColorIndex(buckets: TimeBucket[]): number {
 // Component
 // ---------------------------------------------------------------------------
 
-export function TimerGrid() {
+function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
   const {
     isHydrated,
     allBuckets,
@@ -141,7 +141,7 @@ export function TimerGrid() {
               Create a bucket to start tracking your time.
             </p>
           </div>
-          <Button onClick={handleAddBucket}>
+          <Button data-swipe-ignore onClick={handleAddBucket}>
             <Plus className="size-4" />
             Create your first bucket
           </Button>
@@ -211,4 +211,13 @@ export function TimerGrid() {
       )}
     </div>
   );
+}
+
+export function TimerGrid() {
+  const timerState = useTimerState();
+  return <TimerGridContent timerState={timerState} />;
+}
+
+export function TimerGridWithState({ timerState }: { timerState: UseTimerStateReturn }) {
+  return <TimerGridContent timerState={timerState} />;
 }

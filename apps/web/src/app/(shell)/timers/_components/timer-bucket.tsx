@@ -19,6 +19,9 @@ const LONG_PRESS_MS = 800;
 /** Maximum movement (px) before a long-press is cancelled. */
 const LONG_PRESS_MOVE_THRESHOLD = 10;
 
+/** Maximum movement (px) that still counts as a tap. */
+const TAP_MOVE_THRESHOLD = 10;
+
 /** Duration (ms) for the success checkmark overlay when goal is reached. */
 const SUCCESS_OVERLAY_MS = 1200;
 
@@ -148,6 +151,7 @@ export function TimerBucket({
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pressStartRef = useRef({ x: 0, y: 0 });
   const isLongPressRef = useRef(false);
+  const didMoveDuringPressRef = useRef(false);
 
   // Clean up long-press timer on unmount to prevent stale state updates
   useEffect(() => {
@@ -205,8 +209,15 @@ export function TimerBucket({
       if (e.pointerType === 'mouse') return;
 
       isLongPressRef.current = false;
+      didMoveDuringPressRef.current = false;
       pressStartRef.current = { x: e.clientX, y: e.clientY };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      if (typeof e.currentTarget.setPointerCapture === 'function') {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // If capture fails, we can still fall back to movement thresholds.
+        }
+      }
 
       longPressTimerRef.current = setTimeout(() => {
         isLongPressRef.current = true;
@@ -223,7 +234,15 @@ export function TimerBucket({
 
       const dx = e.clientX - pressStartRef.current.x;
       const dy = e.clientY - pressStartRef.current.y;
-      if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_MOVE_THRESHOLD) {
+      const movement = Math.sqrt(dx * dx + dy * dy);
+
+      if (movement > TAP_MOVE_THRESHOLD) {
+        // Swipes should not activate the bucket on pointerup. Track movement
+        // here so horizontal page swipes stay distinct from single taps.
+        didMoveDuringPressRef.current = true;
+      }
+
+      if (movement > LONG_PRESS_MOVE_THRESHOLD) {
         clearLongPress();
       }
     },
@@ -237,13 +256,19 @@ export function TimerBucket({
     (e: React.PointerEvent) => {
       clearLongPress();
       try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         // Already released or not captured
       }
 
       if (isLongPressRef.current) {
         isLongPressRef.current = false;
+        didMoveDuringPressRef.current = false;
+        return;
+      }
+
+      if (didMoveDuringPressRef.current) {
+        didMoveDuringPressRef.current = false;
         return;
       }
 
@@ -260,8 +285,9 @@ export function TimerBucket({
     (e: React.PointerEvent) => {
       clearLongPress();
       isLongPressRef.current = false;
+      didMoveDuringPressRef.current = false;
       try {
-        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+        e.currentTarget.releasePointerCapture(e.pointerId);
       } catch {
         // Already released
       }

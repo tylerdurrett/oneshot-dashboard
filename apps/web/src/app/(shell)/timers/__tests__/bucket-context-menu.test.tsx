@@ -342,6 +342,88 @@ describe('TimerBucket context menu integration', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
+  it('toggles timer on a touch tap', () => {
+    const onToggle = vi.fn();
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
+        onToggle={onToggle}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
+      />,
+    );
+
+    const bucketButton = screen.getByRole('button');
+    fireEvent.pointerDown(bucketButton, {
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 80,
+      clientY: 80,
+      button: 0,
+    });
+    fireEvent.pointerUp(bucketButton, {
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 80,
+      clientY: 80,
+      button: 0,
+    });
+
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it('does not toggle timer after a touch drag', () => {
+    const onToggle = vi.fn();
+    render(
+      <TimerBucket
+        bucket={makeBucket()}
+        isActive={false}
+        isGoalReached={false}
+        style={{ position: 'absolute', left: 0, top: 0, width: 200, height: 150 }}
+        onToggle={onToggle}
+        onOpenSettings={vi.fn()}
+        onResetForToday={vi.fn()}
+        onSetRemainingTime={vi.fn()}
+        onDismissForToday={vi.fn()}
+      />,
+    );
+
+    const bucketButton = screen.getByRole('button');
+    fireEvent.pointerDown(bucketButton, {
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 80,
+      clientY: 80,
+      button: 0,
+    });
+    fireEvent.pointerMove(bucketButton, {
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 110,
+      clientY: 84,
+      button: 0,
+    });
+    fireEvent.pointerUp(bucketButton, {
+      pointerId: 1,
+      pointerType: 'touch',
+      isPrimary: true,
+      clientX: 110,
+      clientY: 84,
+      button: 0,
+    });
+
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   it('shows confirmation dialog when "Reset for Today" is selected from context menu', () => {
     render(
       <TimerBucket

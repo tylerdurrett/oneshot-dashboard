@@ -1,11 +1,42 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import TimersLayout from '../layout';
 import TimersPage from '../page';
 import TimersAllPage from '../all-page';
+
+const viewSpies = vi.hoisted(() => ({
+  remainingClick: vi.fn(),
+}));
+
+const NativeRequest = globalThis.Request;
+
+vi.mock('../_components/timer-views', () => ({
+  RemainingTimersView: () => (
+    <button
+      data-testid="remaining-view-button"
+      role="button"
+      onClick={viewSpies.remainingClick}
+      className="h-full w-full"
+    >
+      Remaining View
+    </button>
+  ),
+  RemainingTimersViewWithState: () => (
+    <button
+      data-testid="remaining-view-button"
+      role="button"
+      onClick={viewSpies.remainingClick}
+      className="h-full w-full"
+    >
+      Remaining View
+    </button>
+  ),
+  AllTimersView: () => <div>No time tracked yet</div>,
+  AllTimersViewWithState: () => <div>No time tracked yet</div>,
+}));
 
 // Stub browser APIs missing in jsdom
 beforeAll(() => {
@@ -23,9 +54,62 @@ beforeAll(() => {
       disconnect() {}
     } as unknown as typeof ResizeObserver;
   }
+
+  globalThis.Request = class extends NativeRequest {
+    constructor(input: RequestInfo | URL, init?: RequestInit) {
+      const safeInit = init ? { ...init, signal: undefined } : init;
+      super(input, safeInit);
+    }
+  } as typeof Request;
 });
 
-afterEach(cleanup);
+afterAll(() => {
+  globalThis.Request = NativeRequest;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  viewSpies.remainingClick.mockReset();
+  Object.defineProperty(navigator, 'maxTouchPoints', {
+    configurable: true,
+    value: 0,
+  });
+});
+
+beforeEach(() => {
+  mockTouchEnvironment({ isMobile: false, isCoarsePointer: false });
+});
+
+function mockTouchEnvironment({
+  isMobile,
+  isCoarsePointer,
+}: {
+  isMobile: boolean;
+  isCoarsePointer: boolean;
+}) {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches:
+        (query === '(max-width: 767px)' && isMobile) ||
+        ((query === '(pointer: coarse)' || query === '(any-pointer: coarse)') && isCoarsePointer),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+
+  Object.defineProperty(navigator, 'maxTouchPoints', {
+    configurable: true,
+    value: isCoarsePointer ? 1 : 0,
+  });
+}
 
 function renderTimersRoute(initialPath: string) {
   const router = createMemoryRouter(
@@ -43,11 +127,65 @@ function renderTimersRoute(initialPath: string) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return render(
+  return {
+    router,
+    ...render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
-  );
+    ),
+  };
+}
+
+function setPagerBounds(pager: HTMLElement, width = 300, height = 640) {
+  Object.defineProperty(pager, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => ({
+      x: 0,
+      y: 0,
+      top: 0,
+      left: 0,
+      right: width,
+      bottom: height,
+      width,
+      height,
+      toJSON: () => ({}),
+    }),
+  });
+}
+
+function swipe(target: HTMLElement, pager: HTMLElement, {
+  startX,
+  startY,
+  endX,
+  endY,
+}: {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}) {
+  fireEvent.pointerDown(target, {
+    pointerId: 1,
+    pointerType: 'touch',
+    isPrimary: true,
+    clientX: startX,
+    clientY: startY,
+  });
+  fireEvent.pointerMove(pager, {
+    pointerId: 1,
+    pointerType: 'touch',
+    isPrimary: true,
+    clientX: endX,
+    clientY: endY,
+  });
+  fireEvent.pointerUp(pager, {
+    pointerId: 1,
+    pointerType: 'touch',
+    isPrimary: true,
+    clientX: endX,
+    clientY: endY,
+  });
 }
 
 describe('TimersLayout', () => {
@@ -71,8 +209,7 @@ describe('TimersLayout', () => {
 
   it('renders the TimerGrid on the remaining route', () => {
     renderTimersRoute('/timers/remaining');
-    // The sub-nav tabs are present alongside the timer content
-    expect(screen.getByText('Remaining')).toBeDefined();
+    expect(screen.getByText('Remaining View')).toBeDefined();
     expect(screen.getByLabelText('Timer views')).toBeDefined();
   });
 
@@ -97,5 +234,121 @@ describe('TimersLayout', () => {
   it('keeps a dedicated timers content wrapper for standalone PWA spacing fixes', () => {
     const { container } = renderTimersRoute('/timers/remaining');
     expect(container.querySelector('.timers-content')).toBeTruthy();
+  });
+
+  it('keeps the desktop route rendering path when swipe mode is unavailable', () => {
+    renderTimersRoute('/timers/remaining');
+    expect(screen.queryByTestId('timers-mobile-pager')).toBeNull();
+    expect(screen.getByText('Remaining View')).toBeDefined();
+  });
+
+  it('swipes left from Remaining to All on touch mobile', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/remaining');
+
+    const pager = await screen.findByTestId('timers-mobile-pager');
+    const target = screen.getByTestId('remaining-view-button');
+    setPagerBounds(pager);
+
+    swipe(target, pager, { startX: 220, startY: 120, endX: 90, endY: 128 });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/all');
+    });
+  });
+
+  it('swipes right from All to Remaining on touch mobile', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/all');
+
+    const pager = await screen.findByTestId('timers-mobile-pager');
+    setPagerBounds(pager);
+
+    swipe(pager, pager, { startX: 90, startY: 140, endX: 220, endY: 148 });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/remaining');
+    });
+  });
+
+  it('snaps back when the swipe is too short', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/remaining');
+
+    const pager = await screen.findByTestId('timers-mobile-pager');
+    setPagerBounds(pager);
+
+    swipe(pager, pager, { startX: 180, startY: 120, endX: 130, endY: 124 });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/remaining');
+    });
+  });
+
+  it('ignores edge-start swipes so native navigation keeps priority', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/remaining');
+
+    const pager = await screen.findByTestId('timers-mobile-pager');
+    setPagerBounds(pager);
+
+    swipe(pager, pager, { startX: 12, startY: 120, endX: 180, endY: 125 });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/remaining');
+    });
+  });
+
+  it('does not navigate on vertical drags', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/remaining');
+
+    const pager = await screen.findByTestId('timers-mobile-pager');
+    setPagerBounds(pager);
+
+    swipe(pager, pager, { startX: 180, startY: 100, endX: 188, endY: 220 });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/remaining');
+    });
+  });
+
+  it('still lets the sub-nav tabs navigate when swipe mode is enabled', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/remaining');
+
+    fireEvent.click(screen.getByText('All'));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/all');
+    });
+  });
+
+  it('sizes each mobile pager panel to one viewport width', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    renderTimersRoute('/timers/remaining');
+
+    const remainingPage = await screen.findByTestId('timers-page-remaining');
+    const allPage = screen.getByTestId('timers-page-all');
+
+    expect(remainingPage.getAttribute('style')).toContain('width: 50%');
+    expect(allPage.getAttribute('style')).toContain('width: 50%');
+  });
+
+  it('suppresses bucket clicks after a claimed page swipe', async () => {
+    mockTouchEnvironment({ isMobile: true, isCoarsePointer: true });
+    const { router } = renderTimersRoute('/timers/remaining');
+
+    const pager = await screen.findByTestId('timers-mobile-pager');
+    const target = screen.getByTestId('remaining-view-button');
+    setPagerBounds(pager);
+
+    swipe(target, pager, { startX: 220, startY: 120, endX: 90, endY: 126 });
+    fireEvent.click(target);
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe('/timers/all');
+    });
+    expect(viewSpies.remainingClick).not.toHaveBeenCalled();
   });
 });

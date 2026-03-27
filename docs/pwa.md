@@ -42,6 +42,8 @@ Navigation bars and timer buckets also avoid text selection on touch devices, so
 
 The main Timers and Chat tabs also keep the chat connection alive while you switch between them. On mobile, that makes the app feel more like a native tabbed app instead of reconnecting every time you bounce between screens.
 
+On phone-sized touch screens, the Timers area also supports swiping between the `Remaining` and `All` views. The app intentionally leaves a small dead zone at both screen edges so your device or browser can still use edge swipes for back/forward navigation.
+
 Floating timer editors also keep their number inputs at a 16px mobile font size. On iPhone Safari, smaller focused inputs can trigger automatic page zoom, which is especially disruptive for long-press menus anchored to a specific spot on the screen.
 
 Those editors also stay open if iPhone Safari nudges the page while bringing up the keyboard. That focus-time scroll is a normal mobile browser behavior and should not kick you back to the timers grid.

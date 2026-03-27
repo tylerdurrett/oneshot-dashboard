@@ -1,8 +1,5 @@
-import { useDocumentTitle } from '@/hooks/use-document-title';
-
-import { AllTimerGrid } from './_components/all-timer-grid';
+import { AllTimersView } from './_components/timer-views';
 
 export default function TimersAllPage() {
-  useDocumentTitle('All Timers');
-  return <AllTimerGrid />;
+  return <AllTimersView />;
 }

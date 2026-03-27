@@ -12,7 +12,7 @@ import {
   squarify,
   type TreemapItem,
 } from '../_lib/treemap';
-import { useTimerState } from '../_hooks/use-timer-state';
+import { useTimerState, type UseTimerStateReturn } from '../_hooks/use-timer-state';
 import { useContainerSize } from '../_hooks/use-container-size';
 import { BucketSettingsDialog } from './bucket-settings-dialog';
 import { getTimerBucketSizeTier, TimerBucket } from './timer-bucket';
@@ -42,7 +42,7 @@ export function bucketsToElapsedItems(
 // Component
 // ---------------------------------------------------------------------------
 
-export function AllTimerGrid() {
+function AllTimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
   const {
     isHydrated,
     allBuckets,
@@ -166,4 +166,13 @@ export function AllTimerGrid() {
       )}
     </div>
   );
+}
+
+export function AllTimerGrid() {
+  const timerState = useTimerState();
+  return <AllTimerGridContent timerState={timerState} />;
+}
+
+export function AllTimerGridWithState({ timerState }: { timerState: UseTimerStateReturn }) {
+  return <AllTimerGridContent timerState={timerState} />;
 }
