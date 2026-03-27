@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import {
   ensureHostTokenFresh,
   injectCredentials,
-  readKeychainCredentials,
+  readHostCredentials,
   stripRefreshToken,
   refreshAndInjectCredentials,
 } from './credentials.js';
@@ -353,16 +353,19 @@ export async function prepareSandboxForPrompt(
   if (hostStatus.fresh) {
     credentials = hostStatus.credentials;
   } else {
-    const keychainResult = await readKeychainCredentials(spawnFn);
-    if (!keychainResult.ok) {
+    // Platform-dispatching re-read: macOS Keychain or Linux credential file.
+    const hostResult = await readHostCredentials(spawnFn);
+    if (!hostResult.ok) {
       recordHealFailure();
       return {
         ok: false,
-        code: keychainResult.phase === 'keychain' ? 'auth_unavailable' : 'host_refresh_failed',
+        code: hostResult.phase === 'keychain' || hostResult.phase === 'credential-file'
+          ? 'auth_unavailable'
+          : 'host_refresh_failed',
         message: 'The host could not read the chat agent credentials.',
       };
     }
-    credentials = keychainResult.credentials;
+    credentials = hostResult.credentials;
   }
 
   const injection = await injectCredentials(

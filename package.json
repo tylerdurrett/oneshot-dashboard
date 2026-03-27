@@ -22,7 +22,11 @@
     "launchd:install": "bash scripts/install-launchd.sh",
     "launchd:uninstall": "bash scripts/uninstall-launchd.sh",
     "launchd:status": "bash scripts/launchd-status.sh",
-    "launchd:logs": "bash scripts/launchd-logs.sh"
+    "launchd:logs": "bash scripts/launchd-logs.sh",
+    "service:install": "bash scripts/service-dispatch.sh install",
+    "service:uninstall": "bash scripts/service-dispatch.sh uninstall",
+    "service:status": "bash scripts/service-dispatch.sh status",
+    "service:logs": "bash scripts/service-dispatch.sh logs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

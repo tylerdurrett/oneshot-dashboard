@@ -38,14 +38,14 @@ Small changes are one-offs. Larger features use `_tasks/` with status folders: `
 
 ## Restarting Dev Servers
 
-The app runs via `pnpm launchd:install` (persistent launchd service) or `pnpm go` (foreground). The safe restart sequence:
+The app runs via `pnpm service:install` (persistent service — launchd on macOS, systemd on Linux/WSL2) or `pnpm go` (foreground). The safe restart sequence:
 
-1. `pnpm launchd:uninstall` — stops launchd from auto-respawning old processes
+1. `pnpm service:uninstall` — stops the service manager from auto-respawning old processes
 2. `pnpm stop` — kills processes on the configured ports
 3. Verify ports are free: `lsof -ti :4900,:4901,:4902` should return nothing
-4. `pnpm launchd:install` — starts fresh with new code
+4. `pnpm service:install` — starts fresh with new code
 
-**Do NOT** `kill` processes without first uninstalling launchd — it will immediately restart them with stale code, causing port conflicts. If you see `EADDRINUSE` errors, there are stale processes; use `pkill -9 -f "vite.*dev"; pkill -9 -f "tsx"` as a last resort.
+**Do NOT** `kill` processes without first uninstalling the service — the service manager will immediately restart them with stale code, causing port conflicts. If you see `EADDRINUSE` errors, there are stale processes; use `pkill -9 -f "vite.*dev"; pkill -9 -f "tsx"` as a last resort.
 
 After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts the server. If the server is crashing after a migration, verify the migration actually applied: `sqlite3 packages/db/local.db "PRAGMA table_info(TABLE_NAME);"`.
 

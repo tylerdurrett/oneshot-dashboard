@@ -1,11 +1,14 @@
 import { spawn as defaultSpawn } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { config } from '../config.js';
 import type { SpawnFn } from './sandbox.js';
 
 export type { SpawnFn } from './sandbox.js';
 
 /** Where in the credential pipeline a failure occurred. */
-export type CredentialPhase = 'keychain' | 'docker-exec' | 'parse';
+export type CredentialPhase = 'keychain' | 'credential-file' | 'docker-exec' | 'parse';
 
 /** Discriminated union for credential injection results. Never throws. */
 export type CredentialInjectionResult =
@@ -20,6 +23,15 @@ export type HostTokenStatus =
 /** Testable wrapper — `process.platform` is read-only so tests mock this function instead. */
 export function isMacOS(): boolean {
   return process.platform === 'darwin';
+}
+
+/**
+ * Whether the current platform supports reading host credentials and injecting
+ * them into the Docker sandbox. macOS uses Keychain; Linux reads the credential
+ * file directly. Separates capability from platform identity.
+ */
+export function supportsHostCredentialInjection(): boolean {
+  return process.platform === 'darwin' || process.platform === 'linux';
 }
 
 /**
@@ -153,6 +165,80 @@ export async function readKeychainCredentials(
 }
 
 /**
+ * Read Claude credentials from the Linux credential file at
+ * `~/.claude/.credentials.json`. This is the same JSON format that macOS
+ * Keychain returns — on Linux, Claude Code stores it as a plain file.
+ * Guards on Linux — returns a phase-tagged failure on other platforms.
+ * Never rejects.
+ */
+export async function readCredentialFile(): Promise<CredentialInjectionResult> {
+  if (process.platform !== 'linux') {
+    return {
+      ok: false,
+      phase: 'credential-file',
+      message: 'Credential file injection is only available on Linux',
+    };
+  }
+
+  const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
+  let raw: string;
+  try {
+    raw = await fs.promises.readFile(credPath, 'utf8');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
+      console.warn(`[credentials] credential file not found: ${credPath}`);
+      return {
+        ok: false,
+        phase: 'credential-file',
+        message: `Credential file not found: ${credPath}`,
+      };
+    }
+    console.warn(`[credentials] credential file read failed: ${(err as Error).message}`);
+    return {
+      ok: false,
+      phase: 'credential-file',
+      message: `Failed to read credential file: ${(err as Error).message}`,
+    };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    console.warn('[credentials] credential file returned invalid JSON');
+    return {
+      ok: false,
+      phase: 'parse',
+      message: `Credential file contains invalid JSON: ${raw.slice(0, 200)}`,
+    };
+  }
+
+  console.log('[credentials] credential file read: success');
+  return { ok: true, credentials: parsed };
+}
+
+/**
+ * Platform-dispatching credential reader. Routes to the macOS Keychain reader
+ * on Darwin or the credential file reader on Linux.
+ */
+export async function readHostCredentials(
+  spawnFn: SpawnFn = defaultSpawn,
+): Promise<CredentialInjectionResult> {
+  if (process.platform === 'darwin') {
+    return readKeychainCredentials(spawnFn);
+  }
+  if (process.platform === 'linux') {
+    return readCredentialFile();
+  }
+  return {
+    ok: false,
+    phase: 'credential-file',
+    message: `Unsupported platform for credential reading: ${process.platform}`,
+  };
+}
+
+/**
  * Inject credentials JSON into the Docker sandbox using an atomic write.
  * Pipes JSON to stdin of `docker sandbox exec -i`, which stages to a temp
  * file then atomically moves it into place. Never rejects.
@@ -269,18 +355,19 @@ export async function ensureHostTokenFresh(
 async function doEnsureHostTokenFresh(
   spawnFn: SpawnFn,
 ): Promise<HostTokenStatus> {
-  const keychainResult = await readKeychainCredentials(spawnFn);
-  if (!keychainResult.ok) {
-    return { fresh: false, refreshed: false, message: keychainResult.message };
+  // Platform-dispatching read: macOS Keychain or Linux credential file.
+  const hostResult = await readHostCredentials(spawnFn);
+  if (!hostResult.ok) {
+    return { fresh: false, refreshed: false, message: hostResult.message };
   }
 
-  const expiresAt = getHostTokenExpiresAt(keychainResult.credentials);
+  const expiresAt = getHostTokenExpiresAt(hostResult.credentials);
   const remainingMs = expiresAt !== null ? expiresAt - Date.now() : null;
   console.log(`[credentials] host token check: remainingMs=${remainingMs}, threshold=${config.hostRefreshThresholdMs}`);
 
   if (remainingMs === null || remainingMs > config.hostRefreshThresholdMs) {
     console.log('[credentials] host token is fresh, no refresh needed');
-    return { fresh: true, expiresAt, credentials: keychainResult.credentials };
+    return { fresh: true, expiresAt, credentials: hostResult.credentials };
   }
 
   console.log('[credentials] host token near expiry, triggering refresh via claude -p "."');
@@ -362,9 +449,9 @@ export async function refreshAndInjectCredentials(
     credentials = hostStatus.credentials;
   } else {
     console.log('[credentials] pipeline: re-reading credentials after host refresh');
-    const keychainResult = await readKeychainCredentials(spawnFn);
-    if (!keychainResult.ok) return keychainResult;
-    credentials = keychainResult.credentials;
+    const hostResult = await readHostCredentials(spawnFn);
+    if (!hostResult.ok) return hostResult;
+    credentials = hostResult.credentials;
   }
 
   const stripped = stripRefreshToken(credentials);

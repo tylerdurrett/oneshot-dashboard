@@ -100,6 +100,7 @@ function wait(ms) {
 const launchdLabel = 'com.tdogmini.oneshot-dashboard';
 
 function isLaunchdManaged() {
+  if (process.platform !== 'darwin') return false;
   try {
     execFileSync('launchctl', ['print', `gui/${process.getuid()}/${launchdLabel}`], {
       stdio: 'ignore',
@@ -110,14 +111,37 @@ function isLaunchdManaged() {
   }
 }
 
+// Must match SYSTEMD_SERVICE_NAME in scripts/systemd-common.sh
+const systemdServiceName = 'oneshot-dashboard';
+
+function isSystemdManaged() {
+  if (process.platform !== 'linux') return false;
+  try {
+    const output = execFileSync(
+      'systemctl',
+      ['--user', 'is-active', `${systemdServiceName}.service`],
+      { encoding: 'utf8', stdio: 'pipe' },
+    ).trim();
+    return output === 'active';
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
-  // Warn if launchd is managing the service — killing processes will just
-  // cause launchd to restart them immediately.
+  // Warn if a service manager is managing the service — killing processes will
+  // just cause it to restart them immediately.
   if (isLaunchdManaged()) {
     console.log(
       'Warning: oneshot-dashboard is managed by launchd.\n' +
       'Killing processes will cause launchd to restart them immediately.\n' +
-      'Use `pnpm launchd:uninstall` to stop the persistent service.\n',
+      'Use `pnpm service:uninstall` to stop the persistent service.\n',
+    );
+  } else if (isSystemdManaged()) {
+    console.log(
+      'Warning: oneshot-dashboard is managed by systemd.\n' +
+      'Killing processes will cause systemd to restart them immediately.\n' +
+      'Use `pnpm service:uninstall` to stop the persistent service.\n',
     );
   }
 

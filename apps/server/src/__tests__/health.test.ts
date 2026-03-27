@@ -98,6 +98,23 @@ describe('GET /health', () => {
 
     await server.close();
   });
+
+  it('reports credential injection available on Linux', async () => {
+    mockPlatform('linux');
+    const server = buildServer({ logger: false });
+    try {
+      const response = await server.inject({
+        method: 'GET',
+        url: '/health',
+      });
+
+      const body = response.json();
+      expect(body.credentialInjection.available).toBe(true);
+    } finally {
+      await server.close();
+      restorePlatform();
+    }
+  });
 });
 
 describe('Credential sweep', () => {

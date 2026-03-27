@@ -53,7 +53,7 @@ If chat still fails, there are usually only two buckets:
 
 - **Sandbox setup problem**: the local server or sandbox is offline, or the host needs a fresh Claude login. The fastest recovery step is usually `pnpm go`, then `pnpm sandbox` if needed.
 - **Response still finishing**: the page may reconnect and catch up from the saved run state. Give it a moment before retrying.
-- **Immediate "load failed" on another device**: that usually points to a stale server build or a browser-origin mismatch. Restart the app with the normal launchd-safe flow if it comes back after an update.
+- **Immediate "load failed" on another device**: that usually points to a stale server build or a browser-origin mismatch. Restart the app with `pnpm service:uninstall && pnpm stop && pnpm service:install` if it comes back after an update.
 
 ## How to build with Claude Code
 
@@ -108,3 +108,4 @@ I chose this stack for a couple of reasons.
 - [Node.js](https://nodejs.org/) v18+
 - [pnpm](https://pnpm.io/) v10+
 - A coding agent like [Claude Code](https://claude.ai/code) (recommended, not required)
+- **Linux/WSL2 only:** [Docker Desktop](https://docs.docker.com/desktop/install/windows-install/) with WSL2 backend (for sandbox features), `lsof` (`sudo apt install lsof`)

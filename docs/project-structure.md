@@ -7,7 +7,8 @@ One Shot is a **monorepo** — one repository containing multiple packages that 
 ```
 your-project/
 ├── apps/
-│   └── web/                  ← Your Vite + React Router app (where you build your product)
+│   ├── web/                  ← Your Vite + React Router app (where you build your product)
+│   └── server/               ← Fastify API server (chat, timers, sandbox management)
 │
 ├── packages/
 │   ├── ui/                   ← Shared UI components (buttons, cards, inputs, etc.)
@@ -22,7 +23,10 @@ your-project/
 │   ├── new-video.mjs         ← Scaffold new Remotion compositions
 │   ├── get-port.mjs          ← Read dev server port from config
 │   ├── get-studio-port.mjs   ← Read Remotion Studio port from config
-│   └── stop-dev-processes.mjs ← Stop local dev + studio processes (pnpm stop)
+│   ├── stop-dev-processes.mjs ← Stop local dev + studio processes (pnpm stop)
+│   ├── service-dispatch.sh   ← Routes service commands to macOS (launchd) or Linux (systemd)
+│   ├── install-launchd.sh    ← macOS persistent service (called via service-dispatch)
+│   └── install-systemd.sh    ← Linux persistent service (called via service-dispatch)
 ├── _tasks/                ← Feature planning (for larger features)
 ├── .claude/                  ← Claude Code skills and configuration
 ├── package.json              ← Root-level scripts and dependencies

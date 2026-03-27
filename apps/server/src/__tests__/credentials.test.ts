@@ -1,12 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { config } from '../config.js';
 import {
   ensureHostTokenFresh,
   getHostTokenExpiresAt,
   injectCredentials,
+  readCredentialFile,
+  readHostCredentials,
   readKeychainCredentials,
   refreshAndInjectCredentials,
   stripRefreshToken,
+  supportsHostCredentialInjection,
 } from '../services/credentials.js';
 import type { SpawnFn } from '../services/sandbox.js';
 import {
@@ -102,6 +105,10 @@ describe('getHostTokenExpiresAt', () => {
 // ---------------------------------------------------------------------------
 
 describe('readKeychainCredentials', () => {
+  // Pin platform to darwin for Keychain tests — readKeychainCredentials
+  // guards on process.platform === 'darwin'.
+  beforeEach(() => { mockPlatform('darwin'); });
+
   it('returns credentials on success', async () => {
     const creds = fakeCredentials();
     const spawnFn = createFakeSpawn({
@@ -194,6 +201,139 @@ describe('readKeychainCredentials', () => {
 });
 
 // ---------------------------------------------------------------------------
+// supportsHostCredentialInjection
+// ---------------------------------------------------------------------------
+
+describe('supportsHostCredentialInjection', () => {
+  it('returns true on macOS', () => {
+    mockPlatform('darwin');
+    expect(supportsHostCredentialInjection()).toBe(true);
+  });
+
+  it('returns true on Linux', () => {
+    mockPlatform('linux');
+    expect(supportsHostCredentialInjection()).toBe(true);
+  });
+
+  it('returns false on unsupported platforms', () => {
+    mockPlatform('win32');
+    expect(supportsHostCredentialInjection()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readCredentialFile
+// ---------------------------------------------------------------------------
+
+describe('readCredentialFile', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns credentials on success', async () => {
+    mockPlatform('linux');
+    const creds = fakeCredentials();
+    const { promises: fsp } = await import('node:fs');
+    vi.spyOn(fsp, 'readFile').mockResolvedValue(JSON.stringify(creds));
+
+    const result = await readCredentialFile();
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect((result.credentials as Record<string, unknown>).claudeAiOauth).toBeDefined();
+    }
+  });
+
+  it('returns phase "credential-file" when file not found', async () => {
+    mockPlatform('linux');
+    const { promises: fsp } = await import('node:fs');
+    const err = new Error('ENOENT') as NodeJS.ErrnoException;
+    err.code = 'ENOENT';
+    vi.spyOn(fsp, 'readFile').mockRejectedValue(err);
+
+    const result = await readCredentialFile();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.phase).toBe('credential-file');
+      expect(result.message).toContain('not found');
+    }
+  });
+
+  it('returns phase "parse" for invalid JSON', async () => {
+    mockPlatform('linux');
+    const { promises: fsp } = await import('node:fs');
+    vi.spyOn(fsp, 'readFile').mockResolvedValue('not json!!!');
+
+    const result = await readCredentialFile();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.phase).toBe('parse');
+      expect(result.message).toContain('invalid JSON');
+    }
+  });
+
+  it('returns early on non-Linux platforms', async () => {
+    mockPlatform('darwin');
+    const result = await readCredentialFile();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.phase).toBe('credential-file');
+      expect(result.message).toContain('only available on Linux');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// readHostCredentials
+// ---------------------------------------------------------------------------
+
+describe('readHostCredentials', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('routes to Keychain on macOS', async () => {
+    mockPlatform('darwin');
+    const creds = fakeCredentials();
+    const spawnFn = createFakeSpawn({
+      stdout: JSON.stringify(creds),
+      exitCode: 0,
+    });
+
+    const result = await readHostCredentials(spawnFn);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('routes to credential file on Linux', async () => {
+    mockPlatform('linux');
+    const creds = fakeCredentials();
+    const { promises: fsp } = await import('node:fs');
+    vi.spyOn(fsp, 'readFile').mockResolvedValue(JSON.stringify(creds));
+
+    const spawnFn = createFakeSpawn({ exitCode: 0 });
+    const result = await readHostCredentials(spawnFn);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns unsupported error on other platforms', async () => {
+    mockPlatform('win32');
+    const spawnFn = createFakeSpawn({ exitCode: 0 });
+    const result = await readHostCredentials(spawnFn);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.phase).toBe('credential-file');
+      expect(result.message).toContain('Unsupported platform');
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // injectCredentials
 // ---------------------------------------------------------------------------
 
@@ -268,9 +408,15 @@ describe('injectCredentials', () => {
 // ---------------------------------------------------------------------------
 
 describe('ensureHostTokenFresh', () => {
+  // These tests exercise the Keychain-based credential flow, so we pin
+  // platform to darwin. On Linux the code routes to readCredentialFile()
+  // which bypasses spawn mocking.
   // Reset the module-level inflight promise between tests by importing fresh.
   // Since we can't easily reset module state, we rely on each test awaiting
   // the result so the inflight clears via `.finally()`.
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  beforeEach(() => { mockPlatform('darwin'); });
 
   it('returns fresh when token expiry is far in the future (no spawn)', async () => {
     const freshCreds = fakeCredentials({ expiresAt: Date.now() + 7_200_000 });
@@ -337,8 +483,8 @@ describe('ensureHostTokenFresh', () => {
     expect(spawnCount).toBe(1);
   });
 
-  it('returns not-fresh when keychain read fails', async () => {
-    mockPlatform('linux');
+  it('returns not-fresh when host credential read fails (unsupported platform)', async () => {
+    mockPlatform('win32');
 
     const spawnFn = createFakeSpawn({ exitCode: 0 });
     const result = await ensureHostTokenFresh(spawnFn);
@@ -346,7 +492,7 @@ describe('ensureHostTokenFresh', () => {
     expect(result.fresh).toBe(false);
     if (!result.fresh) {
       expect(result.refreshed).toBe(false);
-      expect(result.message).toContain('only available on macOS');
+      expect(result.message).toContain('Unsupported platform');
     }
   });
 });
@@ -356,6 +502,11 @@ describe('ensureHostTokenFresh', () => {
 // ---------------------------------------------------------------------------
 
 describe('refreshAndInjectCredentials', () => {
+  // These tests exercise the Keychain-based credential flow, so we pin
+  // platform to darwin. On Linux the code routes to readCredentialFile()
+  // which bypasses spawn mocking.
+  beforeEach(() => { mockPlatform('darwin'); });
+
   it('completes the full pipeline successfully (fresh token path)', async () => {
     const creds = fakeCredentials({ expiresAt: Date.now() + 7_200_000 });
 
@@ -369,15 +520,15 @@ describe('refreshAndInjectCredentials', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('short-circuits on keychain read failure', async () => {
-    mockPlatform('linux');
+  it('short-circuits on unsupported platform', async () => {
+    mockPlatform('win32');
 
     const spawnFn = createFakeSpawn({ exitCode: 0 });
     const result = await refreshAndInjectCredentials(spawnFn);
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.phase).toBe('keychain');
+      expect(result.phase).toBe('credential-file');
     }
   });
 

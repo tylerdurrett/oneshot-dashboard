@@ -6,7 +6,7 @@
  *
  * - If the sandbox exists and is running → no-op.
  * - If the sandbox exists but is stopped → starts it + injects credentials.
- * - If the sandbox doesn't exist → creates it, injects credentials from Keychain.
+ * - If the sandbox doesn't exist → creates it, injects credentials from host.
  *   Falls back to prompting the user to run `pnpm sandbox` for interactive auth.
  */
 
@@ -14,6 +14,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
+import { readHostCredentials } from './lib/read-host-credentials.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -106,35 +107,28 @@ function checkAuth() {
 }
 
 /**
- * Inject credentials from the macOS Keychain into the sandbox.
+ * Inject credentials from the host into the sandbox.
+ * macOS: reads from Keychain. Linux: reads from ~/.claude/.credentials.json.
  * Returns true on success, false on any failure.
  */
-function tryKeychainInjection() {
-  if (process.platform !== 'darwin') return false;
-
-  let raw;
-  try {
-    raw = run('security find-generic-password -s "Claude Code-credentials" -w', { timeout: 10_000 });
-  } catch {
+function tryCredentialInjection() {
+  const result = readHostCredentials();
+  if (!result.ok) {
+    console.log(`  ${result.message}`);
     return false;
   }
 
-  let creds;
-  try {
-    creds = JSON.parse(raw);
-  } catch {
-    return false;
-  }
+  let creds = result.credentials;
 
   // Refresh host token if near expiry before injecting into sandbox.
   // Only re-read credentials if a refresh was actually triggered.
   const refreshed = ensureHostTokenFresh(creds);
   if (refreshed) {
-    try {
-      raw = run('security find-generic-password -s "Claude Code-credentials" -w', { timeout: 10_000 });
-      creds = JSON.parse(raw);
-    } catch (err) {
-      console.log(`  [setup] Re-read after refresh failed, using original credentials: ${err.message}`);
+    const reread = readHostCredentials();
+    if (reread.ok) {
+      creds = reread.credentials;
+    } else {
+      console.log(`  [setup] Re-read after refresh failed, using original credentials: ${reread.message}`);
     }
   }
 
@@ -149,13 +143,13 @@ function tryKeychainInjection() {
     'chmod 600 /home/agent/.claude/.credentials.json',
   ].join(' && ');
 
-  const result = spawnSync(
+  const injectionResult = spawnSync(
     'docker',
     ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', atomicWriteCmd],
     { input: JSON.stringify(creds), stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 },
   );
 
-  return result.status === 0;
+  return injectionResult.status === 0;
 }
 
 /**
@@ -208,9 +202,9 @@ function main() {
   if (state.exists && state.status === 'running') {
     // Already running — quick auth check, inject if needed
     if (!checkAuth()) {
-      console.log('  Sandbox running but not authenticated — injecting credentials...');
-      if (tryKeychainInjection() && checkAuth()) {
-        console.log('  ✓ Credentials injected');
+      console.log('  Sandbox running but not authenticated — injecting host credentials...');
+      if (tryCredentialInjection() && checkAuth()) {
+        console.log('  ✓ Host credentials injected');
       } else {
         console.log('');
         console.log('  ⚠ Sandbox is not authenticated. Run `pnpm sandbox` to log in.');
@@ -241,9 +235,9 @@ function main() {
 
   // Sandbox is now running — ensure it's authenticated
   if (!checkAuth()) {
-    console.log('  Injecting credentials from Keychain...');
-    if (tryKeychainInjection() && checkAuth()) {
-      console.log('  ✓ Sandbox authenticated via Keychain');
+    console.log('  Injecting host credentials...');
+    if (tryCredentialInjection() && checkAuth()) {
+      console.log('  ✓ Sandbox authenticated via host credentials');
     } else {
       console.log('');
       console.log('  ⚠ Sandbox created but not authenticated.');

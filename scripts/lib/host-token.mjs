@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 const REFRESH_THRESHOLD_MS = 600_000; // 10 minutes — same as config.hostRefreshThresholdMs
 
 /**
- * @param {unknown} creds — parsed Keychain credentials JSON
+ * @param {unknown} creds — parsed host credentials JSON (Keychain on macOS, file on Linux)
  * @returns {boolean} true if a host refresh was triggered (credentials may have rotated)
  */
 export function ensureHostTokenFresh(creds) {

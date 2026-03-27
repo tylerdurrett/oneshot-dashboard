@@ -10,6 +10,7 @@ import { execSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
+import { readHostCredentials } from './lib/read-host-credentials.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -57,49 +58,34 @@ function checkAuthStatus(name, workspace) {
   }
 }
 
-// ── Keychain Injection ───────────────────────────────────
+// ── Host Credential Injection ────────────────────────────
 
 /**
- * Try to inject credentials from the macOS Keychain into the sandbox.
- * Returns true on success, false on any failure (non-macOS, no keychain entry, etc.).
+ * Try to inject credentials from the host into the sandbox.
+ * macOS: reads from Keychain. Linux: reads from ~/.claude/.credentials.json.
+ * Returns true on success, false on any failure.
  * This lets returning users skip the interactive browser login entirely.
  */
-function tryKeychainInjection(name) {
-  if (process.platform !== 'darwin') return false;
+function tryCredentialInjection(name) {
+  console.log('  Trying host credential injection...');
 
-  console.log('  Trying Keychain credential injection...');
-
-  let raw;
-  try {
-    raw = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
-      stdio: 'pipe',
-      timeout: 10_000,
-    }).toString().trim();
-  } catch {
-    console.log('  No Keychain credentials found (first-time setup).');
+  const result = readHostCredentials();
+  if (!result.ok) {
+    console.log(`  ${result.message}`);
     return false;
   }
 
-  let creds;
-  try {
-    creds = JSON.parse(raw);
-  } catch {
-    console.log('  Keychain credentials are not valid JSON.');
-    return false;
-  }
+  let creds = result.credentials;
 
   // Refresh host token if near expiry before injecting into sandbox.
   // Only re-read credentials if a refresh was actually triggered.
   const refreshed = ensureHostTokenFresh(creds);
   if (refreshed) {
-    try {
-      raw = execSync('security find-generic-password -s "Claude Code-credentials" -w', {
-        stdio: 'pipe',
-        timeout: 10_000,
-      }).toString().trim();
-      creds = JSON.parse(raw);
-    } catch (err) {
-      console.log(`  [setup] Re-read after refresh failed, using original credentials: ${err.message}`);
+    const reread = readHostCredentials();
+    if (reread.ok) {
+      creds = reread.credentials;
+    } else {
+      console.log(`  [setup] Re-read after refresh failed, using original credentials: ${reread.message}`);
     }
   }
 
@@ -114,18 +100,18 @@ function tryKeychainInjection(name) {
     'chmod 600 /home/agent/.claude/.credentials.json',
   ].join(' && ');
 
-  const result = spawnSync(
+  const injectionResult = spawnSync(
     'docker',
     ['sandbox', 'exec', '-i', name, 'sh', '-c', atomicWriteCmd],
     { input: JSON.stringify(creds), stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 },
   );
 
-  if (result.status !== 0) {
+  if (injectionResult.status !== 0) {
     console.log('  Credential injection failed.');
     return false;
   }
 
-  console.log('  ✓ Credentials injected from Keychain');
+  console.log('  ✓ Host credentials injected');
   return true;
 }
 
@@ -221,14 +207,14 @@ function main() {
 
   if (!status.loggedIn) {
     if (exists) {
-      // Sandbox exists but not logged in — try Keychain injection first
+      // Sandbox exists but not logged in — try host credential injection first
       console.log('  Sandbox exists but is not logged in.');
       console.log('');
 
-      const injected = tryKeychainInjection(name);
-      const keychainWorked = injected && checkAuthStatus(name, workspace).loggedIn;
+      const injected = tryCredentialInjection(name);
+      const credentialsWorked = injected && checkAuthStatus(name, workspace).loggedIn;
 
-      if (!keychainWorked) {
+      if (!credentialsWorked) {
         if (injected) {
           console.log('  Injected credentials did not restore auth. Falling back to browser login.');
           console.log('');

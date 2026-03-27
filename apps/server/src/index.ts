@@ -8,7 +8,7 @@ import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
 import { timerRoutes, broadcast, SSE_EVENTS } from './routes/timers.js';
-import { isMacOS, refreshAndInjectCredentials } from './services/credentials.js';
+import { supportsHostCredentialInjection, refreshAndInjectCredentials } from './services/credentials.js';
 import {
   probeSandbox,
   type SandboxProbeResult,
@@ -32,7 +32,7 @@ export function buildServer(opts?: BuildServerOptions) {
 
   let sandboxStatus: SandboxProbeResult | null = null;
   let lastCredentialSweep: string | null = null;
-  const credentialInjectionAvailable = isMacOS();
+  const credentialInjectionAvailable = supportsHostCredentialInjection();
 
   // Allow CORS from any host on the web app port (supports Tailscale / LAN access).
   // Explicitly reflect the request origin string so the Access-Control-Allow-Origin
