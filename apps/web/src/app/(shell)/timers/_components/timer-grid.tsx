@@ -132,7 +132,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
 
   if (todaysBuckets.length === 0) {
     return (
-      <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
+      <div ref={containerRef} className="relative flex h-full w-full animate-in fade-in duration-300 items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-center">
           <Clock className="size-12 text-muted-foreground" />
           <div className="flex flex-col gap-1">
@@ -163,7 +163,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
   }
 
   return (
-    <div ref={containerRef} className="relative h-full w-full">
+    <div ref={containerRef} className="relative h-full w-full animate-in fade-in duration-300">
       {rects.map((rect) => {
         const bucket = bucketMap.get(rect.id);
         if (!bucket) return null;

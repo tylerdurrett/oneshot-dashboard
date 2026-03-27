@@ -78,6 +78,10 @@ function isStoppedAndPastGoal(bucket: TimeBucket): boolean {
 export function useTimerState(): UseTimerStateReturn {
   const queryClient = useQueryClient();
   const todayQuery = useTodayState();
+  // Latch hydration: once data loads, never blank the UI again — even on
+  // transient errors or refetch edge cases.
+  const hasHydratedRef = useRef(false);
+  if (todayQuery.isSuccess) hasHydratedRef.current = true;
   const startMutation = useStartTimer();
   const stopMutation = useStopTimer();
   const createMutation = useCreateBucket();
@@ -313,7 +317,7 @@ export function useTimerState(): UseTimerStateReturn {
   );
 
   return {
-    isHydrated: todayQuery.isSuccess,
+    isHydrated: hasHydratedRef.current,
     allBuckets,
     todaysBuckets,
     activeBucketId,
