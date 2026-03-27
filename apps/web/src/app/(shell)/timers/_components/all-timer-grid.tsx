@@ -54,7 +54,7 @@ function AllTimerGridContent({ timerState }: { timerState: UseTimerStateReturn }
     resetBucketForToday,
     setRemainingTime,
     dismissBucketForToday,
-  } = useTimerState();
+  } = timerState;
 
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
 

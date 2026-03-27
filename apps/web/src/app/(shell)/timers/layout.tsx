@@ -108,7 +108,14 @@ interface DragGestureState {
   width: number;
 }
 
-function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
+interface PendingSnapState {
+  fromIndex: number;
+  toIndex: number;
+  releaseOffset: number;
+  width: number;
+}
+
+export function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
   const navigate = useNavigate();
   const { containerRef, size } = useContainerSize(true);
   // The mobile pager mounts both timer panels at once, so it owns one shared
@@ -127,6 +134,7 @@ function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
   const suppressClickRef = useRef(false);
   const suppressClickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settleFrameRef = useRef<number | null>(null);
+  const [pendingSnap, setPendingSnap] = useState<PendingSnapState | null>(null);
 
   const activeIndex = TIMER_VIEW_ORDER.indexOf(activeView);
 
@@ -144,6 +152,21 @@ function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
       if (suppressClickTimeoutRef.current) clearTimeout(suppressClickTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingSnap) return;
+    if (activeIndex !== pendingSnap.toIndex) return;
+
+    if (settleFrameRef.current !== null) {
+      cancelAnimationFrame(settleFrameRef.current);
+    }
+
+    settleFrameRef.current = requestAnimationFrame(() => {
+      settleFrameRef.current = null;
+      setPendingSnap(null);
+      setDragOffset(0);
+    });
+  }, [activeIndex, pendingSnap]);
 
   const clearGesture = useCallback(() => {
     gestureRef.current = {
@@ -282,22 +305,25 @@ function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
             : activeIndex;
 
       if (nextIndex !== activeIndex) {
-        const carryOffset = getDraggedOffset(dx) + (nextIndex - activeIndex) * gesture.width;
+        const releaseOffset = getDraggedOffset(dx);
         const nextView = TIMER_VIEW_ORDER[nextIndex]!;
 
         setIsDragging(false);
-        setDragOffset(carryOffset);
-        navigate(getTimerViewPath(nextView));
-
-        settleFrameRef.current = requestAnimationFrame(() => {
-          settleFrameRef.current = null;
-          setDragOffset(0);
+        setDragOffset(releaseOffset);
+        setPendingSnap({
+          fromIndex: activeIndex,
+          toIndex: nextIndex,
+          releaseOffset,
+          width: gesture.width,
         });
+        navigate(getTimerViewPath(nextView));
       } else {
+        setPendingSnap(null);
         setIsDragging(false);
         setDragOffset(0);
       }
     } else {
+      setPendingSnap(null);
       setIsDragging(false);
       setDragOffset(0);
     }
@@ -323,7 +349,20 @@ function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
     clearSuppressedClick();
   }, [clearSuppressedClick]);
 
-  const translateX = -activeIndex * size.width + dragOffset;
+  const translateX = (() => {
+    if (!pendingSnap) {
+      return -activeIndex * size.width + dragOffset;
+    }
+
+    if (activeIndex !== pendingSnap.toIndex) {
+      return -pendingSnap.fromIndex * pendingSnap.width + pendingSnap.releaseOffset;
+    }
+
+    const carryOffset =
+      pendingSnap.releaseOffset +
+      (pendingSnap.toIndex - pendingSnap.fromIndex) * pendingSnap.width;
+    return -activeIndex * pendingSnap.width + carryOffset;
+  })();
 
   return (
     <div
