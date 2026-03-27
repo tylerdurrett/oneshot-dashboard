@@ -71,6 +71,10 @@ function removeFromSet(
   });
 }
 
+function isStoppedAndPastGoal(bucket: TimeBucket): boolean {
+  return !bucket.startedAt && bucket.elapsedSeconds >= bucket.totalMinutes * 60;
+}
+
 export function useTimerState(): UseTimerStateReturn {
   const queryClient = useQueryClient();
   const todayQuery = useTodayState();
@@ -155,6 +159,10 @@ export function useTimerState(): UseTimerStateReturn {
       if (!isBucketActiveToday(bucket)) return false;
       // Hide buckets dismissed for today.
       if (bucket.dismissedAt) return false;
+      // Some older rows are already over goal but never got goalReachedAt
+      // persisted. Treat those stopped buckets as complete so Remaining
+      // doesn't keep showing them forever.
+      if (isStoppedAndPastGoal(bucket)) return false;
       // Hide buckets that hit their goal and are stopped. Running timers
       // past goal stay visible (showing negative remaining + check icon).
       if (bucket.goalReachedAt && !bucket.startedAt) return false;

@@ -285,7 +285,7 @@ describe('stopTimer', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('does NOT set goalReachedAt when elapsed exceeds total (scheduler handles that)', async () => {
+  it('sets goalReachedAt when stopping an overdue timer', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 1 }); // 60 seconds
     const t1 = new Date(2026, 2, 24, 10, 0, 0);
     await startTimer(bucket.id, testDb, t1);
@@ -297,8 +297,10 @@ describe('stopTimer', () => {
     expect(result.changed).toBe(true);
     // Elapsed is NOT capped — tracks actual usage
     expect(result.elapsedSeconds).toBe(120);
-    // goalReachedAt is NOT set by stopTimer — that's the scheduler's job
-    expect(result.goalReachedAt).toBeNull();
+    expect(result.goalReachedAt).toBe(t2.toISOString());
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows[0]!.goalReachedAt).toBe(t2.toISOString());
   });
 
   it('accumulates across start/stop cycles', async () => {

@@ -37,7 +37,7 @@ your-project/
 This is where you spend most of your time. It's a [Vite](https://vite.dev/) app with [React Router](https://reactrouter.com/) for client-side routing.
 
 - **`src/app/`** — Your pages and layouts (routes defined in `src/router.tsx`, browser tab titles via route metadata)
-- Route folders can also include local `_components/`, `_hooks/`, and `_lib/` helpers so sibling screens can share behavior without duplicating logic. For example, the Timers pages share one timer-state hook so the "Remaining" and "All" views stay in sync.
+- Route folders can also include local `_components/`, `_hooks/`, and `_lib/` helpers so sibling screens can share behavior without duplicating logic. For example, the Timers pages share one timer-state hook so the "Remaining" and "All" views stay in sync and finished paused timers drop out of the Remaining view automatically.
 - **`src/app/globals.css`** — Global styles and Tailwind theme
 - **`src/__tests__/`** — Tests for your app
 

@@ -640,7 +640,7 @@ describe('Timer control routes', () => {
       expect(res.json()).toEqual({ elapsedSeconds: 0, goalReachedAt: null });
     });
 
-    it('does NOT broadcast goal-reached when stopping an over-budget timer', async () => {
+    it('returns goalReachedAt when stopping an over-budget timer', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 1 });
       // Pre-insert a progress row with 59s elapsed and startedAt 2s ago
       const twoSecondsAgo = new Date(Date.now() - 2000).toISOString();
@@ -655,9 +655,10 @@ describe('Timer control routes', () => {
       });
 
       const body = res.json();
-      // 59 + ~2 = ~61, which exceeds 60 seconds, but stopTimer does NOT set goalReachedAt
+      // 59 + ~2 = ~61, so stopping should persist goalReachedAt even if the
+      // background scheduler did not mark it first.
       expect(body.elapsedSeconds).toBeGreaterThanOrEqual(60);
-      expect(body.goalReachedAt).toBeNull();
+      expect(body.goalReachedAt).toEqual(expect.any(String));
     });
 
     it('cancels scheduled goal job on stop', async () => {

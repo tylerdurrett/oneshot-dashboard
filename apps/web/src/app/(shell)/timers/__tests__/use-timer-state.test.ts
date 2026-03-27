@@ -288,6 +288,26 @@ describe('useTimerState', () => {
     expect(result.current.todaysBuckets).toHaveLength(0);
   });
 
+  it('todaysBuckets hides stopped buckets that are already over goal even without goalReachedAt', async () => {
+    mockFetchTodayState.mockResolvedValue(
+      makeTodayState([
+        makeServerBucket({
+          totalMinutes: 60,
+          elapsedSeconds: 3601,
+          startedAt: null,
+          goalReachedAt: null,
+        }),
+      ]),
+    );
+
+    const { result } = renderHook(() => useTimerState(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    expect(result.current.todaysBuckets).toHaveLength(0);
+  });
+
   // ---- toggleBucket ----
 
   it('toggleBucket calls startTimer when bucket is not active', async () => {

@@ -201,8 +201,15 @@ export async function stopTimer(
   const date = getResetDate(now);
 
   const rows = await database
-    .select()
+    .select({
+      id: timerDailyProgress.id,
+      elapsedSeconds: timerDailyProgress.elapsedSeconds,
+      startedAt: timerDailyProgress.startedAt,
+      goalReachedAt: timerDailyProgress.goalReachedAt,
+      totalMinutes: timerBuckets.totalMinutes,
+    })
     .from(timerDailyProgress)
+    .innerJoin(timerBuckets, eq(timerDailyProgress.bucketId, timerBuckets.id))
     .where(
       and(
         eq(timerDailyProgress.bucketId, bucketId),
@@ -216,16 +223,22 @@ export async function stopTimer(
 
   const row = rows[0]!;
   const elapsedSeconds = row.elapsedSeconds + elapsedSince(row.startedAt!, now);
+  const totalSeconds = row.totalMinutes * 60;
+  // If the background scheduler missed the goal-reached moment, stopping an
+  // overdue timer still needs to persist completion so Remaining can hide it.
+  const goalReachedAt =
+    row.goalReachedAt ?? (elapsedSeconds >= totalSeconds ? now.toISOString() : null);
 
   await database
     .update(timerDailyProgress)
     .set({
       elapsedSeconds,
       startedAt: null,
+      goalReachedAt,
     })
     .where(eq(timerDailyProgress.id, row.id));
 
-  return { changed: true, elapsedSeconds, goalReachedAt: row.goalReachedAt };
+  return { changed: true, elapsedSeconds, goalReachedAt };
 }
 
 /**
