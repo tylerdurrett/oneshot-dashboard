@@ -5,6 +5,7 @@ import { Clock, Menu, MessageSquare, Plus } from 'lucide-react';
 import { cn } from '@repo/ui';
 
 import { ADD_BUCKET_EVENT } from '@/app/(shell)/timers/_lib/timer-types';
+import { features } from '@/lib/features';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -17,16 +18,22 @@ interface NavItem {
   matchType: 'exact' | 'prefix';
   /** If true, a context menu with extra actions is shown on right-click / long-press. */
   hasContextMenu?: boolean;
+  /** Feature flag key — item is hidden when its feature is disabled. */
+  feature?: keyof typeof features;
 }
 
 // ---------------------------------------------------------------------------
-// Nav items
+// Nav items — filtered by feature flags at module load time.
 // ---------------------------------------------------------------------------
 
-const NAV_ITEMS: NavItem[] = [
-  { href: '/timers', label: 'Timers', icon: Clock, matchType: 'prefix', hasContextMenu: true },
-  { href: '/chat', label: 'Chat', icon: MessageSquare, matchType: 'prefix' },
+const ALL_NAV_ITEMS: NavItem[] = [
+  { href: '/timers', label: 'Timers', icon: Clock, matchType: 'prefix', hasContextMenu: true, feature: 'timers' },
+  { href: '/chat', label: 'Chat', icon: MessageSquare, matchType: 'prefix', feature: 'chat' },
 ];
+
+const NAV_ITEMS = ALL_NAV_ITEMS.filter(
+  (item) => !item.feature || features[item.feature],
+);
 
 function isItemActive(item: NavItem, pathname: string): boolean {
   if (item.matchType === 'exact') return pathname === item.href;

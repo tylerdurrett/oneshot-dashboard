@@ -2,6 +2,7 @@ import 'dotenv/config';
 
 import cors from '@fastify/cors';
 import { db as defaultDb, enableWalMode, getJournalMode } from '@repo/db';
+import type { FeatureFlags } from '@repo/features';
 import Fastify from 'fastify';
 import { config, isAllowedOrigin } from './config.js';
 import { websocket } from './plugins/websocket.js';
@@ -23,12 +24,16 @@ export interface BuildServerOptions {
   database?: Database;
   /** Override the spawn function for sandbox probe (testing). */
   spawnFn?: SpawnFn;
+  /** Override feature flags (testing). Defaults to config.features. */
+  features?: FeatureFlags;
 }
 
 export function buildServer(opts?: BuildServerOptions) {
   const server = Fastify({
     logger: opts?.logger ?? true,
   });
+
+  const features = opts?.features ?? config.features;
 
   let sandboxStatus: SandboxProbeResult | null = null;
   let lastCredentialSweep: string | null = null;
@@ -47,53 +52,68 @@ export function buildServer(opts?: BuildServerOptions) {
   });
   server.register(websocket);
 
+  // Health endpoint — always active regardless of feature flags.
   server.get('/health', async () => {
     return {
       status: 'ok',
-      sandbox: sandboxStatus
-        ? { status: sandboxStatus.status, message: sandboxStatus.message }
-        : { status: 'unknown', message: 'Sandbox probe has not run yet' },
-      credentialInjection: {
-        available: credentialInjectionAvailable,
-        lastSweep: lastCredentialSweep,
-      },
+      features,
+      sandbox: !features.chat
+        ? { status: 'disabled' }
+        : sandboxStatus
+          ? { status: sandboxStatus.status, message: sandboxStatus.message }
+          : { status: 'unknown', message: 'Sandbox probe has not run yet' },
+      credentialInjection: !features.chat
+        ? { status: 'disabled' }
+        : {
+            available: credentialInjectionAvailable,
+            lastSweep: lastCredentialSweep,
+          },
     };
   });
 
-  const routeOpts: ThreadRoutesOptions = {};
-  if (opts?.database) {
-    routeOpts.database = opts.database;
-  }
-  server.register(threadRoutes, routeOpts);
+  // -- Chat routes (threads + chat runs) --
+  if (features.chat) {
+    const routeOpts: ThreadRoutesOptions = {};
+    if (opts?.database) {
+      routeOpts.database = opts.database;
+    }
+    server.register(threadRoutes, routeOpts);
 
-  const chatOpts: ChatRoutesOptions = {};
-  if (opts?.database) chatOpts.database = opts.database;
-  if (opts?.spawnFn) chatOpts.spawnFn = opts.spawnFn;
-  server.register(chatRoutes, chatOpts);
+    const chatOpts: ChatRoutesOptions = {};
+    if (opts?.database) chatOpts.database = opts.database;
+    if (opts?.spawnFn) chatOpts.spawnFn = opts.spawnFn;
+    server.register(chatRoutes, chatOpts);
+  }
 
   // -- Timer system: scheduler + routes --
+  let scheduler: TimerScheduler | null = null;
 
-  const timerDb = opts?.database ?? defaultDb;
-  const scheduler = new TimerScheduler({
-    database: timerDb,
-    onGoalReached: (bucketId) =>
-      broadcast(SSE_EVENTS.TIMER_GOAL_REACHED, { bucketId }),
-    onDailyReset: () => broadcast(SSE_EVENTS.DAILY_RESET, {}),
-  });
+  if (features.timers) {
+    const timerDb = opts?.database ?? defaultDb;
+    scheduler = new TimerScheduler({
+      database: timerDb,
+      onGoalReached: (bucketId) =>
+        broadcast(SSE_EVENTS.TIMER_GOAL_REACHED, { bucketId }),
+      onDailyReset: () => broadcast(SSE_EVENTS.DAILY_RESET, {}),
+    });
 
-  server.register(timerRoutes, {
-    database: timerDb,
-    scheduler,
-  });
+    server.register(timerRoutes, {
+      database: timerDb,
+      scheduler,
+    });
+  }
 
   /** Initialize the timer scheduler (recovery + completion jobs + daily reset).
-   *  Call after seeding default buckets. */
+   *  No-op when timers feature is disabled. Call after seeding default buckets. */
   async function initScheduler(): Promise<void> {
+    if (!scheduler) return;
     await scheduler.init();
   }
 
-  /** Run the sandbox probe and cache the result for the health endpoint. */
+  /** Run the sandbox probe and cache the result for the health endpoint.
+   *  No-op when chat feature is disabled. */
   async function runSandboxProbe(): Promise<SandboxProbeResult> {
+    if (!features.chat) return { status: 'unavailable', message: 'Chat feature disabled' };
     const result = await probeSandbox(opts?.spawnFn);
     sandboxStatus = result;
     return result;
@@ -103,8 +123,9 @@ export function buildServer(opts?: BuildServerOptions) {
 
   let sweepIntervalId: ReturnType<typeof setInterval> | null = null;
 
-  /** Run a single credential sweep. Logs result but never throws. */
+  /** Run a single credential sweep. No-op when chat is disabled. Logs result but never throws. */
   async function runCredentialSweep(): Promise<void> {
+    if (!features.chat) return;
     try {
       const result = await refreshAndInjectCredentials(opts?.spawnFn);
       lastCredentialSweep = new Date().toISOString();
@@ -119,6 +140,7 @@ export function buildServer(opts?: BuildServerOptions) {
   }
 
   function startCredentialSweep(): void {
+    if (!features.chat) return;
     if (sweepIntervalId) return;
     sweepIntervalId = setInterval(
       () => void runCredentialSweep(),
@@ -134,7 +156,7 @@ export function buildServer(opts?: BuildServerOptions) {
   }
 
   server.addHook('onClose', () => {
-    scheduler.destroy();
+    scheduler?.destroy();
     stopCredentialSweep();
   });
 
@@ -150,6 +172,12 @@ export function buildServer(opts?: BuildServerOptions) {
 // Start the server when this file is run directly (not imported in tests)
 if (!process.env.VITEST) {
   const server = buildServer();
+
+  const { features } = config;
+  const enabledNames = Object.entries(features)
+    .filter(([, v]) => v)
+    .map(([k]) => k);
+  server.log.info(`Feature flags: ${enabledNames.length ? enabledNames.join(', ') : 'none'}`);
 
   // Enable WAL mode for concurrent read/write access
   try {
@@ -169,13 +197,15 @@ if (!process.env.VITEST) {
   }
 
   // Seed default timer buckets before starting (idempotent — no-op if buckets exist)
-  try {
-    const didSeed = await seedDefaultBuckets();
-    if (didSeed) {
-      server.log.info('Seeded default timer buckets');
+  if (features.timers) {
+    try {
+      const didSeed = await seedDefaultBuckets();
+      if (didSeed) {
+        server.log.info('Seeded default timer buckets');
+      }
+    } catch (err) {
+      server.log.warn(`Failed to seed default timer buckets: ${err}`);
     }
-  } catch (err) {
-    server.log.warn(`Failed to seed default timer buckets: ${err}`);
   }
 
   // Bind to 0.0.0.0 so the server is reachable over Tailscale / LAN
@@ -186,39 +216,43 @@ if (!process.env.VITEST) {
     }
 
     // Must run after seeding — scheduler recovery depends on buckets existing
-    try {
-      await server.initScheduler();
-      server.log.info('Timer scheduler initialized');
-    } catch (schedulerErr) {
-      server.log.warn(`Timer scheduler init failed: ${schedulerErr}`);
+    if (features.timers) {
+      try {
+        await server.initScheduler();
+        server.log.info('Timer scheduler initialized');
+      } catch (schedulerErr) {
+        server.log.warn(`Timer scheduler init failed: ${schedulerErr}`);
+      }
     }
 
     // Probe sandbox and run initial credential sweep in parallel (non-blocking)
-    const [result] = await Promise.all([
-      server.runSandboxProbe(),
-      server.runCredentialSweep(),
-    ]);
+    if (features.chat) {
+      const [result] = await Promise.all([
+        server.runSandboxProbe(),
+        server.runCredentialSweep(),
+      ]);
 
-    if (result.status === 'healthy') {
-      server.log.info(result.message);
-    } else if (result.status === 'auth_failed') {
-      server.log.warn(result.message);
-      server.log.warn(
-        `To fix: pnpm sandbox`,
-      );
-    } else {
-      server.log.warn(result.message);
-      server.log.warn(
-        `To create sandbox: docker sandbox run --name ${config.sandboxName} claude ${config.sandboxWorkspace}`,
-      );
-    }
+      if (result.status === 'healthy') {
+        server.log.info(result.message);
+      } else if (result.status === 'auth_failed') {
+        server.log.warn(result.message);
+        server.log.warn(
+          `To fix: pnpm sandbox`,
+        );
+      } else {
+        server.log.warn(result.message);
+        server.log.warn(
+          `To create sandbox: docker sandbox run --name ${config.sandboxName} claude ${config.sandboxWorkspace}`,
+        );
+      }
 
-    // Start recurring credential sweep if enabled
-    if (config.credentialSweepEnabled) {
-      server.startCredentialSweep();
-      server.log.info(
-        `Credential sweep started (interval: ${config.credentialSweepIntervalMs}ms)`,
-      );
+      // Start recurring credential sweep if enabled
+      if (config.credentialSweepEnabled) {
+        server.startCredentialSweep();
+        server.log.info(
+          `Credential sweep started (interval: ${config.credentialSweepIntervalMs}ms)`,
+        );
+      }
     }
   });
 }

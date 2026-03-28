@@ -101,6 +101,7 @@ I chose this stack for a couple of reasons.
 - [UI Components](docs/ui-components.md) — Adding and using Shadcn components
 - [Video](docs/video.md) — Creating videos with Remotion
 - [Database](docs/database.md) — Working with Drizzle ORM and SQLite
+- [Feature Flags](docs/feature-flags.md) — Enabling and disabling features
 - [Dev Cycle](docs/dev-cycle.md) — The built-in feature development workflow
 - [For Agents](docs/for-agents.md) — How the agent-friendly tooling works
 - [Advanced Topics](docs/advanced-topics.md) — Upstream updates and more

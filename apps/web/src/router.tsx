@@ -12,19 +12,22 @@ import { ChatRunProvider } from '@/app/(shell)/chat/chat-run-context';
 import PrototypeIndex from '@/app/prototype/page';
 import ChatPrototype from '@/app/prototype/chat/page';
 import VideoPage from '@/app/video/page';
+import NoFeaturesPage from '@/app/no-features/page';
+import { features, getHomeRedirectPath } from '@/lib/features';
 
 // ---------------------------------------------------------------------------
 // Shell layout — wraps routes in the AppShell (sidebar + bottom nav).
+// ChatRunProvider is only mounted when the chat feature is enabled to avoid
+// unnecessary hooks/subscriptions.
 // ---------------------------------------------------------------------------
 
 function ShellLayout() {
-  return (
-    <ChatRunProvider>
-      <AppShell>
-        <Outlet />
-      </AppShell>
-    </ChatRunProvider>
+  const content = (
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
+  return features.chat ? <ChatRunProvider>{content}</ChatRunProvider> : content;
 }
 
 function PrototypeLayout() {
@@ -37,45 +40,68 @@ function PrototypeLayout() {
 
 // ---------------------------------------------------------------------------
 // Route definitions — exported separately for testing.
+// Shell children and standalone routes are gated by feature flags.
 // ---------------------------------------------------------------------------
+
+const shellChildren = [
+  ...(features.timers
+    ? [
+        {
+          element: <TimersLayout />,
+          children: [
+            { path: 'timers', loader: () => redirect('/timers/remaining') },
+            { path: 'timers/remaining', element: <TimersPage /> },
+            { path: 'timers/all', element: <TimersAllPage /> },
+          ],
+        },
+      ]
+    : []),
+  ...(features.chat
+    ? [
+        {
+          element: <ChatLayout />,
+          errorElement: <RouteErrorBoundary />,
+          children: [
+            { path: 'chat', element: <ChatIndexPage /> },
+            { path: 'chat/:threadId', element: <ThreadPage /> },
+          ],
+        },
+      ]
+    : []),
+];
+
+const prototypeChildren = [
+  { path: 'prototype', element: <PrototypeIndex /> },
+  ...(features.chat
+    ? [{ path: 'prototype/chat', element: <ChatPrototype /> }]
+    : []),
+];
 
 export const routes = [
   {
     path: '/',
-    loader: () => redirect('/timers/remaining'),
+    loader: () => redirect(getHomeRedirectPath()),
   },
   {
     element: <ShellLayout />,
-    children: [
-      {
-        element: <TimersLayout />,
-        children: [
-          { path: 'timers', loader: () => redirect('/timers/remaining') },
-          { path: 'timers/remaining', element: <TimersPage /> },
-          { path: 'timers/all', element: <TimersAllPage /> },
-        ],
-      },
-      {
-        element: <ChatLayout />,
-        errorElement: <RouteErrorBoundary />,
-        children: [
-          { path: 'chat', element: <ChatIndexPage /> },
-          { path: 'chat/:threadId', element: <ThreadPage /> },
-        ],
-      },
-    ],
+    children: shellChildren,
   },
   {
     element: <PrototypeLayout />,
-    children: [
-      { path: 'prototype', element: <PrototypeIndex /> },
-      { path: 'prototype/chat', element: <ChatPrototype /> },
-    ],
+    children: prototypeChildren,
   },
+  ...(features.video
+    ? [
+        {
+          // Standalone route — video page has no shell or layout wrapper
+          path: 'video',
+          element: <VideoPage />,
+        },
+      ]
+    : []),
   {
-    // Standalone route — video page has no shell or layout wrapper
-    path: 'video',
-    element: <VideoPage />,
+    path: 'no-features',
+    element: <NoFeaturesPage />,
   },
 ];
 

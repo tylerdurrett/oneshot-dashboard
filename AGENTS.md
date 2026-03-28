@@ -31,6 +31,7 @@ Uses a two-file convention, applied consistently across all apps:
 - Vitest configs are per-package (for Turbo cache compatibility)
 - SQLite database files (`*.db`) are gitignored; `DATABASE_URL` env var defaults to `file:local.db`
 - Ports are set via `pnpm hello` and stored in `project.config.json` (agent-readable). Convention: Web = N, Remotion Studio = N+1, Agent Server = N+2. Read ports from `project.config.json`, never hardcode them.
+- Feature flags (`timers`, `chat`, `video`) live in `project.config.json` under `features`, default to enabled. Shared logic in `@repo/features`. See `docs/feature-flags.md`.
 
 ## Development Workflow
 

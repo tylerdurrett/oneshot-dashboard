@@ -14,6 +14,7 @@ your-project/
 │   ├── ui/                   ← Shared UI components (buttons, cards, inputs, etc.)
 │   ├── video/                ← Remotion video compositions and Studio
 │   ├── db/                   ← Database (schemas, queries, migrations)
+│   ├── features/             ← Feature flag definitions and helpers
 │   ├── typescript-config/    ← TypeScript settings everyone shares
 │   └── eslint-config/        ← Linting rules everyone shares
 │
@@ -80,6 +81,7 @@ Every package has a name starting with `@repo/`:
 | `packages/ui` | `@repo/ui` |
 | `packages/video` | `@repo/video` |
 | `packages/db` | `@repo/db` |
+| `packages/features` | `@repo/features` |
 | `packages/typescript-config` | `@repo/typescript-config` |
 | `packages/eslint-config` | `@repo/eslint-config` |
 

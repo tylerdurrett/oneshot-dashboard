@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseFeatures } from '@repo/features';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..', '..', '..');
@@ -8,6 +9,7 @@ const root = path.resolve(__dirname, '..', '..', '..');
 interface ProjectConfig {
   port: number;
   serverPort?: number;
+  features?: unknown;
 }
 
 function readProjectConfig(): ProjectConfig {
@@ -23,6 +25,7 @@ function readProjectConfig(): ProjectConfig {
       port: typeof obj.port === 'number' ? obj.port : 4900,
       serverPort:
         typeof obj.serverPort === 'number' ? obj.serverPort : undefined,
+      features: obj.features,
     };
   } catch {
     return { port: 4900 };
@@ -48,6 +51,9 @@ function envBool(name: string, fallback: boolean): boolean {
 }
 
 export const config = {
+  /** Feature flags — which features are active. All default to enabled. */
+  features: parseFeatures(projectConfig.features),
+
   /** Fastify server port. Uses serverPort if available, otherwise port + 2. */
   port: projectConfig.serverPort ?? projectConfig.port + 2,
 

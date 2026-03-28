@@ -16,6 +16,7 @@
     "@fontsource-variable/geist-mono": "^5.2.7",
     "@remotion/player": "4.0.425",
     "@repo/db": "workspace:*",
+    "@repo/features": "workspace:*",
     "@repo/ui": "workspace:*",
     "@repo/video": "workspace:*",
     "@tanstack/react-query": "^5.90.21",

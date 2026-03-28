@@ -5,6 +5,12 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 
 import { routes } from '../router';
 
+// Ensure all features are enabled for the default router test suite.
+vi.mock('@/lib/features', () => ({
+  features: { timers: true, chat: true, video: true },
+  getHomeRedirectPath: () => '/timers/remaining',
+}));
+
 const providerLifecycle = vi.hoisted(() => ({
   mounts: 0,
   unmounts: 0,
