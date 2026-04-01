@@ -1,7 +1,3 @@
-## Project Mission
-
-This is a Turborepo monorepo starter kit, fully set up for efficient agentic development.
-
 This repo is meant to be used by NON-DEVELOPERS who are using coding agents to vibe code. When you create documentation, do not make it too technical. The users may not understand or care about code, but they're very interested in creating things in the repo with agents, so frame documentation around that process. Think: what can the user do with agents and how do I share that with them - NOT, how can the user code this. The exception to that is any AGENTS.md file like this - this is used exclusively by the agent.
 
 AGENTS.md should be VERY concise because it goes into every context
@@ -62,4 +58,4 @@ After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts th
 - Create minimal code, and be pragmatic with your choices. We do not want to overengineer. Our focus is on creating exactly the functionality we need, nothing more
 - Security is always important: always flag security issues
 - Always update docs when you are finished
-- Always run the code review when you're done implementing a plan
+- ALWAYS run your /simplify code review before you're finished
