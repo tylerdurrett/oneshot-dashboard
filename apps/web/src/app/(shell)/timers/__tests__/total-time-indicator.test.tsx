@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { TimeBucket } from '../_lib/timer-types';
 import { TotalTimeIndicator } from '../_components/total-time-indicator';
@@ -79,5 +79,38 @@ describe('TotalTimeIndicator', () => {
     const fillBar = indicator.children[1] as HTMLElement;
     expect(fillBar.style.transform).toBe('scaleX(0.75)');
     expect(screen.getByText('3 hours / 4 hours')).toBeDefined();
+  });
+
+  it('displays earliest finish time when time remains', () => {
+    const now = new Date('2026-04-01T14:00:00');
+    vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
+
+    const buckets = [
+      makeBucket({ totalMinutes: 60, elapsedSeconds: 1800 }), // 30 min remaining
+    ];
+    render(<TotalTimeIndicator allBuckets={buckets} />);
+
+    // 30 min remaining from 2:00 PM = 2:30 PM
+    const expected = new Date(now.getTime() + 1800 * 1000).toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+    expect(screen.getByText(expected)).toBeDefined();
+
+    vi.restoreAllMocks();
+  });
+
+  it('does not display finish time when all time is complete', () => {
+    const buckets = [
+      makeBucket({ totalMinutes: 60, elapsedSeconds: 7200 }), // exceeded goal
+    ];
+    render(<TotalTimeIndicator allBuckets={buckets} />);
+
+    const indicator = screen.getByTestId('total-time-indicator');
+    // The finish time span should be empty when remaining is 0
+    const spans = indicator.querySelectorAll('span');
+    const rightSpan = spans[spans.length - 1];
+    expect(rightSpan.textContent).toBe('');
   });
 });
