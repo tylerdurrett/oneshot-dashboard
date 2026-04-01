@@ -222,17 +222,18 @@ describe('getTotalTimeStats', () => {
   });
 
   it('returns zeroes for an empty array', () => {
-    expect(getTotalTimeStats([], tuesday)).toEqual({ trackedSeconds: 0, goalSeconds: 0 });
+    expect(getTotalTimeStats([], tuesday)).toEqual({ elapsedSeconds: 0, totalDaySeconds: 0 });
   });
 
-  it('sums tracked and goal seconds for active buckets', () => {
+  it('sums elapsed and total-day seconds for active buckets', () => {
     const buckets = [
       makeBucket({ id: 'a', totalMinutes: 60, elapsedSeconds: 1800 }),
       makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 900 }),
     ];
+    // Both buckets are under their goals, so totalDaySeconds = sum of goals
     expect(getTotalTimeStats(buckets, tuesday)).toEqual({
-      trackedSeconds: 2700,
-      goalSeconds: 5400,
+      elapsedSeconds: 2700,
+      totalDaySeconds: 5400,
     });
   });
 
@@ -242,8 +243,8 @@ describe('getTotalTimeStats', () => {
       makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 900, dismissedAt: '2026-03-24T09:00:00Z' }),
     ];
     expect(getTotalTimeStats(buckets, tuesday)).toEqual({
-      trackedSeconds: 1800,
-      goalSeconds: 3600,
+      elapsedSeconds: 1800,
+      totalDaySeconds: 3600,
     });
   });
 
@@ -253,12 +254,12 @@ describe('getTotalTimeStats', () => {
       makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 900, daysOfWeek: [0] }), // Sunday only
     ];
     expect(getTotalTimeStats(buckets, tuesday)).toEqual({
-      trackedSeconds: 1800,
-      goalSeconds: 3600,
+      elapsedSeconds: 1800,
+      totalDaySeconds: 3600,
     });
   });
 
-  it('includes completed (past-goal) buckets', () => {
+  it('includes completed (past-goal) buckets with inflated total', () => {
     const buckets = [
       makeBucket({
         id: 'a',
@@ -268,8 +269,30 @@ describe('getTotalTimeStats', () => {
       }),
     ];
     const stats = getTotalTimeStats(buckets, tuesday);
-    expect(stats.trackedSeconds).toBe(4000);
-    expect(stats.goalSeconds).toBe(3600);
+    expect(stats.elapsedSeconds).toBe(4000);
+    // totalDaySeconds = max(4000, 3600) = 4000 (inflated by overage)
+    expect(stats.totalDaySeconds).toBe(4000);
+  });
+
+  it('overage in one bucket inflates totalDaySeconds, not compensating for unfilled buckets', () => {
+    const buckets = [
+      makeBucket({ id: 'work', totalMinutes: 60, elapsedSeconds: 10800 }), // 1hr goal, 3hr done
+      makeBucket({ id: 'exercise', totalMinutes: 60, elapsedSeconds: 0 }),  // 1hr goal, 0hr done
+    ];
+    const stats = getTotalTimeStats(buckets, tuesday);
+    expect(stats.elapsedSeconds).toBe(10800);
+    // totalDaySeconds = max(10800, 3600) + max(0, 3600) = 10800 + 3600 = 14400
+    expect(stats.totalDaySeconds).toBe(14400);
+  });
+
+  it('returns equal elapsed and totalDaySeconds when all buckets are exactly at their goals', () => {
+    const buckets = [
+      makeBucket({ id: 'a', totalMinutes: 60, elapsedSeconds: 3600 }),
+      makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 1800 }),
+    ];
+    const stats = getTotalTimeStats(buckets, tuesday);
+    expect(stats.elapsedSeconds).toBe(5400);
+    expect(stats.totalDaySeconds).toBe(5400);
   });
 });
 

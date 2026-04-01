@@ -35,26 +35,26 @@ describe('TotalTimeIndicator', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('displays formatted tracked and goal time', () => {
+  it('displays formatted elapsed and total-day time', () => {
     const buckets = [
       makeBucket({ totalMinutes: 120, elapsedSeconds: 4500 }),
       makeBucket({ id: 'b2', totalMinutes: 60, elapsedSeconds: 900 }),
     ];
     render(<TotalTimeIndicator allBuckets={buckets} />);
-    // 5400s = 1.5 hours, goal = 180min = 3 hours
+    // elapsed=5400s=1.5hr, totalDay=max(4500,7200)+max(900,3600)=7200+3600=10800s=3hr
     expect(screen.getByText('1.5 hours / 3 hours')).toBeDefined();
   });
 
-  it('displays minutes when tracked is under an hour', () => {
+  it('displays minutes when elapsed is under an hour', () => {
     const buckets = [
       makeBucket({ totalMinutes: 120, elapsedSeconds: 1800 }),
     ];
     render(<TotalTimeIndicator allBuckets={buckets} />);
-    // 1800s = 30 minutes, goal = 120min = 2 hours
+    // elapsed=1800s=30min, totalDay=max(1800,7200)=7200s=2hr
     expect(screen.getByText('30 minutes / 2 hours')).toBeDefined();
   });
 
-  it('caps progress bar at 100% when tracked exceeds goal', () => {
+  it('shows 100% progress when single bucket exceeds its goal', () => {
     const buckets = [
       makeBucket({ totalMinutes: 60, elapsedSeconds: 7200 }),
     ];
@@ -62,9 +62,22 @@ describe('TotalTimeIndicator', () => {
 
     const indicator = screen.getByTestId('total-time-indicator');
     const fillBar = indicator.children[1] as HTMLElement;
-    // scaleX should be 1 (100%), not 2
+    // elapsed=7200, totalDay=max(7200,3600)=7200, progress=1.0
     expect(fillBar.style.transform).toBe('scaleX(1)');
-    // But the text still shows the actual tracked time
-    expect(screen.getByText('2 hours / 1 hour')).toBeDefined();
+    expect(screen.getByText('2 hours / 2 hours')).toBeDefined();
+  });
+
+  it('shows partial progress when one bucket has overage but another is unfilled', () => {
+    const buckets = [
+      makeBucket({ id: 'work', totalMinutes: 60, elapsedSeconds: 10800 }), // 3hr on 1hr goal
+      makeBucket({ id: 'exercise', totalMinutes: 60, elapsedSeconds: 0 }),  // 0hr on 1hr goal
+    ];
+    render(<TotalTimeIndicator allBuckets={buckets} />);
+
+    // elapsed=10800 (3hr), totalDay=max(10800,3600)+max(0,3600)=14400 (4hr), progress=0.75
+    const indicator = screen.getByTestId('total-time-indicator');
+    const fillBar = indicator.children[1] as HTMLElement;
+    expect(fillBar.style.transform).toBe('scaleX(0.75)');
+    expect(screen.getByText('3 hours / 4 hours')).toBeDefined();
   });
 });

@@ -121,23 +121,27 @@ export function formatDurationLabel(seconds: number): string {
 }
 
 /**
- * Aggregate tracked and goal seconds across all qualifying buckets for today.
+ * Aggregate elapsed and total-day seconds across all qualifying buckets for today.
  * Includes buckets active today that are NOT dismissed — completed/past-goal
  * buckets still count toward the daily total.
+ *
+ * totalDaySeconds uses max(elapsed, goal) per bucket so that overage in one
+ * bucket inflates the denominator, preventing it from compensating for
+ * unfilled buckets.
  */
 export function getTotalTimeStats(
   allBuckets: TimeBucket[],
   now?: Date,
-): { trackedSeconds: number; goalSeconds: number } {
+): { elapsedSeconds: number; totalDaySeconds: number } {
   const effectiveNow = now ?? new Date();
-  let trackedSeconds = 0;
-  let goalSeconds = 0;
+  let elapsedSeconds = 0;
+  let totalDaySeconds = 0;
   for (const b of allBuckets) {
     if (!isBucketActiveToday(b, effectiveNow) || b.dismissedAt) continue;
-    trackedSeconds += b.elapsedSeconds;
-    goalSeconds += b.totalMinutes * 60;
+    elapsedSeconds += b.elapsedSeconds;
+    totalDaySeconds += Math.max(b.elapsedSeconds, b.totalMinutes * 60);
   }
-  return { trackedSeconds, goalSeconds };
+  return { elapsedSeconds, totalDaySeconds };
 }
 
 /**

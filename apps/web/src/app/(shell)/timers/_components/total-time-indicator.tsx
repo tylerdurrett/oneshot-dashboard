@@ -7,15 +7,15 @@ export function TotalTimeIndicator({
 }: {
   allBuckets: TimeBucket[];
 }) {
-  const { trackedSeconds, goalSeconds } = useMemo(
+  const { elapsedSeconds, totalDaySeconds } = useMemo(
     () => getTotalTimeStats(allBuckets),
     [allBuckets],
   );
 
-  if (goalSeconds === 0) return null;
+  if (totalDaySeconds === 0) return null;
 
-  const progress = Math.min(1, trackedSeconds / goalSeconds);
-  const label = `${formatDurationLabel(trackedSeconds)} / ${formatDurationLabel(goalSeconds)}`;
+  const progress = Math.min(1, elapsedSeconds / totalDaySeconds);
+  const label = `${formatDurationLabel(elapsedSeconds)} / ${formatDurationLabel(totalDaySeconds)}`;
 
   return (
     <div
