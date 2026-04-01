@@ -47,13 +47,14 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('BucketContextMenu', () => {
-  it('renders four menu items', () => {
+  it('renders five menu items', () => {
     render(
       <BucketContextMenu
         bucket={makeBucket()}
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={vi.fn()}
@@ -62,6 +63,7 @@ describe('BucketContextMenu', () => {
 
     expect(screen.getByText('Bucket Settings')).toBeTruthy();
     expect(screen.getByText('Set Elapsed Time')).toBeTruthy();
+    expect(screen.getByText("Set Today's Goal")).toBeTruthy();
     expect(screen.getByText('Reset for Today')).toBeTruthy();
     expect(screen.getByText('Dismiss for Today')).toBeTruthy();
   });
@@ -75,6 +77,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={onOpenSettings}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={onClose}
@@ -95,6 +98,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={onResetForToday}
         onDismissForToday={vi.fn()}
         onClose={onClose}
@@ -115,6 +119,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={onDismissForToday}
         onClose={onClose}
@@ -133,6 +138,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={vi.fn()}
@@ -154,6 +160,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={vi.fn()}
@@ -174,6 +181,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={vi.fn()}
@@ -198,6 +206,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={onSetElapsedTime}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={onClose}
@@ -223,6 +232,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={vi.fn()}
@@ -244,6 +254,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={onClose}
@@ -267,6 +278,7 @@ describe('BucketContextMenu', () => {
         position={{ x: 100, y: 100 }}
         onOpenSettings={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
         onClose={onClose}
@@ -277,6 +289,122 @@ describe('BucketContextMenu', () => {
     fireEvent.scroll(document);
 
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('switches to setGoal view when "Set Today\'s Goal" is clicked', () => {
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
+        onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Set Today's Goal"));
+
+    expect(screen.queryByText('Bucket Settings')).toBeNull();
+    expect(screen.getByText('Hours')).toBeTruthy();
+    expect(screen.getByText('Minutes')).toBeTruthy();
+  });
+
+  it('pre-populates goal inputs from bucket totalMinutes', () => {
+    // 90-minute bucket → 1 hour, 30 minutes
+    render(
+      <BucketContextMenu
+        bucket={makeBucket({ totalMinutes: 90 })}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
+        onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Set Today's Goal"));
+
+    const [hoursInput, minutesInput] = screen.getAllByRole('spinbutton');
+    expect((hoursInput as HTMLInputElement).value).toBe('1');
+    expect((minutesInput as HTMLInputElement).value).toBe('30');
+  });
+
+  it('calls onSetDailyGoal with correct minutes when "Set" is clicked in goal view', () => {
+    const onSetDailyGoal = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={onSetDailyGoal}
+        onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Set Today's Goal"));
+
+    const [hoursInput, minutesInput] = screen.getAllByRole('spinbutton');
+    fireEvent.change(hoursInput!, { target: { value: '2' } });
+    fireEvent.change(minutesInput!, { target: { value: '15' } });
+    fireEvent.click(screen.getByText('Set'));
+
+    // 2h 15m = 135 minutes
+    expect(onSetDailyGoal).toHaveBeenCalledWith(135);
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('"Back" button returns to menu view from setGoal', () => {
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
+        onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Set Today's Goal"));
+    expect(screen.queryByText('Bucket Settings')).toBeNull();
+
+    fireEvent.click(screen.getByText('Back'));
+    expect(screen.getByText('Bucket Settings')).toBeTruthy();
+  });
+
+  it('keeps the set-goal editor open when mobile focus scrolling fires', async () => {
+    const onClose = vi.fn();
+    render(
+      <BucketContextMenu
+        bucket={makeBucket()}
+        position={{ x: 100, y: 100 }}
+        onOpenSettings={vi.fn()}
+        onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
+        onResetForToday={vi.fn()}
+        onDismissForToday={vi.fn()}
+        onClose={onClose}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Set Today's Goal"));
+    await waitForMenuListeners();
+    fireEvent.scroll(document);
+
+    expect(screen.getByText('Hours')).toBeTruthy();
+    expect(screen.getByText('Minutes')).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 
@@ -309,6 +437,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -317,6 +446,7 @@ describe('TimerBucket context menu integration', () => {
 
     expect(screen.getByText('Bucket Settings')).toBeTruthy();
     expect(screen.getByText('Set Elapsed Time')).toBeTruthy();
+    expect(screen.getByText("Set Today's Goal")).toBeTruthy();
     expect(screen.getByText('Reset for Today')).toBeTruthy();
     expect(screen.getByText('Dismiss for Today')).toBeTruthy();
   });
@@ -333,6 +463,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -354,6 +485,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -391,6 +523,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -435,6 +568,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -457,6 +591,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={onResetForToday}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -479,6 +614,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -501,6 +637,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={onDismissForToday}
       />,
     );
@@ -524,6 +661,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -543,6 +681,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -561,6 +700,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -590,6 +730,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );
@@ -611,6 +752,7 @@ describe('TimerBucket context menu integration', () => {
         onOpenSettings={vi.fn()}
         onResetForToday={vi.fn()}
         onSetElapsedTime={vi.fn()}
+        onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
       />,
     );

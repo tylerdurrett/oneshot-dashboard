@@ -110,6 +110,7 @@ export interface TimerBucketProps {
   onOpenSettings: () => void;
   onResetForToday: () => void;
   onSetElapsedTime: (elapsedSeconds: number) => void;
+  onSetDailyGoal: (targetMinutes: number) => void;
   onDismissForToday: () => void;
 }
 
@@ -128,6 +129,7 @@ export function TimerBucket({
   onOpenSettings,
   onResetForToday,
   onSetElapsedTime,
+  onSetDailyGoal,
   onDismissForToday,
 }: TimerBucketProps) {
   const totalSeconds = bucket.totalMinutes * 60;
@@ -394,6 +396,7 @@ export function TimerBucket({
           position={menuPosition}
           onOpenSettings={onOpenSettings}
           onSetElapsedTime={onSetElapsedTime}
+          onSetDailyGoal={onSetDailyGoal}
           onResetForToday={() => {
             setConfirmResetOpen(true);
           }}

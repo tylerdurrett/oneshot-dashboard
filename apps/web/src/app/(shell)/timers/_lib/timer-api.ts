@@ -175,6 +175,23 @@ export async function setTimerTime(
   return res.json() as Promise<StopTimerResponse>;
 }
 
+/** Override today's goal for a bucket (does not affect future days). */
+export async function setDailyGoal(
+  bucketId: string,
+  targetMinutes: number,
+): Promise<{ targetMinutes: number; goalReachedAt: string | null }> {
+  const res = await fetch(
+    `${getBaseUrl()}/timers/buckets/${bucketId}/set-daily-goal`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetMinutes }),
+    },
+  );
+  if (!res.ok) throw new Error(`Failed to set daily goal: ${res.status}`);
+  return res.json() as Promise<{ targetMinutes: number; goalReachedAt: string | null }>;
+}
+
 /** Dismiss a bucket for today — hides it until the next 3 AM reset. */
 export async function dismissBucket(bucketId: string): Promise<void> {
   const res = await fetch(

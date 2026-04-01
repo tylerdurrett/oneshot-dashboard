@@ -17,6 +17,7 @@ import {
   stopTimer,
   resetProgress,
   setElapsedTime,
+  setDailyGoal,
   computeGoalMs,
   dismissBucket,
 } from '../services/timer-progress.js';
@@ -326,6 +327,40 @@ export async function timerRoutes(
 
       return {
         elapsedSeconds: result.elapsedSeconds,
+        goalReachedAt: result.goalReachedAt,
+      };
+    },
+  );
+
+  /** Override today's goal for a bucket. Reschedules goal if running. */
+  server.post<{ Params: { id: string }; Body: { targetMinutes: number } }>(
+    '/timers/buckets/:id/set-daily-goal',
+    async (request, reply) => {
+      const { id } = request.params;
+      const { targetMinutes } = request.body;
+
+      let result;
+      try {
+        result = await setDailyGoal(id, targetMinutes, db);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('Bucket not found')) {
+          return reply.status(404).send({ error: 'Bucket not found' });
+        }
+        throw err;
+      }
+
+      // Reschedule goal if the timer is currently running
+      const goalAtMs = await computeGoalMs(id, db);
+      if (goalAtMs) {
+        scheduler?.scheduleGoalReached(id, goalAtMs);
+      } else {
+        scheduler?.cancelGoalJob(id);
+      }
+
+      broadcast(SSE_EVENTS.TIMER_UPDATED, { bucketId: id });
+
+      return {
+        targetMinutes: result.targetMinutes,
         goalReachedAt: result.goalReachedAt,
       };
     },

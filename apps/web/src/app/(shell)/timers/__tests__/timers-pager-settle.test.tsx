@@ -52,6 +52,7 @@ const mockTimerState: UseTimerStateReturn = {
   updateBucket: vi.fn(),
   resetBucketForToday: vi.fn(),
   setElapsedTime: vi.fn(),
+  setDailyGoal: vi.fn(),
   dismissBucketForToday: vi.fn(),
 };
 

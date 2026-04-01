@@ -9,6 +9,7 @@ import {
   stopTimer,
   resetTimer,
   setTimerTime,
+  setDailyGoal,
   dismissBucket,
 } from '../_lib/timer-api';
 import type {
@@ -95,6 +96,23 @@ export function useSetTimerTime() {
       bucketId: string;
       elapsedSeconds: number;
     }) => setTimerTime(bucketId, elapsedSeconds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: timerKeys.today });
+    },
+  });
+}
+
+export function useSetDailyGoal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      bucketId,
+      targetMinutes,
+    }: {
+      bucketId: string;
+      targetMinutes: number;
+    }) => setDailyGoal(bucketId, targetMinutes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: timerKeys.today });
     },

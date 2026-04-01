@@ -8,6 +8,7 @@ import {
   stopTimer,
   resetProgress,
   setElapsedTime,
+  setDailyGoal,
   markGoalReached,
   stopAllRunningTimers,
   dismissBucket,
@@ -655,5 +656,127 @@ describe('dismissBucket', () => {
     const tomorrow = new Date(2026, 2, 25, 10, 0, 0);
     const state = await getTodayState(testDb, tomorrow);
     expect(state.buckets[0]!.dismissedAt).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setDailyGoal
+// ---------------------------------------------------------------------------
+
+describe('setDailyGoal', () => {
+  let testDb: Database;
+
+  beforeEach(() => {
+    testDb = createTimerTestDb();
+  });
+
+  it('sets targetMinutesOverride on an existing progress row', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    await testDb.insert(timerDailyProgress).values({
+      id: crypto.randomUUID(),
+      bucketId: bucket.id,
+      date: '2026-03-24',
+      elapsedSeconds: 300,
+    });
+
+    const result = await setDailyGoal(bucket.id, 30, testDb, now);
+
+    expect(result.targetMinutes).toBe(30);
+    expect(result.goalReachedAt).toBeNull();
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.targetMinutesOverride).toBe(30);
+    // Elapsed should be preserved
+    expect(rows[0]!.elapsedSeconds).toBe(300);
+  });
+
+  it('creates a progress row if none exists', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    await setDailyGoal(bucket.id, 45, testDb, now);
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.targetMinutesOverride).toBe(45);
+    expect(rows[0]!.elapsedSeconds).toBe(0);
+  });
+
+  it('clears goalReachedAt when goal changes', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    await testDb.insert(timerDailyProgress).values({
+      id: crypto.randomUUID(),
+      bucketId: bucket.id,
+      date: '2026-03-24',
+      elapsedSeconds: 3600,
+      goalReachedAt: now.toISOString(),
+    });
+
+    const result = await setDailyGoal(bucket.id, 120, testDb, now);
+    expect(result.goalReachedAt).toBeNull();
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    expect(rows[0]!.goalReachedAt).toBeNull();
+  });
+
+  it('clamps to minimum 1 minute', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    const result = await setDailyGoal(bucket.id, 0, testDb, now);
+    expect(result.targetMinutes).toBe(1);
+  });
+
+  it('throws for nonexistent bucket', async () => {
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+    await expect(
+      setDailyGoal('nonexistent-id', 30, testDb, now),
+    ).rejects.toThrow('Bucket not found');
+  });
+
+  it('getTodayState returns override as totalMinutes', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+
+    await setDailyGoal(bucket.id, 30, testDb, now);
+
+    const state = await getTodayState(testDb, now);
+    // Override value should be returned as totalMinutes
+    expect(state.buckets[0]!.totalMinutes).toBe(30);
+  });
+
+  it('override does not affect the next day', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const today = new Date(2026, 2, 24, 10, 0, 0);
+    await setDailyGoal(bucket.id, 30, testDb, today);
+
+    // Next day — no progress row, so bucket's original totalMinutes applies
+    const tomorrow = new Date(2026, 2, 25, 10, 0, 0);
+    const state = await getTodayState(testDb, tomorrow);
+    expect(state.buckets[0]!.totalMinutes).toBe(60);
+  });
+
+  it('stopTimer uses override for goal detection', async () => {
+    // Bucket has 60 min default, but override to 5 min (300s)
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const t1 = new Date(2026, 2, 24, 10, 0, 0);
+    await setDailyGoal(bucket.id, 5, testDb, t1);
+
+    // Start the timer (this reuses the existing progress row)
+    await startTimer(bucket.id, testDb, t1);
+
+    // Stop 6 minutes later — past the 5-min override but under 60-min default
+    const t2 = new Date(2026, 2, 24, 10, 6, 0);
+    const result = await stopTimer(bucket.id, testDb, t2);
+
+    expect(result.changed).toBe(true);
+    expect(result.elapsedSeconds).toBe(360); // 6 minutes
+    // Should detect goal reached based on override (5 min), not default (60 min)
+    expect(result.goalReachedAt).toBe(t2.toISOString());
   });
 });

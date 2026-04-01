@@ -104,7 +104,7 @@ export async function getTodayState(
     buckets.push({
       id: bucket.id,
       name: bucket.name,
-      totalMinutes: bucket.totalMinutes,
+      totalMinutes: progress?.targetMinutesOverride ?? bucket.totalMinutes,
       colorIndex: bucket.colorIndex,
       daysOfWeek: JSON.parse(bucket.daysOfWeek) as number[],
       sortOrder: bucket.sortOrder,
@@ -207,6 +207,7 @@ export async function stopTimer(
       startedAt: timerDailyProgress.startedAt,
       goalReachedAt: timerDailyProgress.goalReachedAt,
       totalMinutes: timerBuckets.totalMinutes,
+      targetMinutesOverride: timerDailyProgress.targetMinutesOverride,
     })
     .from(timerDailyProgress)
     .innerJoin(timerBuckets, eq(timerDailyProgress.bucketId, timerBuckets.id))
@@ -223,7 +224,7 @@ export async function stopTimer(
 
   const row = rows[0]!;
   const elapsedSeconds = row.elapsedSeconds + elapsedSince(row.startedAt!, now);
-  const totalSeconds = row.totalMinutes * 60;
+  const totalSeconds = (row.targetMinutesOverride ?? row.totalMinutes) * 60;
   // If the background scheduler missed the goal-reached moment, stopping an
   // overdue timer still needs to persist completion so Remaining can hide it.
   const goalReachedAt =
@@ -322,6 +323,62 @@ export async function setElapsedTime(
 }
 
 /**
+ * Override the target goal for a bucket for just today. Clears goalReachedAt
+ * so the scheduler can re-evaluate based on the new target.
+ */
+export async function setDailyGoal(
+  bucketId: string,
+  targetMinutes: number,
+  database: Database = defaultDb,
+  now: Date = new Date(),
+): Promise<{ targetMinutes: number; goalReachedAt: string | null }> {
+  const date = getResetDate(now);
+
+  const bucketRows = await database
+    .select()
+    .from(timerBuckets)
+    .where(eq(timerBuckets.id, bucketId));
+
+  if (bucketRows.length === 0) {
+    throw new Error(`Bucket not found: ${bucketId}`);
+  }
+
+  const clamped = Math.max(1, targetMinutes);
+  // Changing the goal clears goal state so the scheduler can
+  // re-notify if the timer crosses the new goal while running.
+  const goalReachedAt = null;
+
+  const existing = await database
+    .select()
+    .from(timerDailyProgress)
+    .where(
+      and(
+        eq(timerDailyProgress.bucketId, bucketId),
+        eq(timerDailyProgress.date, date),
+      ),
+    );
+
+  if (existing.length > 0) {
+    await database
+      .update(timerDailyProgress)
+      .set({ targetMinutesOverride: clamped, goalReachedAt })
+      .where(eq(timerDailyProgress.id, existing[0]!.id));
+  } else {
+    await database.insert(timerDailyProgress).values({
+      id: crypto.randomUUID(),
+      bucketId,
+      date,
+      elapsedSeconds: 0,
+      startedAt: null,
+      goalReachedAt,
+      targetMinutesOverride: clamped,
+    });
+  }
+
+  return { targetMinutes: clamped, goalReachedAt };
+}
+
+/**
  * Compute the absolute timestamp (ms) when a running timer will reach its goal.
  * Returns null if the bucket doesn't exist, there's no progress row, the timer
  * is not running, or the goal has already been reached.
@@ -339,6 +396,7 @@ export async function computeGoalMs(
   const rows = await database
     .select({
       totalMinutes: timerBuckets.totalMinutes,
+      targetMinutesOverride: timerDailyProgress.targetMinutesOverride,
       elapsedSeconds: timerDailyProgress.elapsedSeconds,
       startedAt: timerDailyProgress.startedAt,
       goalReachedAt: timerDailyProgress.goalReachedAt,
@@ -355,7 +413,7 @@ export async function computeGoalMs(
   if (rows.length === 0 || !rows[0]!.startedAt) return null;
   if (rows[0]!.goalReachedAt) return null;
 
-  const totalSeconds = rows[0]!.totalMinutes * 60;
+  const totalSeconds = (rows[0]!.targetMinutesOverride ?? rows[0]!.totalMinutes) * 60;
   const remainingSeconds = totalSeconds - rows[0]!.elapsedSeconds;
 
   if (remainingSeconds <= 0) return null;

@@ -48,6 +48,7 @@ function makeTimerState(overrides: Partial<UseTimerStateReturn> = {}): UseTimerS
     updateBucket: vi.fn(),
     resetBucketForToday: vi.fn(),
     setElapsedTime: vi.fn(),
+    setDailyGoal: vi.fn(),
     dismissBucketForToday: vi.fn(),
     ...overrides,
   };

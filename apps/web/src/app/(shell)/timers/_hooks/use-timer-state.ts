@@ -13,6 +13,7 @@ import {
   useUpdateBucket as useUpdateBucketMutation,
   useResetTimer,
   useSetTimerTime,
+  useSetDailyGoal,
   useDismissBucket,
   timerKeys,
 } from './use-timer-queries';
@@ -30,6 +31,7 @@ export interface UseTimerStateReturn {
   updateBucket: (id: string, updates: Partial<TimeBucket>) => void;
   resetBucketForToday: (id: string) => void;
   setElapsedTime: (id: string, elapsedSeconds: number) => void;
+  setDailyGoal: (id: string, targetMinutes: number) => void;
   dismissBucketForToday: (id: string) => void;
 }
 
@@ -92,6 +94,7 @@ export function useTimerState(): UseTimerStateReturn {
   const updateMutation = useUpdateBucketMutation();
   const resetMutation = useResetTimer();
   const setTimeMutation = useSetTimerTime();
+  const setDailyGoalMutation = useSetDailyGoal();
   const dismissMutation = useDismissBucket();
 
   // Session-only tracking of buckets that reached their goal during this
@@ -323,6 +326,16 @@ export function useTimerState(): UseTimerStateReturn {
     [setTimeMutation],
   );
 
+  const setDailyGoal = useCallback(
+    (id: string, targetMinutes: number) => {
+      setDailyGoalMutation.mutate({ bucketId: id, targetMinutes });
+      // Clear goal-reached tracking so re-reaching triggers chime
+      removeFromSet(setGoalReachedBuckets, id);
+      prevGoalReachedRef.current.delete(id);
+    },
+    [setDailyGoalMutation],
+  );
+
   const dismissBucketForToday = useCallback(
     (id: string) => {
       dismissMutation.mutate(id);
@@ -343,6 +356,7 @@ export function useTimerState(): UseTimerStateReturn {
     updateBucket: updateBucketFn,
     resetBucketForToday,
     setElapsedTime,
+    setDailyGoal,
     dismissBucketForToday,
   };
 }

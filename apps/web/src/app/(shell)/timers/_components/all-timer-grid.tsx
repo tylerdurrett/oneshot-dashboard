@@ -53,6 +53,7 @@ function AllTimerGridContent({ timerState }: { timerState: UseTimerStateReturn }
     removeBucket,
     resetBucketForToday,
     setElapsedTime,
+    setDailyGoal,
     dismissBucketForToday,
   } = timerState;
 
@@ -148,6 +149,7 @@ function AllTimerGridContent({ timerState }: { timerState: UseTimerStateReturn }
             onOpenSettings={() => setSelectedBucketId(bucket.id)}
             onResetForToday={() => resetBucketForToday(bucket.id)}
             onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
+            onSetDailyGoal={(m) => setDailyGoal(bucket.id, m)}
             onDismissForToday={() => dismissBucketForToday(bucket.id)}
           />
         );

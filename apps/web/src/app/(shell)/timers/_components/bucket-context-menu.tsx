@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, EyeOff, RotateCcw, Settings } from 'lucide-react';
+import { Clock, EyeOff, RotateCcw, Settings, Target } from 'lucide-react';
 
 import type { TimeBucket } from '../_lib/timer-types';
 
@@ -13,14 +13,17 @@ export interface BucketContextMenuProps {
   position: { x: number; y: number };
   onOpenSettings: () => void;
   onSetElapsedTime: (elapsedSeconds: number) => void;
+  onSetDailyGoal: (targetMinutes: number) => void;
   onResetForToday: () => void;
   onDismissForToday: () => void;
   onClose: () => void;
 }
 
 // ---------------------------------------------------------------------------
-// Constants
+// Constants & Types
 // ---------------------------------------------------------------------------
+
+type ContextMenuView = 'menu' | 'setTime' | 'setGoal';
 
 const VIEWPORT_MARGIN = 8;
 const OFFSET_BELOW = 10;
@@ -28,6 +31,77 @@ const MENU_ITEM_CLASS =
   'flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-popover-foreground hover:bg-accent';
 const TIME_INPUT_CLASS =
   'w-16 rounded border border-border bg-input/30 px-2 py-1 text-base text-popover-foreground md:text-sm';
+
+// ---------------------------------------------------------------------------
+// Shared hours/minutes input panel
+// ---------------------------------------------------------------------------
+
+function TimeInputPanel({
+  title,
+  hours,
+  minutes,
+  onHoursChange,
+  onMinutesChange,
+  onBack,
+  onSubmit,
+  submitDisabled,
+}: {
+  title: string;
+  hours: number;
+  minutes: number;
+  onHoursChange: (v: number) => void;
+  onMinutesChange: (v: number) => void;
+  onBack: () => void;
+  onSubmit: () => void;
+  submitDisabled?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-2 p-2">
+      <span className="text-xs font-medium text-muted-foreground">{title}</span>
+      <div className="flex items-center gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Hours</span>
+          <input
+            type="number"
+            min={0}
+            max={23}
+            value={hours}
+            onChange={(e) => onHoursChange(Number(e.target.value))}
+            // Keep mobile inputs at 16px so iOS Safari does not auto-zoom
+            // and strand this fixed-position menu off-screen after focus.
+            className={TIME_INPUT_CLASS}
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-muted-foreground">Minutes</span>
+          <input
+            type="number"
+            min={0}
+            max={59}
+            value={minutes}
+            onChange={(e) => onMinutesChange(Number(e.target.value))}
+            className={TIME_INPUT_CLASS}
+          />
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button
+          className="flex-1 rounded-md bg-accent px-3 py-1.5 text-xs text-accent-foreground hover:bg-accent/80"
+          onClick={onBack}
+        >
+          Back
+        </button>
+        <button
+          className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+          disabled={submitDisabled}
+          onClick={onSubmit}
+        >
+          Set
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -38,6 +112,7 @@ export function BucketContextMenu({
   position,
   onOpenSettings,
   onSetElapsedTime,
+  onSetDailyGoal,
   onResetForToday,
   onDismissForToday,
   onClose,
@@ -47,15 +122,19 @@ export function BucketContextMenu({
   // every time the parent re-renders with a new callback reference.
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const viewRef = useRef<'menu' | 'setTime'>('menu');
+  const viewRef = useRef<ContextMenuView>('menu');
 
-  const [view, setView] = useState<'menu' | 'setTime'>('menu');
+  const [view, setView] = useState<ContextMenuView>('menu');
   viewRef.current = view;
   const [adjusted, setAdjusted] = useState({ x: position.x, y: position.y + OFFSET_BELOW });
 
   // Pre-populate time inputs from bucket's elapsed time
   const [hours, setHours] = useState(Math.floor(bucket.elapsedSeconds / 3600));
   const [minutes, setMinutes] = useState(Math.floor((bucket.elapsedSeconds % 3600) / 60));
+
+  // Pre-populate goal inputs from bucket's current totalMinutes (may already be overridden for today)
+  const [goalHours, setGoalHours] = useState(Math.floor(bucket.totalMinutes / 60));
+  const [goalMinutes, setGoalMinutes] = useState(bucket.totalMinutes % 60);
 
   // Viewport-edge clamping — useLayoutEffect prevents a flash of un-clamped position
   useLayoutEffect(() => {
@@ -95,7 +174,7 @@ export function BucketContextMenu({
     // keyboards can trigger a scroll when focusing the time inputs, so keep
     // the editor open once the user is in the "set time" view.
     const handleScroll = () => {
-      if (viewRef.current === 'setTime') return;
+      if (viewRef.current === 'setTime' || viewRef.current === 'setGoal') return;
       onCloseRef.current();
     };
 
@@ -120,6 +199,16 @@ export function BucketContextMenu({
     onSetElapsedTime(h * 3600 + m * 60);
     onClose();
   }, [hours, minutes, onSetElapsedTime, onClose]);
+
+  const handleSetGoal = useCallback(() => {
+    const h = Math.max(0, Math.min(23, goalHours));
+    const m = Math.max(0, Math.min(59, goalMinutes));
+    const total = h * 60 + m;
+    if (total > 0) {
+      onSetDailyGoal(total);
+    }
+    onClose();
+  }, [goalHours, goalMinutes, onSetDailyGoal, onClose]);
 
   const menu = (
     <div
@@ -152,6 +241,14 @@ export function BucketContextMenu({
           <button
             role="menuitem"
             className={MENU_ITEM_CLASS}
+            onClick={() => setView('setGoal')}
+          >
+            <Target className="size-4" />
+            Set Today&#39;s Goal
+          </button>
+          <button
+            role="menuitem"
+            className={MENU_ITEM_CLASS}
             onClick={() => {
               onResetForToday();
               onClose();
@@ -175,49 +272,28 @@ export function BucketContextMenu({
       )}
 
       {view === 'setTime' && (
-        <div className="flex flex-col gap-2 p-2">
-          <span className="text-xs font-medium text-muted-foreground">Set Elapsed Time</span>
-          <div className="flex items-center gap-2">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Hours</span>
-              <input
-                type="number"
-                min={0}
-                max={23}
-                value={hours}
-                onChange={(e) => setHours(Number(e.target.value))}
-                // Keep mobile inputs at 16px so iOS Safari does not auto-zoom
-                // and strand this fixed-position menu off-screen after focus.
-                className={TIME_INPUT_CLASS}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Minutes</span>
-              <input
-                type="number"
-                min={0}
-                max={59}
-                value={minutes}
-                onChange={(e) => setMinutes(Number(e.target.value))}
-                className={TIME_INPUT_CLASS}
-              />
-            </label>
-          </div>
-          <div className="flex gap-2">
-            <button
-              className="flex-1 rounded-md bg-accent px-3 py-1.5 text-xs text-accent-foreground hover:bg-accent/80"
-              onClick={() => setView('menu')}
-            >
-              Back
-            </button>
-            <button
-              className="flex-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-              onClick={handleSetTime}
-            >
-              Set
-            </button>
-          </div>
-        </div>
+        <TimeInputPanel
+          title="Set Elapsed Time"
+          hours={hours}
+          minutes={minutes}
+          onHoursChange={setHours}
+          onMinutesChange={setMinutes}
+          onBack={() => setView('menu')}
+          onSubmit={handleSetTime}
+        />
+      )}
+
+      {view === 'setGoal' && (
+        <TimeInputPanel
+          title="Set Today&#39;s Goal"
+          hours={goalHours}
+          minutes={goalMinutes}
+          onHoursChange={setGoalHours}
+          onMinutesChange={setGoalMinutes}
+          onBack={() => setView('menu')}
+          onSubmit={handleSetGoal}
+          submitDisabled={goalHours <= 0 && goalMinutes <= 0}
+        />
       )}
     </div>
   );

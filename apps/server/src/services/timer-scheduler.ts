@@ -66,6 +66,7 @@ export class TimerScheduler {
         startedAt: timerDailyProgress.startedAt,
         goalReachedAt: timerDailyProgress.goalReachedAt,
         totalMinutes: timerBuckets.totalMinutes,
+        targetMinutesOverride: timerDailyProgress.targetMinutesOverride,
       })
       .from(timerDailyProgress)
       .innerJoin(timerBuckets, eq(timerDailyProgress.bucketId, timerBuckets.id))
@@ -85,7 +86,7 @@ export class TimerScheduler {
           })
           .where(eq(timerDailyProgress.id, row.progressId));
       } else {
-        const totalSeconds = row.totalMinutes * 60;
+        const totalSeconds = (row.targetMinutesOverride ?? row.totalMinutes) * 60;
         const totalElapsed = row.elapsedSeconds + elapsed;
 
         if (totalElapsed >= totalSeconds && !row.goalReachedAt) {

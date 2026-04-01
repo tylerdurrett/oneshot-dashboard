@@ -54,6 +54,7 @@ export function createTimerTestDb(): Database {
       started_at TEXT,
       goal_reached_at TEXT,
       dismissed_at TEXT,
+      target_minutes_override INTEGER,
       FOREIGN KEY (bucket_id) REFERENCES timer_buckets(id)
     );
     CREATE UNIQUE INDEX uq_bucket_date ON timer_daily_progress (bucket_id, date);
