@@ -16,7 +16,7 @@ import {
   startTimer,
   stopTimer,
   resetProgress,
-  setRemainingTime,
+  setElapsedTime,
   computeGoalMs,
   dismissBucket,
 } from '../services/timer-progress.js';
@@ -293,19 +293,22 @@ export async function timerRoutes(
     },
   );
 
-  /** Set remaining time for a bucket. Reschedules goal if running. */
-  server.post<{ Params: { id: string }; Body: { remainingSeconds: number } }>(
+  /** Set elapsed time for a bucket. Reschedules goal if running. */
+  server.post<{ Params: { id: string }; Body: { elapsedSeconds: number } }>(
     '/timers/buckets/:id/set-time',
     async (request, reply) => {
       const { id } = request.params;
-      const { remainingSeconds } = request.body;
+      const { elapsedSeconds } = request.body;
 
-      const bucket = await getBucket(id, db);
-      if (!bucket) {
-        return reply.status(404).send({ error: 'Bucket not found' });
+      let result;
+      try {
+        result = await setElapsedTime(id, elapsedSeconds, db);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes('Bucket not found')) {
+          return reply.status(404).send({ error: 'Bucket not found' });
+        }
+        throw err;
       }
-
-      const result = await setRemainingTime(id, remainingSeconds, db);
 
       // Reschedule goal if the timer is currently running
       const goalAtMs = await computeGoalMs(id, db);

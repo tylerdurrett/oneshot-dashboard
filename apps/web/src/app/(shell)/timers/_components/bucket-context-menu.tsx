@@ -12,7 +12,7 @@ export interface BucketContextMenuProps {
   bucket: TimeBucket;
   position: { x: number; y: number };
   onOpenSettings: () => void;
-  onSetRemainingTime: (remainingSeconds: number) => void;
+  onSetElapsedTime: (elapsedSeconds: number) => void;
   onResetForToday: () => void;
   onDismissForToday: () => void;
   onClose: () => void;
@@ -37,7 +37,7 @@ export function BucketContextMenu({
   bucket,
   position,
   onOpenSettings,
-  onSetRemainingTime,
+  onSetElapsedTime,
   onResetForToday,
   onDismissForToday,
   onClose,
@@ -53,10 +53,9 @@ export function BucketContextMenu({
   viewRef.current = view;
   const [adjusted, setAdjusted] = useState({ x: position.x, y: position.y + OFFSET_BELOW });
 
-  // Pre-populate time inputs from bucket's remaining time
-  const remainingTotal = Math.max(0, bucket.totalMinutes * 60 - bucket.elapsedSeconds);
-  const [hours, setHours] = useState(Math.floor(remainingTotal / 3600));
-  const [minutes, setMinutes] = useState(Math.floor((remainingTotal % 3600) / 60));
+  // Pre-populate time inputs from bucket's elapsed time
+  const [hours, setHours] = useState(Math.floor(bucket.elapsedSeconds / 3600));
+  const [minutes, setMinutes] = useState(Math.floor((bucket.elapsedSeconds % 3600) / 60));
 
   // Viewport-edge clamping — useLayoutEffect prevents a flash of un-clamped position
   useLayoutEffect(() => {
@@ -118,9 +117,9 @@ export function BucketContextMenu({
   const handleSetTime = useCallback(() => {
     const h = Math.max(0, Math.min(23, hours));
     const m = Math.max(0, Math.min(59, minutes));
-    onSetRemainingTime(h * 3600 + m * 60);
+    onSetElapsedTime(h * 3600 + m * 60);
     onClose();
-  }, [hours, minutes, onSetRemainingTime, onClose]);
+  }, [hours, minutes, onSetElapsedTime, onClose]);
 
   const menu = (
     <div
@@ -148,7 +147,7 @@ export function BucketContextMenu({
             onClick={() => setView('setTime')}
           >
             <Clock className="size-4" />
-            Set Remaining Time
+            Set Elapsed Time
           </button>
           <button
             role="menuitem"
@@ -177,7 +176,7 @@ export function BucketContextMenu({
 
       {view === 'setTime' && (
         <div className="flex flex-col gap-2 p-2">
-          <span className="text-xs font-medium text-muted-foreground">Set Remaining Time</span>
+          <span className="text-xs font-medium text-muted-foreground">Set Elapsed Time</span>
           <div className="flex items-center gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-muted-foreground">Hours</span>

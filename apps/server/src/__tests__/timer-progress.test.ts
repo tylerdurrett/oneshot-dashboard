@@ -7,7 +7,7 @@ import {
   startTimer,
   stopTimer,
   resetProgress,
-  setRemainingTime,
+  setElapsedTime,
   markGoalReached,
   stopAllRunningTimers,
   dismissBucket,
@@ -409,23 +409,23 @@ describe('resetProgress', () => {
 });
 
 // ---------------------------------------------------------------------------
-// setRemainingTime
+// setElapsedTime
 // ---------------------------------------------------------------------------
 
-describe('setRemainingTime', () => {
+describe('setElapsedTime', () => {
   let testDb: Database;
 
   beforeEach(() => {
     testDb = createTimerTestDb();
   });
 
-  it('sets correct elapsed seconds from remaining', async () => {
+  it('sets elapsed seconds directly', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 60 }); // 3600s total
     const now = new Date(2026, 2, 24, 10, 0, 0);
 
-    const result = await setRemainingTime(bucket.id, 1800, testDb, now);
+    const result = await setElapsedTime(bucket.id, 1800, testDb, now);
 
-    expect(result.elapsedSeconds).toBe(1800); // 3600 - 1800
+    expect(result.elapsedSeconds).toBe(1800);
     // goalReachedAt is always cleared when manually setting time
     expect(result.goalReachedAt).toBeNull();
 
@@ -434,11 +434,11 @@ describe('setRemainingTime', () => {
     expect(rows[0]!.elapsedSeconds).toBe(1800);
   });
 
-  it('does NOT set goalReachedAt when remaining is 0 (clears it)', async () => {
+  it('does NOT set goalReachedAt when elapsed equals total (clears it)', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 60 });
     const now = new Date(2026, 2, 24, 10, 0, 0);
 
-    const result = await setRemainingTime(bucket.id, 0, testDb, now);
+    const result = await setElapsedTime(bucket.id, 3600, testDb, now);
 
     expect(result.elapsedSeconds).toBe(3600);
     // Manually setting time always clears goalReachedAt
@@ -449,11 +449,11 @@ describe('setRemainingTime', () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 60 });
     const now = new Date(2026, 2, 24, 10, 0, 0);
 
-    await setRemainingTime(bucket.id, 2400, testDb, now);
+    await setElapsedTime(bucket.id, 1200, testDb, now);
 
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.elapsedSeconds).toBe(1200); // 3600 - 2400
+    expect(rows[0]!.elapsedSeconds).toBe(1200);
   });
 
   it('updates existing progress row', async () => {
@@ -468,7 +468,7 @@ describe('setRemainingTime', () => {
       elapsedSeconds: 100,
     });
 
-    await setRemainingTime(bucket.id, 1800, testDb, now);
+    await setElapsedTime(bucket.id, 1800, testDb, now);
 
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows).toHaveLength(1); // no duplicate
@@ -478,7 +478,7 @@ describe('setRemainingTime', () => {
   it('throws for nonexistent bucket', async () => {
     const now = new Date(2026, 2, 24, 10, 0, 0);
     await expect(
-      setRemainingTime('nonexistent-id', 1000, testDb, now),
+      setElapsedTime('nonexistent-id', 1000, testDb, now),
     ).rejects.toThrow('Bucket not found');
   });
 });

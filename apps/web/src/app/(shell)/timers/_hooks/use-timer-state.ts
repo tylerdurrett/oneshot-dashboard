@@ -29,7 +29,7 @@ export interface UseTimerStateReturn {
   removeBucket: (id: string) => void;
   updateBucket: (id: string, updates: Partial<TimeBucket>) => void;
   resetBucketForToday: (id: string) => void;
-  setRemainingTime: (id: string, remainingSeconds: number) => void;
+  setElapsedTime: (id: string, elapsedSeconds: number) => void;
   dismissBucketForToday: (id: string) => void;
 }
 
@@ -301,9 +301,9 @@ export function useTimerState(): UseTimerStateReturn {
     [resetMutation],
   );
 
-  const setRemainingTime = useCallback(
-    (id: string, remainingSeconds: number) => {
-      setTimeMutation.mutate({ bucketId: id, remainingSeconds });
+  const setElapsedTime = useCallback(
+    (id: string, elapsedSeconds: number) => {
+      setTimeMutation.mutate({ bucketId: id, elapsedSeconds });
     },
     [setTimeMutation],
   );
@@ -327,7 +327,7 @@ export function useTimerState(): UseTimerStateReturn {
     removeBucket,
     updateBucket: updateBucketFn,
     resetBucketForToday,
-    setRemainingTime,
+    setElapsedTime,
     dismissBucketForToday,
   };
 }

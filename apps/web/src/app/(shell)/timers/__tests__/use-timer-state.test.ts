@@ -467,9 +467,9 @@ describe('useTimerState', () => {
     expect(result.current.goalReachedBuckets.has('b1')).toBe(false);
   });
 
-  // ---- setRemainingTime ----
+  // ---- setElapsedTime ----
 
-  it('setRemainingTime calls setTimerTime mutation', async () => {
+  it('setElapsedTime calls setTimerTime mutation', async () => {
     mockFetchTodayState.mockResolvedValue(makeTodayState());
     mockSetTimerTime.mockResolvedValue({
       elapsedSeconds: 3300,
@@ -482,7 +482,7 @@ describe('useTimerState', () => {
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
-    act(() => result.current.setRemainingTime('b1', 300));
+    act(() => result.current.setElapsedTime('b1', 300));
 
     await waitFor(() =>
       expect(mockSetTimerTime).toHaveBeenCalledWith('b1', 300),

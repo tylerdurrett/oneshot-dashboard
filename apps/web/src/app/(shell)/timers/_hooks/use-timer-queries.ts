@@ -90,11 +90,11 @@ export function useSetTimerTime() {
   return useMutation({
     mutationFn: ({
       bucketId,
-      remainingSeconds,
+      elapsedSeconds,
     }: {
       bucketId: string;
-      remainingSeconds: number;
-    }) => setTimerTime(bucketId, remainingSeconds),
+      elapsedSeconds: number;
+    }) => setTimerTime(bucketId, elapsedSeconds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: timerKeys.today });
     },

@@ -744,30 +744,29 @@ describe('Timer control routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /timers/buckets/:id/set-time', () => {
-    it('sets remaining time correctly', async () => {
+    it('sets elapsed time correctly', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
 
       const res = await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/set-time`,
-        payload: { remainingSeconds: 1800 },
+        payload: { elapsedSeconds: 1800 },
       });
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      // elapsed = 3600 - 1800 = 1800
       expect(body.elapsedSeconds).toBe(1800);
       // goalReachedAt is always cleared when manually setting time
       expect(body.goalReachedAt).toBeNull();
     });
 
-    it('clears goalReachedAt when remaining is 0', async () => {
+    it('clears goalReachedAt when elapsed equals total', async () => {
       const bucket = await seedBucket(testDb, { totalMinutes: 60 });
 
       const res = await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/set-time`,
-        payload: { remainingSeconds: 0 },
+        payload: { elapsedSeconds: 3600 },
       });
 
       const body = res.json();
@@ -780,7 +779,7 @@ describe('Timer control routes', () => {
       const res = await server.inject({
         method: 'POST',
         url: '/timers/buckets/nonexistent/set-time',
-        payload: { remainingSeconds: 100 },
+        payload: { elapsedSeconds: 100 },
       });
 
       expect(res.statusCode).toBe(404);
@@ -800,7 +799,7 @@ describe('Timer control routes', () => {
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/set-time`,
-        payload: { remainingSeconds: 900 },
+        payload: { elapsedSeconds: 2700 },
       });
 
       // Should reschedule goal for the still-running timer
@@ -820,7 +819,7 @@ describe('Timer control routes', () => {
       await server.inject({
         method: 'POST',
         url: `/timers/buckets/${bucket.id}/set-time`,
-        payload: { remainingSeconds: 500 },
+        payload: { elapsedSeconds: 500 },
       });
 
       expect(mockScheduler.cancelGoalJob).toHaveBeenCalledWith(bucket.id);

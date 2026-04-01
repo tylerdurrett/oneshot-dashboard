@@ -286,7 +286,7 @@ describe('useSetTimerTime', () => {
     await waitFor(() => expect(todayResult.current.isSuccess).toBe(true));
 
     const { result } = renderHook(() => useSetTimerTime(), { wrapper });
-    result.current.mutate({ bucketId: 'b1', remainingSeconds: 300 });
+    result.current.mutate({ bucketId: 'b1', elapsedSeconds: 300 });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toEqual(response);

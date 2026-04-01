@@ -161,14 +161,14 @@ export async function resetTimer(bucketId: string): Promise<void> {
 
 export async function setTimerTime(
   bucketId: string,
-  remainingSeconds: number,
+  elapsedSeconds: number,
 ): Promise<StopTimerResponse> {
   const res = await fetch(
     `${getBaseUrl()}/timers/buckets/${bucketId}/set-time`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ remainingSeconds }),
+      body: JSON.stringify({ elapsedSeconds }),
     },
   );
   if (!res.ok) throw new Error(`Failed to set timer time: ${res.status}`);

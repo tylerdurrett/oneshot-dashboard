@@ -267,12 +267,12 @@ export async function resetProgress(
 }
 
 /**
- * Set remaining time for a bucket. Computes elapsedSeconds from the bucket's
- * totalMinutes. Clears goalReachedAt since the user is manually adjusting time.
+ * Set elapsed time for a bucket directly. Clears goalReachedAt since the user
+ * is manually adjusting time.
  */
-export async function setRemainingTime(
+export async function setElapsedTime(
   bucketId: string,
-  remainingSeconds: number,
+  elapsedSeconds: number,
   database: Database = defaultDb,
   now: Date = new Date(),
 ): Promise<{ elapsedSeconds: number; goalReachedAt: string | null }> {
@@ -287,8 +287,7 @@ export async function setRemainingTime(
     throw new Error(`Bucket not found: ${bucketId}`);
   }
 
-  const totalSeconds = bucketRows[0]!.totalMinutes * 60;
-  const elapsedSeconds = Math.max(0, totalSeconds - remainingSeconds);
+  const clamped = Math.max(0, elapsedSeconds);
   // Manually adjusting time clears goal state so the scheduler can
   // re-notify if the timer crosses the goal again while running.
   const goalReachedAt = null;
@@ -306,20 +305,20 @@ export async function setRemainingTime(
   if (existing.length > 0) {
     await database
       .update(timerDailyProgress)
-      .set({ elapsedSeconds, goalReachedAt })
+      .set({ elapsedSeconds: clamped, goalReachedAt })
       .where(eq(timerDailyProgress.id, existing[0]!.id));
   } else {
     await database.insert(timerDailyProgress).values({
       id: crypto.randomUUID(),
       bucketId,
       date,
-      elapsedSeconds,
+      elapsedSeconds: clamped,
       startedAt: null,
       goalReachedAt,
     });
   }
 
-  return { elapsedSeconds, goalReachedAt };
+  return { elapsedSeconds: clamped, goalReachedAt };
 }
 
 /**
@@ -328,7 +327,7 @@ export async function setRemainingTime(
  * is not running, or the goal has already been reached.
  *
  * Used by routes to schedule goal-reached jobs after starting a timer or
- * adjusting remaining time.
+ * adjusting elapsed time.
  */
 export async function computeGoalMs(
   bucketId: string,

@@ -66,7 +66,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
     updateBucket,
     removeBucket,
     resetBucketForToday,
-    setRemainingTime,
+    setElapsedTime,
     dismissBucketForToday,
   } = timerState;
 
@@ -192,7 +192,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
             onToggle={() => toggleBucket(bucket.id)}
             onOpenSettings={() => setSelectedBucketId(bucket.id)}
             onResetForToday={() => resetBucketForToday(bucket.id)}
-            onSetRemainingTime={(s) => setRemainingTime(bucket.id, s)}
+            onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
             onDismissForToday={() => dismissBucketForToday(bucket.id)}
           />
         );

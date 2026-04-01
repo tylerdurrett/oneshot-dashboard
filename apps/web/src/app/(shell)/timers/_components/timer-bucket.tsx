@@ -109,7 +109,7 @@ export interface TimerBucketProps {
   onToggle: () => void;
   onOpenSettings: () => void;
   onResetForToday: () => void;
-  onSetRemainingTime: (remainingSeconds: number) => void;
+  onSetElapsedTime: (elapsedSeconds: number) => void;
   onDismissForToday: () => void;
 }
 
@@ -127,7 +127,7 @@ export function TimerBucket({
   onToggle,
   onOpenSettings,
   onResetForToday,
-  onSetRemainingTime,
+  onSetElapsedTime,
   onDismissForToday,
 }: TimerBucketProps) {
   const totalSeconds = bucket.totalMinutes * 60;
@@ -393,7 +393,7 @@ export function TimerBucket({
           bucket={bucket}
           position={menuPosition}
           onOpenSettings={onOpenSettings}
-          onSetRemainingTime={onSetRemainingTime}
+          onSetElapsedTime={onSetElapsedTime}
           onResetForToday={() => {
             setConfirmResetOpen(true);
           }}
