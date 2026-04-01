@@ -1,5 +1,8 @@
-import { RemainingTimersView } from './_components/timer-views';
+import { useOutletContext } from 'react-router';
+import type { UseTimerStateReturn } from './_hooks/use-timer-state';
+import { TimerGridWithState } from './_components/timer-grid';
 
 export default function TimersPage() {
-  return <RemainingTimersView />;
+  const timerState = useOutletContext<UseTimerStateReturn>();
+  return <TimerGridWithState timerState={timerState} />;
 }

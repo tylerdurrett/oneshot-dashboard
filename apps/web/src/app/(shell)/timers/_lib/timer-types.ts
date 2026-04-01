@@ -107,6 +107,40 @@ export function isBucketActiveToday(
 }
 
 /**
+ * Format a duration in seconds as a human-readable label with units.
+ * Returns decimal hours (max 2 decimals) when >= 1 hour, whole minutes otherwise.
+ * Examples: "35 minutes", "1.25 hours", "8 hours", "0 minutes"
+ */
+export function formatDurationLabel(seconds: number): string {
+  if (seconds >= 3600) {
+    const hours = parseFloat((seconds / 3600).toFixed(2));
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  }
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+}
+
+/**
+ * Aggregate tracked and goal seconds across all qualifying buckets for today.
+ * Includes buckets active today that are NOT dismissed — completed/past-goal
+ * buckets still count toward the daily total.
+ */
+export function getTotalTimeStats(
+  allBuckets: TimeBucket[],
+  now?: Date,
+): { trackedSeconds: number; goalSeconds: number } {
+  const effectiveNow = now ?? new Date();
+  let trackedSeconds = 0;
+  let goalSeconds = 0;
+  for (const b of allBuckets) {
+    if (!isBucketActiveToday(b, effectiveNow) || b.dismissedAt) continue;
+    trackedSeconds += b.elapsedSeconds;
+    goalSeconds += b.totalMinutes * 60;
+  }
+  return { trackedSeconds, goalSeconds };
+}
+
+/**
  * Generate a unique ID for a new bucket.
  */
 export { generateId as generateBucketId } from '@/lib/generate-id';

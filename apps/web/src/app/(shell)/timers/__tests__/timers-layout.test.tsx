@@ -13,8 +13,25 @@ const viewSpies = vi.hoisted(() => ({
 
 const NativeRequest = globalThis.Request;
 
-vi.mock('../_components/timer-views', () => ({
-  RemainingTimersView: () => (
+vi.mock('../_hooks/use-timer-state', () => ({
+  useTimerState: () => ({
+    isHydrated: true,
+    allBuckets: [],
+    todaysBuckets: [],
+    activeBucketId: null,
+    goalReachedBuckets: new Set(),
+    toggleBucket: vi.fn(),
+    addBucket: vi.fn(),
+    removeBucket: vi.fn(),
+    updateBucket: vi.fn(),
+    resetBucketForToday: vi.fn(),
+    setRemainingTime: vi.fn(),
+    dismissBucketForToday: vi.fn(),
+  }),
+}));
+
+vi.mock('../_components/timer-grid', () => ({
+  TimerGridWithState: () => (
     <button
       data-testid="remaining-view-button"
       role="button"
@@ -24,18 +41,10 @@ vi.mock('../_components/timer-views', () => ({
       Remaining View
     </button>
   ),
-  RemainingTimersViewWithState: () => (
-    <button
-      data-testid="remaining-view-button"
-      role="button"
-      onClick={viewSpies.remainingClick}
-      className="h-full w-full"
-    >
-      Remaining View
-    </button>
-  ),
-  AllTimersView: () => <div>No time tracked yet</div>,
-  AllTimersViewWithState: () => <div>No time tracked yet</div>,
+}));
+
+vi.mock('../_components/all-timer-grid', () => ({
+  AllTimerGridWithState: () => <div>No time tracked yet</div>,
 }));
 
 // Stub browser APIs missing in jsdom

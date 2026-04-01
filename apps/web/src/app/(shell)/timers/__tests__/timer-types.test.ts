@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatTime,
+  formatDurationLabel,
+  getTotalTimeStats,
   isBucketActiveToday,
   generateBucketId,
   BUCKET_COLORS,
@@ -148,6 +150,126 @@ describe('BUCKET_COLORS', () => {
       expect(color.vibrant).toMatch(/^var\(--bucket-\d+\)$/);
       expect(color.muted).toMatch(/^var\(--bucket-\d+-muted\)$/);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// formatDurationLabel
+// ---------------------------------------------------------------------------
+
+describe('formatDurationLabel', () => {
+  it('formats 0 seconds as "0 minutes"', () => {
+    expect(formatDurationLabel(0)).toBe('0 minutes');
+  });
+
+  it('formats 60 seconds as "1 minute" (singular)', () => {
+    expect(formatDurationLabel(60)).toBe('1 minute');
+  });
+
+  it('formats 2100 seconds as "35 minutes"', () => {
+    expect(formatDurationLabel(2100)).toBe('35 minutes');
+  });
+
+  it('formats 3540 seconds as "59 minutes"', () => {
+    expect(formatDurationLabel(3540)).toBe('59 minutes');
+  });
+
+  it('formats exactly 1 hour as "1 hour" (singular)', () => {
+    expect(formatDurationLabel(3600)).toBe('1 hour');
+  });
+
+  it('formats 4500 seconds as "1.25 hours"', () => {
+    expect(formatDurationLabel(4500)).toBe('1.25 hours');
+  });
+
+  it('formats 5400 seconds as "1.5 hours"', () => {
+    expect(formatDurationLabel(5400)).toBe('1.5 hours');
+  });
+
+  it('formats 30600 seconds as "8.5 hours"', () => {
+    expect(formatDurationLabel(30600)).toBe('8.5 hours');
+  });
+
+  it('formats 28800 seconds as "8 hours" (no decimals when whole)', () => {
+    expect(formatDurationLabel(28800)).toBe('8 hours');
+  });
+
+  it('limits to 2 decimal places', () => {
+    // 3700 seconds = 1.02777... hours → "1.03 hours"
+    expect(formatDurationLabel(3700)).toBe('1.03 hours');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getTotalTimeStats
+// ---------------------------------------------------------------------------
+
+describe('getTotalTimeStats', () => {
+  // Tuesday March 24, 2026 at 10 AM
+  const tuesday = new Date(2026, 2, 24, 10, 0, 0);
+
+  const makeBucket = (overrides: Partial<TimeBucket> = {}): TimeBucket => ({
+    id: 'b1',
+    name: 'Test',
+    totalMinutes: 60,
+    elapsedSeconds: 1800,
+    colorIndex: 0,
+    daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    startedAt: null,
+    goalReachedAt: null,
+    dismissedAt: null,
+    ...overrides,
+  });
+
+  it('returns zeroes for an empty array', () => {
+    expect(getTotalTimeStats([], tuesday)).toEqual({ trackedSeconds: 0, goalSeconds: 0 });
+  });
+
+  it('sums tracked and goal seconds for active buckets', () => {
+    const buckets = [
+      makeBucket({ id: 'a', totalMinutes: 60, elapsedSeconds: 1800 }),
+      makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 900 }),
+    ];
+    expect(getTotalTimeStats(buckets, tuesday)).toEqual({
+      trackedSeconds: 2700,
+      goalSeconds: 5400,
+    });
+  });
+
+  it('excludes dismissed buckets', () => {
+    const buckets = [
+      makeBucket({ id: 'a', totalMinutes: 60, elapsedSeconds: 1800 }),
+      makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 900, dismissedAt: '2026-03-24T09:00:00Z' }),
+    ];
+    expect(getTotalTimeStats(buckets, tuesday)).toEqual({
+      trackedSeconds: 1800,
+      goalSeconds: 3600,
+    });
+  });
+
+  it('excludes buckets not active today', () => {
+    const buckets = [
+      makeBucket({ id: 'a', totalMinutes: 60, elapsedSeconds: 1800 }),
+      makeBucket({ id: 'b', totalMinutes: 30, elapsedSeconds: 900, daysOfWeek: [0] }), // Sunday only
+    ];
+    expect(getTotalTimeStats(buckets, tuesday)).toEqual({
+      trackedSeconds: 1800,
+      goalSeconds: 3600,
+    });
+  });
+
+  it('includes completed (past-goal) buckets', () => {
+    const buckets = [
+      makeBucket({
+        id: 'a',
+        totalMinutes: 60,
+        elapsedSeconds: 4000,
+        goalReachedAt: '2026-03-24T08:00:00Z',
+      }),
+    ];
+    const stats = getTotalTimeStats(buckets, tuesday);
+    expect(stats.trackedSeconds).toBe(4000);
+    expect(stats.goalSeconds).toBe(3600);
   });
 });
 

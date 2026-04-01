@@ -3,9 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MobileTimersPager } from '../layout';
 
-const { mockNavigate, mockUseTimerState, mockRaf } = vi.hoisted(() => ({
+const { mockNavigate, mockRaf } = vi.hoisted(() => ({
   mockNavigate: vi.fn(),
-  mockUseTimerState: vi.fn(),
   mockRaf: vi.fn((cb: FrameRequestCallback) => {
     return window.setTimeout(() => cb(0), 0);
   }),
@@ -25,38 +24,41 @@ vi.mock('../_hooks/use-container-size', () => ({
   }),
 }));
 
-vi.mock('../_hooks/use-timer-state', () => ({
-  useTimerState: mockUseTimerState,
-}));
+vi.mock('../_hooks/use-timer-state', () => ({}));
 
-vi.mock('../_components/timer-views', () => ({
-  RemainingTimersViewWithState: () => (
+vi.mock('../_components/timer-grid', () => ({
+  TimerGridWithState: () => (
     <button data-testid="remaining-view-button" className="h-full w-full">
       Remaining View
     </button>
   ),
-  AllTimersViewWithState: () => <div>All View</div>,
 }));
+
+vi.mock('../_components/all-timer-grid', () => ({
+  AllTimerGridWithState: () => <div>All View</div>,
+}));
+
+import type { UseTimerStateReturn } from '../_hooks/use-timer-state';
+
+const mockTimerState: UseTimerStateReturn = {
+  isHydrated: true,
+  allBuckets: [],
+  todaysBuckets: [],
+  activeBucketId: null,
+  goalReachedBuckets: new Set<string>(),
+  toggleBucket: vi.fn(),
+  addBucket: vi.fn(),
+  removeBucket: vi.fn(),
+  updateBucket: vi.fn(),
+  resetBucketForToday: vi.fn(),
+  setRemainingTime: vi.fn(),
+  dismissBucketForToday: vi.fn(),
+};
 
 beforeEach(() => {
   vi.useFakeTimers();
   mockNavigate.mockReset();
-  mockUseTimerState.mockReset();
   mockRaf.mockClear();
-  mockUseTimerState.mockReturnValue({
-    isHydrated: true,
-    allBuckets: [],
-    todaysBuckets: [],
-    activeBucketId: null,
-    goalReachedBuckets: new Set(),
-    toggleBucket: vi.fn(),
-    addBucket: vi.fn(),
-    removeBucket: vi.fn(),
-    updateBucket: vi.fn(),
-    resetBucketForToday: vi.fn(),
-    setRemainingTime: vi.fn(),
-    dismissBucketForToday: vi.fn(),
-  });
 
   vi.stubGlobal('requestAnimationFrame', mockRaf);
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
@@ -109,7 +111,7 @@ function swipe(target: HTMLElement, pager: HTMLElement) {
 
 describe('MobileTimersPager settle timing', () => {
   it('holds the released position until the destination view becomes active', async () => {
-    const { rerender } = render(<MobileTimersPager activeView="remaining" />);
+    const { rerender } = render(<MobileTimersPager activeView="remaining" timerState={mockTimerState} />);
 
     const pager = screen.getByTestId('timers-mobile-pager');
     const target = screen.getByTestId('remaining-view-button');
@@ -123,7 +125,7 @@ describe('MobileTimersPager settle timing', () => {
       'transform: translate3d(-130px, 0, 0)',
     );
 
-    rerender(<MobileTimersPager activeView="all" />);
+    rerender(<MobileTimersPager activeView="all" timerState={mockTimerState} />);
 
     expect(mockRaf).toHaveBeenCalledTimes(1);
     expect(pager.firstElementChild?.getAttribute('style')).toContain(

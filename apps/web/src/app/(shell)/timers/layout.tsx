@@ -6,9 +6,11 @@ import { cn } from '@repo/ui';
 import { ALL_TIMERS_TITLE, TIMERS_TITLE } from '@/app/route-metadata';
 import { useDocumentTitle } from '@/hooks/use-document-title';
 
-import { AllTimersViewWithState, RemainingTimersViewWithState } from './_components/timer-views';
+import { AllTimerGridWithState } from './_components/all-timer-grid';
+import { TimerGridWithState } from './_components/timer-grid';
+import { TotalTimeIndicator } from './_components/total-time-indicator';
 import { useContainerSize } from './_hooks/use-container-size';
-import { useTimerState } from './_hooks/use-timer-state';
+import { useTimerState, type UseTimerStateReturn } from './_hooks/use-timer-state';
 
 export type TimerViewId = 'remaining' | 'all';
 
@@ -115,12 +117,9 @@ interface PendingSnapState {
   width: number;
 }
 
-export function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
+export function MobileTimersPager({ activeView, timerState }: { activeView: TimerViewId; timerState: UseTimerStateReturn }) {
   const navigate = useNavigate();
   const { containerRef, size } = useContainerSize(true);
-  // The mobile pager mounts both timer panels at once, so it owns one shared
-  // timer state instance to avoid duplicate SSE streams and timer intervals.
-  const timerState = useTimerState();
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const gestureRef = useRef<DragGestureState>({
@@ -391,7 +390,7 @@ export function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
           className="h-full shrink-0"
           style={{ width: `${100 / TIMER_VIEW_COUNT}%` }}
         >
-          <RemainingTimersViewWithState timerState={timerState} />
+          <TimerGridWithState timerState={timerState} />
         </section>
         <section
           data-testid="timers-page-all"
@@ -399,7 +398,7 @@ export function MobileTimersPager({ activeView }: { activeView: TimerViewId }) {
           className="h-full shrink-0"
           style={{ width: `${100 / TIMER_VIEW_COUNT}%` }}
         >
-          <AllTimersViewWithState timerState={timerState} />
+          <AllTimerGridWithState timerState={timerState} />
         </section>
       </div>
     </div>
@@ -410,6 +409,7 @@ export default function TimersLayout() {
   const { pathname } = useLocation();
   const activeView = getTimerViewFromPath(pathname);
   const useMobilePager = useMobilePagerEligibility() && activeView !== null;
+  const timerState = useTimerState();
 
   useDocumentTitle(activeView ? TIMER_VIEW_TITLE[activeView] : TIMERS_TITLE);
 
@@ -450,13 +450,16 @@ export default function TimersLayout() {
         })}
       </nav>
 
-      {/* Content area */}
-      <div className="timers-content flex-1 min-h-0 min-w-0 overflow-hidden">
-        {useMobilePager && activeView ? (
-          <MobileTimersPager activeView={activeView} />
-        ) : (
-          <Outlet />
-        )}
+      {/* Content area + total time indicator */}
+      <div className="flex flex-col flex-1 min-h-0 min-w-0">
+        <div className="timers-content flex-1 min-h-0 min-w-0 overflow-hidden">
+          {useMobilePager && activeView ? (
+            <MobileTimersPager activeView={activeView} timerState={timerState} />
+          ) : (
+            <Outlet context={timerState} />
+          )}
+        </div>
+        <TotalTimeIndicator allBuckets={timerState.allBuckets} />
       </div>
     </div>
   );
