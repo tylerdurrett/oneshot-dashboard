@@ -71,6 +71,9 @@ function removeFromSet(
   });
 }
 
+/** Coalesce burst SSE events into a single query invalidation. */
+const SSE_DEBOUNCE_MS = 50;
+
 function isStoppedAndPastGoal(bucket: TimeBucket): boolean {
   return !bucket.startedAt && bucket.elapsedSeconds >= bucket.totalMinutes * 60;
 }
@@ -213,12 +216,24 @@ export function useTimerState(): UseTimerStateReturn {
     // Intentionally excludes goalReachedBuckets from deps to avoid infinite loop.
   }, [serverBuckets, todayQuery.isSuccess]);
 
-  // SSE integration — useTimerSSE stores handlers in a ref, so useCallback
-  // wrappers are unnecessary (handler identity doesn't trigger reconnection).
-  const invalidateToday = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: timerKeys.today }),
-    [queryClient],
-  );
+  // SSE integration — handlers stored in a ref by useTimerSSE, so callback
+  // identity doesn't trigger reconnection. Invalidation is debounced via
+  // SSE_DEBOUNCE_MS to coalesce burst events into a single refetch.
+  const invalidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const invalidateToday = useCallback(() => {
+    if (invalidateTimerRef.current) clearTimeout(invalidateTimerRef.current);
+    invalidateTimerRef.current = setTimeout(() => {
+      invalidateTimerRef.current = null;
+      queryClient.invalidateQueries({ queryKey: timerKeys.today });
+    }, SSE_DEBOUNCE_MS);
+  }, [queryClient]);
+
+  useEffect(() => {
+    return () => {
+      if (invalidateTimerRef.current) clearTimeout(invalidateTimerRef.current);
+    };
+  }, []);
 
   useTimerSSE({
     onGoalReached: useCallback(
@@ -229,15 +244,15 @@ export function useTimerState(): UseTimerStateReturn {
           next.add(data.bucketId);
           return next;
         });
-        queryClient.invalidateQueries({ queryKey: timerKeys.today });
+        invalidateToday();
       },
-      [queryClient],
+      [invalidateToday],
     ),
     onDailyReset: useCallback(() => {
-      queryClient.invalidateQueries({ queryKey: timerKeys.today });
+      invalidateToday();
       setGoalReachedBuckets(new Set());
       prevGoalReachedRef.current = new Set();
-    }, [queryClient]),
+    }, [invalidateToday]),
     onTimerStarted: invalidateToday,
     onTimerStopped: invalidateToday,
     onTimerReset: invalidateToday,
