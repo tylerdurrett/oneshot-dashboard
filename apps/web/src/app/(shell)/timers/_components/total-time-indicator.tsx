@@ -26,6 +26,11 @@ export function TotalTimeIndicator({
       })
     : null;
 
+  // Format remaining time as compact H:MM (e.g. "3:00", "0:45")
+  const remainingH = Math.floor(remainingSeconds / 3600);
+  const remainingM = Math.floor((remainingSeconds % 3600) / 60);
+  const remainingCompact = `${remainingH}:${String(remainingM).padStart(2, '0')}`;
+
   return (
     <div
       data-testid="total-time-indicator"
@@ -36,12 +41,13 @@ export function TotalTimeIndicator({
         className="absolute inset-0 origin-left bg-primary/30 transition-transform duration-300 ease-linear"
         style={{ transform: `scaleX(${progress})` }}
       />
-      <span className="relative z-10 flex h-full items-center text-xs font-medium tabular-nums text-muted-foreground">
-        <span className="w-20 shrink-0" />
-        <span className="flex-1 text-center">{label}</span>
-        <span className="w-20 shrink-0 text-right pr-3 text-muted-foreground/70">
-          {finishTime}
-        </span>
+      <span className="relative z-10 flex h-full items-center justify-between px-3 text-xs font-medium tabular-nums text-muted-foreground">
+        <span>{label}</span>
+        {finishTime && (
+          <span className="text-muted-foreground/70">
+            {remainingCompact}=&gt;{finishTime}
+          </span>
+        )}
       </span>
     </div>
   );

@@ -81,7 +81,7 @@ describe('TotalTimeIndicator', () => {
     expect(screen.getByText('3 hours / 4 hours')).toBeDefined();
   });
 
-  it('displays earliest finish time when time remains', () => {
+  it('displays remaining time and finish time when time remains', () => {
     const now = new Date('2026-04-01T14:00:00');
     vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
 
@@ -90,13 +90,13 @@ describe('TotalTimeIndicator', () => {
     ];
     render(<TotalTimeIndicator allBuckets={buckets} />);
 
-    // 30 min remaining from 2:00 PM = 2:30 PM
-    const expected = new Date(now.getTime() + 1800 * 1000).toLocaleTimeString([], {
+    // 30 min remaining from 2:00 PM → "0:30=>2:30 PM"
+    const finishTime = new Date(now.getTime() + 1800 * 1000).toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
-    expect(screen.getByText(expected)).toBeDefined();
+    expect(screen.getByText(`0:30=>${finishTime}`)).toBeDefined();
 
     vi.restoreAllMocks();
   });
@@ -108,9 +108,7 @@ describe('TotalTimeIndicator', () => {
     render(<TotalTimeIndicator allBuckets={buckets} />);
 
     const indicator = screen.getByTestId('total-time-indicator');
-    // The finish time span should be empty when remaining is 0
-    const spans = indicator.querySelectorAll('span');
-    const rightSpan = spans[spans.length - 1];
-    expect(rightSpan.textContent).toBe('');
+    // Only the label span should be present (no finish time span)
+    expect(indicator.textContent).not.toMatch(/=>/);
   });
 });
