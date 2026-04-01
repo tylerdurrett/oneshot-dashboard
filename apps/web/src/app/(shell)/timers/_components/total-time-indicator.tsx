@@ -1,6 +1,18 @@
 import { useMemo } from 'react';
 
-import { formatDurationLabel, getTotalTimeStats, type TimeBucket } from '../_lib/timer-types';
+import { getTotalTimeStats, type TimeBucket } from '../_lib/timer-types';
+
+/** Format seconds as decimal hours rounded to 2 places (e.g. 4.88) */
+function decimalHours(seconds: number): string {
+  return parseFloat((seconds / 3600).toFixed(2)).toString();
+}
+
+/** Format seconds as H:MM (e.g. "4:34") */
+function compactHM(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}:${String(m).padStart(2, '0')}`;
+}
 
 export function TotalTimeIndicator({
   allBuckets,
@@ -15,9 +27,10 @@ export function TotalTimeIndicator({
   if (totalDaySeconds === 0) return null;
 
   const progress = Math.min(1, elapsedSeconds / totalDaySeconds);
-  const label = `${formatDurationLabel(elapsedSeconds)} / ${formatDurationLabel(totalDaySeconds)}`;
-
   const remainingSeconds = Math.max(0, totalDaySeconds - elapsedSeconds);
+
+  const summaryLabel = `${decimalHours(elapsedSeconds)} done, ${compactHM(remainingSeconds)} left (${decimalHours(totalDaySeconds)} total)`;
+
   const finishTime = remainingSeconds > 0
     ? new Date(Date.now() + remainingSeconds * 1000).toLocaleTimeString([], {
         hour: 'numeric',
@@ -25,11 +38,6 @@ export function TotalTimeIndicator({
         hour12: true,
       })
     : null;
-
-  // Format remaining time as compact H:MM (e.g. "3:00", "0:45")
-  const remainingH = Math.floor(remainingSeconds / 3600);
-  const remainingM = Math.floor((remainingSeconds % 3600) / 60);
-  const remainingCompact = `${remainingH}:${String(remainingM).padStart(2, '0')}`;
 
   return (
     <div
@@ -42,10 +50,10 @@ export function TotalTimeIndicator({
         style={{ transform: `scaleX(${progress})` }}
       />
       <span className="relative z-10 flex h-full items-center justify-between px-3 text-xs font-medium tabular-nums text-muted-foreground">
-        <span>{label}</span>
+        <span>{summaryLabel}</span>
         {finishTime && (
           <span className="text-muted-foreground/70">
-            {remainingCompact}=&gt;{finishTime}
+            Finish at {finishTime}
           </span>
         )}
       </span>

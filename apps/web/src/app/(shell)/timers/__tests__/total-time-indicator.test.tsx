@@ -35,23 +35,17 @@ describe('TotalTimeIndicator', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('displays formatted elapsed and total-day time', () => {
+  it('displays summary with done, left, and total', () => {
     const buckets = [
       makeBucket({ totalMinutes: 120, elapsedSeconds: 4500 }),
       makeBucket({ id: 'b2', totalMinutes: 60, elapsedSeconds: 900 }),
     ];
     render(<TotalTimeIndicator allBuckets={buckets} />);
-    // elapsed=5400s=1.5hr, totalDay=max(4500,7200)+max(900,3600)=7200+3600=10800s=3hr
-    expect(screen.getByText('1.5 hours / 3 hours')).toBeDefined();
-  });
-
-  it('displays minutes when elapsed is under an hour', () => {
-    const buckets = [
-      makeBucket({ totalMinutes: 120, elapsedSeconds: 1800 }),
-    ];
-    render(<TotalTimeIndicator allBuckets={buckets} />);
-    // elapsed=1800s=30min, totalDay=max(1800,7200)=7200s=2hr
-    expect(screen.getByText('30 minutes / 2 hours')).toBeDefined();
+    // elapsed=5400s=1.5hr, remaining=10800-5400=5400s=1:30, totalDay=3hr
+    const indicator = screen.getByTestId('total-time-indicator');
+    expect(indicator.textContent).toContain('1.5 done');
+    expect(indicator.textContent).toContain('1:30 left');
+    expect(indicator.textContent).toContain('(3 total)');
   });
 
   it('shows 100% progress when single bucket exceeds its goal', () => {
@@ -64,7 +58,8 @@ describe('TotalTimeIndicator', () => {
     const fillBar = indicator.children[1] as HTMLElement;
     // elapsed=7200, totalDay=max(7200,3600)=7200, progress=1.0
     expect(fillBar.style.transform).toBe('scaleX(1)');
-    expect(screen.getByText('2 hours / 2 hours')).toBeDefined();
+    expect(indicator.textContent).toContain('2 done');
+    expect(indicator.textContent).toContain('0:00 left');
   });
 
   it('shows partial progress when one bucket has overage but another is unfilled', () => {
@@ -78,10 +73,12 @@ describe('TotalTimeIndicator', () => {
     const indicator = screen.getByTestId('total-time-indicator');
     const fillBar = indicator.children[1] as HTMLElement;
     expect(fillBar.style.transform).toBe('scaleX(0.75)');
-    expect(screen.getByText('3 hours / 4 hours')).toBeDefined();
+    expect(indicator.textContent).toContain('3 done');
+    expect(indicator.textContent).toContain('1:00 left');
+    expect(indicator.textContent).toContain('(4 total)');
   });
 
-  it('displays remaining time and finish time when time remains', () => {
+  it('displays finish time when time remains', () => {
     const now = new Date('2026-04-01T14:00:00');
     vi.spyOn(Date, 'now').mockReturnValue(now.getTime());
 
@@ -90,13 +87,13 @@ describe('TotalTimeIndicator', () => {
     ];
     render(<TotalTimeIndicator allBuckets={buckets} />);
 
-    // 30 min remaining from 2:00 PM → "0:30=>2:30 PM"
     const finishTime = new Date(now.getTime() + 1800 * 1000).toLocaleTimeString([], {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
-    expect(screen.getByText(`0:30=>${finishTime}`)).toBeDefined();
+    const indicator = screen.getByTestId('total-time-indicator');
+    expect(indicator.textContent).toContain(`Finish at ${finishTime}`);
 
     vi.restoreAllMocks();
   });
@@ -108,7 +105,6 @@ describe('TotalTimeIndicator', () => {
     render(<TotalTimeIndicator allBuckets={buckets} />);
 
     const indicator = screen.getByTestId('total-time-indicator');
-    // Only the label span should be present (no finish time span)
-    expect(indicator.textContent).not.toMatch(/=>/);
+    expect(indicator.textContent).not.toContain('Finish at');
   });
 });
