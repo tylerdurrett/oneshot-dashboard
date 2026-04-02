@@ -84,17 +84,40 @@ export function SwipeView({
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
 
+  // Track whether we've received the first real width measurement.
+  // Until then, we use duration:0 so the strip snaps into position instantly
+  // instead of spring-animating in from x=0. Without this, every initial load
+  // (and phone lock/unlock) triggers a visible slide-in because the animate
+  // target jumps from -(idx*0)=0 to -(idx*realWidth) once ResizeObserver fires.
+  const hasInitialWidth = useRef(false);
+
   // Measure container width with ResizeObserver.
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const ro = new ResizeObserver(([entry]) => {
-      if (entry) setContainerWidth(entry.contentRect.width);
+      if (entry) {
+        const w = entry.contentRect.width;
+        // Skip setState when width hasn't changed. On mobile, the
+        // ResizeObserver re-fires on visibility resume (phone lock/unlock)
+        // with the same width. Without this guard, the setState triggers a
+        // re-render, the animate target "changes" from 0→realWidth (because
+        // containerWidth was briefly 0 during the render cycle), and Framer
+        // Motion plays a spring animation — making it look like the user
+        // just swiped to the page.
+        setContainerWidth((prev) => (w === prev ? prev : w));
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // Flip the flag after the first real measurement so subsequent renders
+  // use the spring transition for actual navigation.
+  if (!hasInitialWidth.current && containerWidth > 0) {
+    hasInitialWidth.current = true;
+  }
 
   // Motion value for the strip's x offset — avoids re-renders during drag.
   const x = useMotionValue(0);
@@ -147,7 +170,13 @@ export function SwipeView({
         dragMomentum={false}
         onDragEnd={handleDragEnd}
         animate={{ x: -activeIndex * containerWidth }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        // Snap instantly on the first render (before we have a real width),
+        // then use a spring for actual user-initiated navigation.
+        transition={
+          hasInitialWidth.current
+            ? { type: 'spring', stiffness: 300, damping: 30 }
+            : { duration: 0 }
+        }
         style={{
           x,
           // Let the browser handle vertical scroll and pinch zoom natively.
