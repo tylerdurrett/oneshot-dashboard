@@ -1,5 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 import { Clock } from 'lucide-react';
+import { motion } from 'motion/react';
 
 import {
   GRID_GAP,
@@ -7,6 +8,7 @@ import {
   isBucketActiveToday,
   type TimeBucket,
 } from '../_lib/timer-types';
+import { REFLOW_TRANSITION, TILE_INNER_STYLE, TILE_WRAPPER_STYLE } from '../_lib/animation';
 import {
   getResponsiveTreemapConstraints,
   squarify,
@@ -124,34 +126,35 @@ function AllTimerGridContent({ timerState }: { timerState: UseTimerStateReturn }
         const bucket = bucketMap.get(rect.id);
         if (!bucket) return null;
 
-        const bucketStyle = {
-          position: 'absolute' as const,
-          left: rect.x + GRID_PADDING + GRID_GAP / 2,
-          top: rect.y + GRID_PADDING + GRID_GAP / 2,
-          width: rect.width - GRID_GAP,
-          height: rect.height - GRID_GAP,
-        };
-        const sizeTier = getTimerBucketSizeTier(
-          bucketStyle.width,
-          bucketStyle.height,
-        );
+        const left = rect.x + GRID_PADDING + GRID_GAP / 2;
+        const top = rect.y + GRID_PADDING + GRID_GAP / 2;
+        const width = rect.width - GRID_GAP;
+        const height = rect.height - GRID_GAP;
+        const sizeTier = getTimerBucketSizeTier(width, height);
 
         return (
-          <TimerBucket
+          <motion.div
             key={bucket.id}
-            bucket={bucket}
-            isActive={activeBucketId === bucket.id}
-            isGoalReached={goalReachedBuckets.has(bucket.id)}
-            sizeTier={sizeTier}
-            mode="elapsed"
-            style={bucketStyle}
-            onToggle={() => toggleBucket(bucket.id)}
-            onOpenSettings={() => setSelectedBucketId(bucket.id)}
-            onResetForToday={() => resetBucketForToday(bucket.id)}
-            onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
-            onSetDailyGoal={(m) => setDailyGoal(bucket.id, m)}
-            onDismissForToday={() => dismissBucketForToday(bucket.id)}
-          />
+            initial={false}
+            animate={{ left, top, width, height }}
+            transition={REFLOW_TRANSITION}
+            style={TILE_WRAPPER_STYLE}
+          >
+            <TimerBucket
+              bucket={bucket}
+              isActive={activeBucketId === bucket.id}
+              isGoalReached={goalReachedBuckets.has(bucket.id)}
+              sizeTier={sizeTier}
+              mode="elapsed"
+              style={TILE_INNER_STYLE}
+              onToggle={() => toggleBucket(bucket.id)}
+              onOpenSettings={() => setSelectedBucketId(bucket.id)}
+              onResetForToday={() => resetBucketForToday(bucket.id)}
+              onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
+              onSetDailyGoal={(m) => setDailyGoal(bucket.id, m)}
+              onDismissForToday={() => dismissBucketForToday(bucket.id)}
+            />
+          </motion.div>
         );
       })}
 

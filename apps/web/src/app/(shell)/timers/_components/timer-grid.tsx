@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Clock, Plus } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 
 import { Button } from '@repo/ui';
 
@@ -19,6 +20,7 @@ import {
   squarify,
   type TreemapItem,
 } from '../_lib/treemap';
+import { BUBBLE_POP_EXIT, TILE_INNER_STYLE, TILE_TRANSITION, TILE_WRAPPER_STYLE } from '../_lib/animation';
 import { useTimerState, type UseTimerStateReturn } from '../_hooks/use-timer-state';
 import { useContainerSize } from '../_hooks/use-container-size';
 
@@ -133,74 +135,66 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
     ? allBuckets.find((b) => b.id === selectedBucketId) ?? null
     : null;
 
-  if (todaysBuckets.length === 0) {
-    return (
-      <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <Clock className="size-12 text-muted-foreground" />
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-semibold text-foreground">No buckets yet</h2>
-            <p className="text-sm text-muted-foreground">
-              Create a bucket to start tracking your time.
-            </p>
-          </div>
-          <Button data-swipe-ignore onClick={handleAddBucket}>
-            <Plus className="size-4" />
-            Create your first bucket
-          </Button>
-        </div>
-
-        {selectedBucketId && (
-          <BucketSettingsDialog
-            bucket={selectedBucket}
-            open
-            onOpenChange={(open) => {
-              if (!open) setSelectedBucketId(null);
-            }}
-            onSave={updateBucket}
-            onDelete={handleDeleteBucket}
-          />
-        )}
-      </div>
-    );
-  }
-
   return (
     <div ref={containerRef} className="relative h-full w-full">
-      {rects.map((rect) => {
-        const bucket = bucketMap.get(rect.id);
-        if (!bucket) return null;
+      {/* Empty state — rendered underneath exiting tiles so the last pop
+          finishes visually before the user notices the empty view. */}
+      {todaysBuckets.length === 0 && (
+        <div className="flex h-full w-full items-center justify-center">
+          <div className="flex flex-col items-center gap-4 text-center">
+            <Clock className="size-12 text-muted-foreground" />
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-semibold text-foreground">No buckets yet</h2>
+              <p className="text-sm text-muted-foreground">
+                Create a bucket to start tracking your time.
+              </p>
+            </div>
+            <Button data-swipe-ignore onClick={handleAddBucket}>
+              <Plus className="size-4" />
+              Create your first bucket
+            </Button>
+          </div>
+        </div>
+      )}
 
-        const bucketStyle = {
-          position: 'absolute' as const,
-          left: rect.x + GRID_PADDING + GRID_GAP / 2,
-          top: rect.y + GRID_PADDING + GRID_GAP / 2,
-          width: rect.width - GRID_GAP,
-          height: rect.height - GRID_GAP,
-        };
-        const sizeTier = getTimerBucketSizeTier(
-          bucketStyle.width,
-          bucketStyle.height,
-        );
+      <AnimatePresence initial={false} mode="popLayout">
+        {rects.map((rect) => {
+          const bucket = bucketMap.get(rect.id);
+          if (!bucket) return null;
 
-        return (
-          <TimerBucket
-            key={bucket.id}
-            bucket={bucket}
-            isActive={activeBucketId === bucket.id}
-            isGoalReached={goalReachedBuckets.has(bucket.id)}
-            sizeTier={sizeTier}
-            mode="remaining"
-            style={bucketStyle}
-            onToggle={() => toggleBucket(bucket.id)}
-            onOpenSettings={() => setSelectedBucketId(bucket.id)}
-            onResetForToday={() => resetBucketForToday(bucket.id)}
-            onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
-            onSetDailyGoal={(m) => setDailyGoal(bucket.id, m)}
-            onDismissForToday={() => dismissBucketForToday(bucket.id)}
-          />
-        );
-      })}
+          const left = rect.x + GRID_PADDING + GRID_GAP / 2;
+          const top = rect.y + GRID_PADDING + GRID_GAP / 2;
+          const width = rect.width - GRID_GAP;
+          const height = rect.height - GRID_GAP;
+          const sizeTier = getTimerBucketSizeTier(width, height);
+
+          return (
+            <motion.div
+              key={bucket.id}
+              initial={false}
+              animate={{ left, top, width, height, scale: 1, opacity: 1 }}
+              exit={BUBBLE_POP_EXIT}
+              transition={TILE_TRANSITION}
+              style={TILE_WRAPPER_STYLE}
+            >
+              <TimerBucket
+                bucket={bucket}
+                isActive={activeBucketId === bucket.id}
+                isGoalReached={goalReachedBuckets.has(bucket.id)}
+                sizeTier={sizeTier}
+                mode="remaining"
+                style={TILE_INNER_STYLE}
+                onToggle={() => toggleBucket(bucket.id)}
+                onOpenSettings={() => setSelectedBucketId(bucket.id)}
+                onResetForToday={() => resetBucketForToday(bucket.id)}
+                onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
+                onSetDailyGoal={(m) => setDailyGoal(bucket.id, m)}
+                onDismissForToday={() => dismissBucketForToday(bucket.id)}
+              />
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
 
       {selectedBucketId && (
         <BucketSettingsDialog

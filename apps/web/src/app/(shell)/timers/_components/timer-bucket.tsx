@@ -336,7 +336,6 @@ export function TimerBucket({
         }}
         className={cn(
           'touch-none relative select-none cursor-pointer rounded-lg overflow-hidden',
-          'transition-[opacity,transform] duration-400',
         )}
         // Prevent iOS long-press from selecting bucket text instead of
         // respecting the bucket tap / context-menu gestures.

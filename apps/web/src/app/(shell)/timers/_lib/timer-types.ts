@@ -62,6 +62,9 @@ export const GRID_PADDING = 6;
 /** Gap between adjacent treemap buckets (px). */
 export const GRID_GAP = 4;
 
+/** Border radius for treemap bucket tiles (px). Matches Tailwind's rounded-lg. */
+export const TILE_BORDER_RADIUS = 8;
+
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
