@@ -55,7 +55,7 @@ export const BUCKET_COLORS: BucketColor[] = [
 export const ADD_BUCKET_EVENT = 'add-bucket';
 
 /** Padding around the outer edge of the treemap grid (px). */
-export const GRID_PADDING = 8;
+export const GRID_PADDING = 6;
 
 /** Gap between adjacent treemap buckets (px). */
 export const GRID_GAP = 4;
