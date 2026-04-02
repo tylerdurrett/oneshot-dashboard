@@ -42,18 +42,18 @@ function mockStandaloneMode(isStandalone: boolean) {
 
 describe('AppShell', () => {
   it('renders children in the main content area', () => {
-    renderWithRouter('/timers', <div data-testid="child">Content</div>);
+    renderWithRouter('/timers/remaining', <div data-testid="child">Content</div>);
     expect(screen.getByTestId('child')).toBeDefined();
   });
 
   it('renders two navigation landmarks (desktop sidebar + mobile bottom)', () => {
-    renderWithRouter('/timers');
+    renderWithRouter('/timers/remaining');
     expect(screen.getByRole('navigation', { name: 'Sidebar navigation' })).toBeDefined();
     expect(screen.getByRole('navigation', { name: 'Bottom navigation' })).toBeDefined();
   });
 
   it('keeps shell navs non-selectable', () => {
-    renderWithRouter('/timers');
+    renderWithRouter('/timers/remaining');
 
     expect(
       screen.getByRole('navigation', { name: 'Sidebar navigation' }).classList.contains('select-none'),
@@ -62,30 +62,26 @@ describe('AppShell', () => {
       screen.getByRole('navigation', { name: 'Bottom navigation' }).classList.contains('select-none'),
     ).toBe(true);
 
-    const timerLink = screen.getAllByText('Timers')[0]!.closest('a');
-    expect(timerLink?.classList.contains('select-none')).toBe(true);
-
-    const moreButton = screen.getAllByRole('button', { name: 'More options' })[0]!;
-    expect(moreButton.classList.contains('select-none')).toBe(true);
+    // To Do has context menu so it uses touch-none select-none
+    const remainingLink = screen.getAllByText('To Do')[0]!.closest('a');
+    expect(remainingLink?.classList.contains('select-none')).toBe(true);
   });
 
-  it('renders Timers and Chat nav links', () => {
-    renderWithRouter('/timers');
-    const timerLinks = screen.getAllByText('Timers');
-    const chatLinks = screen.getAllByText('Chat');
+  it('renders To Do, Done, and Settings nav links', () => {
+    renderWithRouter('/timers/remaining');
     // Two of each — one desktop, one mobile
-    expect(timerLinks).toHaveLength(2);
-    expect(chatLinks).toHaveLength(2);
+    expect(screen.getAllByText('To Do')).toHaveLength(2);
+    expect(screen.getAllByText('Done')).toHaveLength(2);
+    expect(screen.getAllByText('Settings')).toHaveLength(2);
   });
 
-  it('renders More as a button (not a link)', () => {
-    renderWithRouter('/timers');
-    const moreButtons = screen.getAllByRole('button', { name: 'More options' });
-    expect(moreButtons).toHaveLength(2);
+  it('does not render a More button (hidden for now)', () => {
+    renderWithRouter('/timers/remaining');
+    expect(screen.queryByRole('button', { name: 'More options' })).toBeNull();
   });
 
   it('applies the iPhone safe-area inset to the bottom nav instead of the shell', () => {
-    const { container } = renderWithRouter('/timers');
+    const { container } = renderWithRouter('/timers/remaining');
 
     expect(container.firstElementChild?.classList.contains('safe-area-pb')).toBe(false);
     expect(
@@ -95,7 +91,7 @@ describe('AppShell', () => {
 
   it('marks the shell for the standalone PWA layout workaround when installed', () => {
     mockStandaloneMode(true);
-    const { container } = renderWithRouter('/timers');
+    const { container } = renderWithRouter('/timers/remaining');
 
     expect(container.firstElementChild?.classList.contains('app-shell-standalone')).toBe(true);
     expect(screen.getByRole('main').classList.contains('app-shell-main')).toBe(true);
@@ -104,27 +100,27 @@ describe('AppShell', () => {
     ).toBe(true);
   });
 
-  it('highlights Timers when pathname is /timers', () => {
-    renderWithRouter('/timers');
-    const timerLinks = screen.getAllByText('Timers');
-    const parentLink = timerLinks[0]!.closest('a');
+  it('highlights To Do when pathname is /timers/remaining', () => {
+    renderWithRouter('/timers/remaining');
+    const remainingLinks = screen.getAllByText('To Do');
+    const parentLink = remainingLinks[0]!.closest('a');
     expect(parentLink).toBeDefined();
     expect(parentLink!.getAttribute('data-active')).toBe('true');
   });
 
-  it('highlights Chat for nested chat routes (prefix match)', () => {
-    renderWithRouter('/chat/thread-123');
-    const chatLinks = screen.getAllByText('Chat');
-    const parentLink = chatLinks[0]!.closest('a');
-    expect(parentLink).toBeDefined();
-    expect(parentLink!.getAttribute('data-active')).toBe('true');
-  });
-
-  it('does not highlight Timers when on chat page', () => {
-    renderWithRouter('/chat');
-    const timerLinks = screen.getAllByText('Timers');
-    const parentLink = timerLinks[0]!.closest('a');
+  it('does not highlight Done when on remaining page', () => {
+    renderWithRouter('/timers/remaining');
+    const allLinks = screen.getAllByText('Done');
+    const parentLink = allLinks[0]!.closest('a');
     expect(parentLink).toBeDefined();
     expect(parentLink!.hasAttribute('data-active')).toBe(false);
+  });
+
+  it('highlights Settings when on settings page', () => {
+    renderWithRouter('/settings');
+    const settingsLinks = screen.getAllByText('Settings');
+    const parentLink = settingsLinks[0]!.closest('a');
+    expect(parentLink).toBeDefined();
+    expect(parentLink!.getAttribute('data-active')).toBe('true');
   });
 });

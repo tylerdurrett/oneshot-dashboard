@@ -8,11 +8,11 @@ describe('route metadata', () => {
   });
 
   it('exports the timers page title', () => {
-    expect(TIMERS_TITLE).toBe('Timers');
+    expect(TIMERS_TITLE).toBe('To Do');
   });
 
   it('exports the all timers page title', () => {
-    expect(ALL_TIMERS_TITLE).toBe('All Timers');
+    expect(ALL_TIMERS_TITLE).toBe('Done');
   });
 
   it('exports the chat page title', () => {

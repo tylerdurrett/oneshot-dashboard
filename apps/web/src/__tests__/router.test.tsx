@@ -112,10 +112,9 @@ describe('router', () => {
 
   it('renders /timers/remaining page', () => {
     renderRoute('/timers/remaining');
-    // "Timers" appears in the AppShell nav; sub-nav tabs also render
-    const matches = screen.getAllByText('Timers');
+    // "To Do" appears in the AppShell nav (desktop + mobile)
+    const matches = screen.getAllByText('To Do');
     expect(matches.length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Remaining')).toBeDefined();
   });
 
   it('renders /timers/all page', () => {

@@ -12,6 +12,7 @@ import { ChatRunProvider } from '@/app/(shell)/chat/chat-run-context';
 import PrototypeIndex from '@/app/prototype/page';
 import ChatPrototype from '@/app/prototype/chat/page';
 import VideoPage from '@/app/video/page';
+import SettingsPage from '@/app/(shell)/settings/page';
 import NoFeaturesPage from '@/app/no-features/page';
 import { features, getHomeRedirectPath } from '@/lib/features';
 
@@ -68,6 +69,7 @@ const shellChildren = [
         },
       ]
     : []),
+  { path: 'settings', element: <SettingsPage /> },
 ];
 
 const prototypeChildren = [

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router';
-import { Clock, Menu, MessageSquare, Plus } from 'lucide-react';
+import { Circle, CircleCheckBig, Plus, Settings } from 'lucide-react';
 import { cn } from '@repo/ui';
 
 import { ADD_BUCKET_EVENT } from '@/app/(shell)/timers/_lib/timer-types';
@@ -27,8 +27,9 @@ interface NavItem {
 // ---------------------------------------------------------------------------
 
 const ALL_NAV_ITEMS: NavItem[] = [
-  { href: '/timers', label: 'Timers', icon: Clock, matchType: 'prefix', hasContextMenu: true, feature: 'timers' },
-  { href: '/chat', label: 'Chat', icon: MessageSquare, matchType: 'prefix', feature: 'chat' },
+  { href: '/timers/remaining', label: 'To Do', icon: Circle, matchType: 'exact', hasContextMenu: true, feature: 'timers' },
+  { href: '/timers/all', label: 'Done', icon: CircleCheckBig, matchType: 'exact', feature: 'timers' },
+  { href: '/settings', label: 'Settings', icon: Settings, matchType: 'prefix' },
 ];
 
 const NAV_ITEMS = ALL_NAV_ITEMS.filter(
@@ -361,30 +362,6 @@ const NavContextMenu = forwardRef<
 });
 
 // ---------------------------------------------------------------------------
-// More button
-// ---------------------------------------------------------------------------
-
-// TODO: wire up overflow menu (e.g. DropdownMenu from @repo/ui)
-function MoreButton({ isMobile }: { isMobile: boolean }) {
-  return (
-    <button
-      type="button"
-      className={cn(
-        'flex flex-col items-center justify-center gap-1 transition-colors text-sidebar-foreground/50 hover:text-sidebar-foreground select-none',
-        isMobile ? 'flex-1 py-2' : 'w-full px-3 py-3',
-      )}
-      aria-label="More options"
-      style={{ WebkitTouchCallout: 'none' }}
-    >
-      <div className="p-1.5 rounded-lg">
-        <Menu className="size-5" />
-      </div>
-      <span className="text-[10px] font-medium">More</span>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Render helper: pick the right NavLink variant
 // ---------------------------------------------------------------------------
 
@@ -428,7 +405,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {NAV_ITEMS.map((item) =>
             renderNavItem(item, false, isItemActive(item, pathname)),
           )}
-          <MoreButton isMobile={false} />
         </div>
       </nav>
 
@@ -442,13 +418,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         aria-label="Bottom navigation"
         className="app-shell-mobile-nav flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb select-none"
       >
-        {/* Keep the iPhone standalone safe-area inset on the nav itself.
-            Installed iOS PWAs also pin the nav to the viewport bottom via CSS,
-            because WebKit can misplace bottom-aligned flex layouts in standalone mode. */}
         {NAV_ITEMS.map((item) =>
           renderNavItem(item, true, isItemActive(item, pathname)),
         )}
-        <MoreButton isMobile={true} />
       </nav>
     </div>
   );
