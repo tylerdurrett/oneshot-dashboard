@@ -42,7 +42,7 @@ export function TotalTimeIndicator({
   return (
     <div
       data-testid="total-time-indicator"
-      className="relative h-8 shrink-0 mx-2 mb-2 rounded-md overflow-hidden"
+      className="relative h-8 shrink-0 mx-2 mt-2 rounded-md overflow-hidden"
     >
       <div className="absolute inset-0 bg-muted" />
       <div
