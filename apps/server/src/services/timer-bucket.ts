@@ -2,6 +2,40 @@ import { asc, eq, max } from 'drizzle-orm';
 import { db as defaultDb, timerBuckets, timerDailyProgress } from '@repo/db';
 import type { Database } from './thread.js';
 
+// ---------------------------------------------------------------------------
+// WeeklySchedule helpers — pure functions, exported for tests + reuse
+// ---------------------------------------------------------------------------
+
+/** Map of day-of-week ("0"-"6", 0=Sunday) to target minutes. */
+export type WeeklySchedule = Record<string, number>;
+
+/** Derive a sorted active-days array from a schedule. */
+export function daysFromSchedule(schedule: WeeklySchedule): number[] {
+  return Object.keys(schedule).map(Number).sort((a, b) => a - b);
+}
+
+/** Build a uniform schedule where every active day gets the same value. */
+export function scheduleFromUniform(totalMinutes: number, days: number[]): WeeklySchedule {
+  const schedule: WeeklySchedule = {};
+  for (const d of days) schedule[String(d)] = totalMinutes;
+  return schedule;
+}
+
+/** Look up a day's target from a schedule, falling back to a default. */
+export function minutesForDay(
+  schedule: WeeklySchedule | null,
+  dayOfWeek: number,
+  fallback: number,
+): number {
+  if (!schedule) return fallback;
+  const value = schedule[String(dayOfWeek)];
+  return value != null ? value : fallback;
+}
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 /** Bucket shape returned to callers — daysOfWeek is always number[]. */
 export interface TimerBucketRow {
   id: string;
@@ -9,6 +43,7 @@ export interface TimerBucketRow {
   totalMinutes: number;
   colorIndex: number;
   daysOfWeek: number[];
+  weeklySchedule: WeeklySchedule | null;
   sortOrder: number;
   deactivatedAt: number | null;
   createdAt: number;
@@ -21,6 +56,7 @@ export interface CreateBucketInput {
   totalMinutes: number;
   colorIndex: number;
   daysOfWeek: number[];
+  weeklySchedule?: WeeklySchedule;
   sortOrder?: number;
 }
 
@@ -30,6 +66,7 @@ export interface UpdateBucketInput {
   totalMinutes?: number;
   colorIndex?: number;
   daysOfWeek?: number[];
+  weeklySchedule?: WeeklySchedule;
   sortOrder?: number;
   deactivatedAt?: number | null; // null to reactivate, timestamp to deactivate
 }
@@ -37,11 +74,17 @@ export interface UpdateBucketInput {
 /** Raw row shape from the timerBuckets table (daysOfWeek is a JSON string in DB). */
 type TimerBucketDbRow = typeof timerBuckets.$inferSelect;
 
-/** Convert a raw DB row to the caller-facing shape (daysOfWeek as number[]). */
+/** Convert a raw DB row to the caller-facing shape.
+ *  When weeklySchedule is present, daysOfWeek is derived from it (single source of truth). */
 function parseBucket(row: TimerBucketDbRow): TimerBucketRow {
+  const schedule = row.weeklySchedule
+    ? (JSON.parse(row.weeklySchedule) as WeeklySchedule)
+    : null;
   return {
     ...row,
-    daysOfWeek: JSON.parse(row.daysOfWeek) as number[],
+    weeklySchedule: schedule,
+    // Derive daysOfWeek from schedule when available; fall back to legacy column.
+    daysOfWeek: schedule ? daysFromSchedule(schedule) : (JSON.parse(row.daysOfWeek) as number[]),
   };
 }
 
@@ -54,7 +97,8 @@ const DEFAULT_BUCKETS = [
   { name: 'Exercise', totalMinutes: 60, colorIndex: 3 },
 ] as const;
 
-const MON_FRI = JSON.stringify([1, 2, 3, 4, 5]);
+const MON_FRI_DAYS = [1, 2, 3, 4, 5];
+const MON_FRI = JSON.stringify(MON_FRI_DAYS);
 
 /**
  * Seed the default timer buckets if the table is empty.
@@ -75,6 +119,7 @@ export async function seedDefaultBuckets(
       totalMinutes: b.totalMinutes,
       colorIndex: b.colorIndex,
       daysOfWeek: MON_FRI,
+      weeklySchedule: JSON.stringify(scheduleFromUniform(b.totalMinutes, MON_FRI_DAYS)),
       sortOrder: i,
       createdAt: now,
       updatedAt: now,
@@ -123,12 +168,19 @@ export async function createBucket(
     sortOrder = (result[0]?.maxSort ?? -1) + 1;
   }
 
+  // weeklySchedule is the source of truth; build from uniform values if not provided.
+  const schedule = input.weeklySchedule ?? scheduleFromUniform(input.totalMinutes, input.daysOfWeek);
+  const derivedDays = daysFromSchedule(schedule);
+  // totalMinutes stored as max of schedule values for backward compat.
+  const derivedTotalMinutes = Math.max(...Object.values(schedule), 0);
+
   await database.insert(timerBuckets).values({
     id,
     name: input.name,
-    totalMinutes: input.totalMinutes,
+    totalMinutes: derivedTotalMinutes,
     colorIndex: input.colorIndex,
-    daysOfWeek: JSON.stringify(input.daysOfWeek),
+    daysOfWeek: JSON.stringify(derivedDays),
+    weeklySchedule: JSON.stringify(schedule),
     sortOrder,
     createdAt: now,
     updatedAt: now,
@@ -137,9 +189,10 @@ export async function createBucket(
   return {
     id,
     name: input.name,
-    totalMinutes: input.totalMinutes,
+    totalMinutes: derivedTotalMinutes,
     colorIndex: input.colorIndex,
-    daysOfWeek: input.daysOfWeek,
+    daysOfWeek: derivedDays,
+    weeklySchedule: schedule,
     sortOrder,
     deactivatedAt: null,
     createdAt: now,
@@ -155,12 +208,28 @@ export async function updateBucket(
 ): Promise<TimerBucketRow | undefined> {
   const setFields: Partial<TimerBucketDbRow> = { updatedAt: Date.now() };
   if (updates.name !== undefined) setFields.name = updates.name;
-  if (updates.totalMinutes !== undefined) setFields.totalMinutes = updates.totalMinutes;
   if (updates.colorIndex !== undefined) setFields.colorIndex = updates.colorIndex;
-  if (updates.daysOfWeek !== undefined) setFields.daysOfWeek = JSON.stringify(updates.daysOfWeek);
   if (updates.sortOrder !== undefined) setFields.sortOrder = updates.sortOrder;
   // Use !== undefined (not truthy check) because null is valid (reactivation)
   if (updates.deactivatedAt !== undefined) setFields.deactivatedAt = updates.deactivatedAt;
+
+  if (updates.weeklySchedule !== undefined) {
+    // weeklySchedule provided — it's the source of truth; derive the legacy fields.
+    setFields.weeklySchedule = JSON.stringify(updates.weeklySchedule);
+    setFields.daysOfWeek = JSON.stringify(daysFromSchedule(updates.weeklySchedule));
+    setFields.totalMinutes = Math.max(...Object.values(updates.weeklySchedule), 0);
+  } else if (updates.totalMinutes !== undefined || updates.daysOfWeek !== undefined) {
+    // Legacy callers updating totalMinutes/daysOfWeek — rebuild weeklySchedule.
+    // We need the current bucket state to fill in what wasn't provided.
+    const existing = await database.select().from(timerBuckets).where(eq(timerBuckets.id, id));
+    if (existing[0]) {
+      const currentDays = updates.daysOfWeek ?? (JSON.parse(existing[0].daysOfWeek) as number[]);
+      const currentMinutes = updates.totalMinutes ?? existing[0].totalMinutes;
+      setFields.weeklySchedule = JSON.stringify(scheduleFromUniform(currentMinutes, currentDays));
+      if (updates.totalMinutes !== undefined) setFields.totalMinutes = updates.totalMinutes;
+      if (updates.daysOfWeek !== undefined) setFields.daysOfWeek = JSON.stringify(updates.daysOfWeek);
+    }
+  }
 
   await database
     .update(timerBuckets)

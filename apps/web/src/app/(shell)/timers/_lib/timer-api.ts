@@ -12,6 +12,7 @@ export interface ServerBucket {
   totalMinutes: number;
   colorIndex: number;
   daysOfWeek: number[];
+  weeklySchedule: Record<string, number> | null;
   sortOrder: number;
   elapsedSeconds: number;
   startedAt: string | null;
@@ -45,6 +46,7 @@ export interface BucketResponse {
   totalMinutes: number;
   colorIndex: number;
   daysOfWeek: number[];
+  weeklySchedule: Record<string, number> | null;
   sortOrder: number;
   deactivatedAt: number | null;
   createdAt: number;
@@ -57,6 +59,7 @@ export interface CreateBucketInput {
   totalMinutes: number;
   colorIndex: number;
   daysOfWeek: number[];
+  weeklySchedule?: Record<string, number>;
 }
 
 /** Input for updating a bucket (all fields optional). */
@@ -65,6 +68,7 @@ export interface UpdateBucketInput {
   totalMinutes?: number;
   colorIndex?: number;
   daysOfWeek?: number[];
+  weeklySchedule?: Record<string, number>;
   sortOrder?: number;
   deactivatedAt?: number | null;
 }

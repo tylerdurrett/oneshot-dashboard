@@ -92,6 +92,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
       elapsedSeconds: 0,
       colorIndex: nextAvailableColorIndex(allBucketsRef.current),
       daysOfWeek: ALL_DAYS,
+      weeklySchedule: null,
       startedAt: null,
       goalReachedAt: null,
       dismissedAt: null,

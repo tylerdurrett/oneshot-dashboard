@@ -49,8 +49,11 @@ function formatDuration(totalMinutes: number): string {
   return `${h}h ${m}m`;
 }
 
-/** Compute weekly commitment for sorting: totalMinutes * active days. */
+/** Compute weekly commitment for sorting: sum of all per-day targets. */
 function weeklyCommitment(bucket: BucketResponse): number {
+  if (bucket.weeklySchedule) {
+    return Object.values(bucket.weeklySchedule).reduce((sum, m) => sum + m, 0);
+  }
   return bucket.totalMinutes * bucket.daysOfWeek.length;
 }
 
@@ -63,6 +66,7 @@ function bucketResponseToTimeBucket(b: BucketResponse): TimeBucket {
     elapsedSeconds: 0,
     colorIndex: b.colorIndex,
     daysOfWeek: b.daysOfWeek,
+    weeklySchedule: b.weeklySchedule,
     startedAt: null,
     goalReachedAt: null,
     dismissedAt: null,
@@ -109,12 +113,13 @@ export default function SettingsPage() {
   };
 
   const handleSave = (id: string, updates: Partial<TimeBucket>) => {
-    const { name, totalMinutes, colorIndex, daysOfWeek } = updates;
+    const { name, totalMinutes, colorIndex, daysOfWeek, weeklySchedule } = updates;
     const serverUpdates: UpdateBucketInput = {
       ...(name !== undefined && { name }),
       ...(totalMinutes !== undefined && { totalMinutes }),
       ...(colorIndex !== undefined && { colorIndex }),
       ...(daysOfWeek !== undefined && { daysOfWeek }),
+      ...(weeklySchedule != null && { weeklySchedule }),
     };
     updateMutation.mutate({ id, updates: serverUpdates });
   };
@@ -148,7 +153,8 @@ export default function SettingsPage() {
           {sortedBuckets.map((bucket) => {
             const isDeactivated = bucket.deactivatedAt !== null;
             const color = BUCKET_COLORS[bucket.colorIndex] ?? BUCKET_COLORS[0]!;
-            const subtitle = `${formatDuration(bucket.totalMinutes)} / ${formatDaysOfWeek(bucket.daysOfWeek)}`;
+            const weeklyTotal = weeklyCommitment(bucket);
+            const subtitle = `${formatDuration(weeklyTotal)}/week · ${formatDaysOfWeek(bucket.daysOfWeek)}`;
 
             return (
               <button

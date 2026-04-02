@@ -27,6 +27,7 @@ export const timerBuckets = sqliteTable('timer_buckets', {
   totalMinutes: integer('total_minutes').notNull(),
   colorIndex: integer('color_index').notNull(),
   daysOfWeek: text('days_of_week').notNull(), // JSON array string, e.g. "[1,2,3,4,5]"
+  weeklySchedule: text('weekly_schedule'), // JSON object mapping day-of-week to minutes, e.g. '{"1":120,"2":120}'
   sortOrder: integer('sort_order').notNull().default(0),
   deactivatedAt: integer('deactivated_at'), // nullable — null means active, timestamp means deactivated
   createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),

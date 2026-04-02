@@ -181,9 +181,9 @@ export async function timerRoutes(
   server.post<{ Body: CreateBucketInput }>(
     '/timers/buckets',
     async (request, reply) => {
-      const { name, totalMinutes, colorIndex, daysOfWeek } = request.body;
+      const { name, totalMinutes, colorIndex, daysOfWeek, weeklySchedule } = request.body;
       const bucket = await createBucket(
-        { name, totalMinutes, colorIndex, daysOfWeek },
+        { name, totalMinutes, colorIndex, daysOfWeek, weeklySchedule },
         db,
       );
       return reply.status(201).send({ bucket });

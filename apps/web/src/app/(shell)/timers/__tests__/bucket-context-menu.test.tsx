@@ -20,6 +20,7 @@ function makeBucket(overrides: Partial<TimeBucket> = {}): TimeBucket {
     elapsedSeconds: 900, // 15 minutes elapsed → 45 minutes remaining
     colorIndex: 0,
     daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    weeklySchedule: null,
     startedAt: null,
     goalReachedAt: null,
     dismissedAt: null,

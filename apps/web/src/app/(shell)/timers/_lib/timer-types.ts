@@ -9,7 +9,7 @@
 export interface TimeBucket {
   id: string;
   name: string;
-  /** Total allocated time in minutes (the daily goal/budget). */
+  /** Total allocated time in minutes (the daily goal/budget). With weeklySchedule, this is the resolved goal for today. */
   totalMinutes: number;
   /** Seconds elapsed today (resets daily at 3 AM). Can exceed totalMinutes * 60. */
   elapsedSeconds: number;
@@ -17,6 +17,8 @@ export interface TimeBucket {
   colorIndex: number;
   /** Days of the week this bucket is active (0 = Sunday … 6 = Saturday). */
   daysOfWeek: number[];
+  /** Per-day schedule mapping day-of-week ("0"-"6") to target minutes. Null for legacy buckets. */
+  weeklySchedule: Record<string, number> | null;
   /** ISO timestamp if timer is currently running, null if paused/stopped. */
   startedAt: string | null;
   /** ISO timestamp when elapsed first reached totalMinutes goal, null if not yet reached. */

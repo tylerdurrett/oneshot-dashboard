@@ -5,6 +5,8 @@ import {
   RESET_HOUR,
   elapsedSince,
   getResetDate,
+  getResetDayOfWeek,
+  resolveTargetMinutes,
   markGoalReached,
   stopAllRunningTimers,
 } from './timer-progress.js';
@@ -57,6 +59,8 @@ export class TimerScheduler {
   async init(now: Date = new Date()): Promise<void> {
     const todayDate = getResetDate(now);
 
+    const dayOfWeek = getResetDayOfWeek(now);
+
     const running = await this.database
       .select({
         progressId: timerDailyProgress.id,
@@ -66,6 +70,7 @@ export class TimerScheduler {
         startedAt: timerDailyProgress.startedAt,
         goalReachedAt: timerDailyProgress.goalReachedAt,
         totalMinutes: timerBuckets.totalMinutes,
+        weeklySchedule: timerBuckets.weeklySchedule,
         targetMinutesOverride: timerDailyProgress.targetMinutesOverride,
       })
       .from(timerDailyProgress)
@@ -86,7 +91,13 @@ export class TimerScheduler {
           })
           .where(eq(timerDailyProgress.id, row.progressId));
       } else {
-        const totalSeconds = (row.targetMinutesOverride ?? row.totalMinutes) * 60;
+        const schedule = row.weeklySchedule ? (JSON.parse(row.weeklySchedule) as Record<string, number>) : null;
+        const totalSeconds = resolveTargetMinutes(
+          row.targetMinutesOverride,
+          schedule,
+          row.totalMinutes,
+          dayOfWeek,
+        ) * 60;
         const totalElapsed = row.elapsedSeconds + elapsed;
 
         if (totalElapsed >= totalSeconds && !row.goalReachedAt) {

@@ -46,6 +46,7 @@ function makeBucket(overrides: Partial<BucketResponse> = {}): BucketResponse {
     totalMinutes: 60,
     colorIndex: 0,
     daysOfWeek: [1, 2, 3, 4, 5],
+    weeklySchedule: null,
     sortOrder: 0,
     deactivatedAt: null,
     createdAt: 1000,
@@ -204,7 +205,8 @@ describe('SettingsPage', () => {
       isLoading: false,
     });
     renderPage();
-    expect(screen.getByText('3h / Weekdays')).toBeDefined();
+    // 180 min * 5 days = 900 min = 15h/week
+    expect(screen.getByText('15h/week · Weekdays')).toBeDefined();
   });
 
   it('shows "Every day" for all-week buckets', () => {
@@ -215,6 +217,7 @@ describe('SettingsPage', () => {
       isLoading: false,
     });
     renderPage();
-    expect(screen.getByText('30m / Every day')).toBeDefined();
+    // 30 min * 7 days = 210 min = 3h 30m/week
+    expect(screen.getByText('3h 30m/week · Every day')).toBeDefined();
   });
 });

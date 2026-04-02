@@ -54,6 +54,7 @@ function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
     elapsedSeconds,
     colorIndex: sb.colorIndex,
     daysOfWeek: sb.daysOfWeek,
+    weeklySchedule: sb.weeklySchedule,
     startedAt: sb.startedAt,
     goalReachedAt: sb.goalReachedAt,
     dismissedAt: sb.dismissedAt,
@@ -282,6 +283,7 @@ export function useTimerState(): UseTimerStateReturn {
         totalMinutes: bucket.totalMinutes,
         colorIndex: bucket.colorIndex,
         daysOfWeek: bucket.daysOfWeek,
+        ...(bucket.weeklySchedule && { weeklySchedule: bucket.weeklySchedule }),
       });
     },
     [createMutation],
@@ -297,12 +299,13 @@ export function useTimerState(): UseTimerStateReturn {
 
   const updateBucketFn = useCallback(
     (id: string, updates: Partial<TimeBucket>) => {
-      const { name, totalMinutes, colorIndex, daysOfWeek } = updates;
+      const { name, totalMinutes, colorIndex, daysOfWeek, weeklySchedule } = updates;
       const serverUpdates: UpdateBucketInput = {
         ...(name !== undefined && { name }),
         ...(totalMinutes !== undefined && { totalMinutes }),
         ...(colorIndex !== undefined && { colorIndex }),
         ...(daysOfWeek !== undefined && { daysOfWeek }),
+        ...(weeklySchedule != null && { weeklySchedule }),
       };
       updateMutation.mutate({ id, updates: serverUpdates });
     },

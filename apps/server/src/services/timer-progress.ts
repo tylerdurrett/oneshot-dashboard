@@ -1,6 +1,7 @@
 import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { db as defaultDb, timerBuckets, timerDailyProgress } from '@repo/db';
 import type { Database } from './thread.js';
+import { daysFromSchedule, minutesForDay } from './timer-bucket.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,6 +14,7 @@ export interface TodayBucketState {
   totalMinutes: number;
   colorIndex: number;
   daysOfWeek: number[];
+  weeklySchedule: Record<string, number> | null;
   sortOrder: number;
   elapsedSeconds: number;
   startedAt: string | null;
@@ -52,20 +54,45 @@ export function elapsedSince(startedAt: string, now: Date): number {
   return Math.floor((now.getTime() - new Date(startedAt).getTime()) / 1000);
 }
 
+/** Adjust a date for the 3AM day boundary: before RESET_HOUR counts as previous day. */
+function getAdjustedDate(now: Date): Date {
+  const adjusted = new Date(now);
+  if (adjusted.getHours() < RESET_HOUR) {
+    adjusted.setDate(adjusted.getDate() - 1);
+  }
+  return adjusted;
+}
+
 /**
  * Return today's date as `YYYY-MM-DD`, treating times before 3 AM as the
  * previous calendar day. Replicates the client-side logic so the server
  * is the source of truth for date boundaries.
  */
 export function getResetDate(now: Date = new Date()): string {
-  const adjusted = new Date(now);
-  if (adjusted.getHours() < RESET_HOUR) {
-    adjusted.setDate(adjusted.getDate() - 1);
-  }
+  const adjusted = getAdjustedDate(now);
   const year = adjusted.getFullYear();
   const month = String(adjusted.getMonth() + 1).padStart(2, '0');
   const day = String(adjusted.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/** Get the effective day-of-week (0=Sunday) for schedule lookup, respecting the 3AM boundary. */
+export function getResetDayOfWeek(now: Date = new Date()): number {
+  return getAdjustedDate(now).getDay();
+}
+
+/**
+ * Resolve the target minutes for a bucket on a given day.
+ * Priority: daily override → weeklySchedule → totalMinutes fallback.
+ */
+export function resolveTargetMinutes(
+  override: number | null | undefined,
+  schedule: Record<string, number> | null | undefined,
+  totalMinutes: number,
+  dayOfWeek: number,
+): number {
+  if (override != null) return override;
+  return minutesForDay(schedule ?? null, dayOfWeek, totalMinutes);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +109,7 @@ export async function getTodayState(
   now: Date = new Date(),
 ): Promise<TodayStateResult> {
   const date = getResetDate(now);
+  const dayOfWeek = getResetDayOfWeek(now);
 
   const rows = await database
     .select()
@@ -102,13 +130,24 @@ export async function getTodayState(
   for (const row of rows) {
     const bucket = row.timer_buckets;
     const progress = row.timer_daily_progress;
+    const schedule = bucket.weeklySchedule
+      ? (JSON.parse(bucket.weeklySchedule) as Record<string, number>)
+      : null;
 
     buckets.push({
       id: bucket.id,
       name: bucket.name,
-      totalMinutes: progress?.targetMinutesOverride ?? bucket.totalMinutes,
+      totalMinutes: resolveTargetMinutes(
+        progress?.targetMinutesOverride,
+        schedule,
+        bucket.totalMinutes,
+        dayOfWeek,
+      ),
       colorIndex: bucket.colorIndex,
-      daysOfWeek: JSON.parse(bucket.daysOfWeek) as number[],
+      daysOfWeek: schedule
+        ? daysFromSchedule(schedule)
+        : (JSON.parse(bucket.daysOfWeek) as number[]),
+      weeklySchedule: schedule,
       sortOrder: bucket.sortOrder,
       elapsedSeconds: progress?.elapsedSeconds ?? 0,
       startedAt: progress?.startedAt ?? null,
@@ -202,6 +241,8 @@ export async function stopTimer(
 ): Promise<StopTimerResult> {
   const date = getResetDate(now);
 
+  const dayOfWeek = getResetDayOfWeek(now);
+
   const rows = await database
     .select({
       id: timerDailyProgress.id,
@@ -209,6 +250,7 @@ export async function stopTimer(
       startedAt: timerDailyProgress.startedAt,
       goalReachedAt: timerDailyProgress.goalReachedAt,
       totalMinutes: timerBuckets.totalMinutes,
+      weeklySchedule: timerBuckets.weeklySchedule,
       targetMinutesOverride: timerDailyProgress.targetMinutesOverride,
     })
     .from(timerDailyProgress)
@@ -226,7 +268,13 @@ export async function stopTimer(
 
   const row = rows[0]!;
   const elapsedSeconds = row.elapsedSeconds + elapsedSince(row.startedAt!, now);
-  const totalSeconds = (row.targetMinutesOverride ?? row.totalMinutes) * 60;
+  const schedule = row.weeklySchedule ? (JSON.parse(row.weeklySchedule) as Record<string, number>) : null;
+  const totalSeconds = resolveTargetMinutes(
+    row.targetMinutesOverride,
+    schedule,
+    row.totalMinutes,
+    dayOfWeek,
+  ) * 60;
   // If the background scheduler missed the goal-reached moment, stopping an
   // overdue timer still needs to persist completion so Remaining can hide it.
   const goalReachedAt =
@@ -395,9 +443,12 @@ export async function computeGoalMs(
 ): Promise<number | null> {
   const date = getResetDate(now);
 
+  const dayOfWeek = getResetDayOfWeek(now);
+
   const rows = await database
     .select({
       totalMinutes: timerBuckets.totalMinutes,
+      weeklySchedule: timerBuckets.weeklySchedule,
       targetMinutesOverride: timerDailyProgress.targetMinutesOverride,
       elapsedSeconds: timerDailyProgress.elapsedSeconds,
       startedAt: timerDailyProgress.startedAt,
@@ -415,7 +466,13 @@ export async function computeGoalMs(
   if (rows.length === 0 || !rows[0]!.startedAt) return null;
   if (rows[0]!.goalReachedAt) return null;
 
-  const totalSeconds = (rows[0]!.targetMinutesOverride ?? rows[0]!.totalMinutes) * 60;
+  const schedule = rows[0]!.weeklySchedule ? (JSON.parse(rows[0]!.weeklySchedule) as Record<string, number>) : null;
+  const totalSeconds = resolveTargetMinutes(
+    rows[0]!.targetMinutesOverride,
+    schedule,
+    rows[0]!.totalMinutes,
+    dayOfWeek,
+  ) * 60;
   const remainingSeconds = totalSeconds - rows[0]!.elapsedSeconds;
 
   if (remainingSeconds <= 0) return null;
