@@ -57,6 +57,7 @@ function serverBucketToTimeBucket(sb: ServerBucket, now: Date): TimeBucket {
     startedAt: sb.startedAt,
     goalReachedAt: sb.goalReachedAt,
     dismissedAt: sb.dismissedAt,
+    deactivatedAt: null, // getTodayState already filters out deactivated buckets
   };
 }
 

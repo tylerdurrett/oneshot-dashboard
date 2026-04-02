@@ -20,6 +20,7 @@ function makeBucket(
     startedAt: null,
     goalReachedAt: null,
     dismissedAt: null,
+    deactivatedAt: null,
   };
 }
 

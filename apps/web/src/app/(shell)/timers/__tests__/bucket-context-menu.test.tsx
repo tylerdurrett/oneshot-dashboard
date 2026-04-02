@@ -23,6 +23,7 @@ function makeBucket(overrides: Partial<TimeBucket> = {}): TimeBucket {
     startedAt: null,
     goalReachedAt: null,
     dismissedAt: null,
+    deactivatedAt: null,
     ...overrides,
   };
 }

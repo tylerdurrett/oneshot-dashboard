@@ -118,6 +118,7 @@ const bucketList = [
     colorIndex: 0,
     daysOfWeek: [1, 2, 3, 4, 5],
     sortOrder: 0,
+    deactivatedAt: null,
     createdAt: 1000,
     updatedAt: 1000,
   },

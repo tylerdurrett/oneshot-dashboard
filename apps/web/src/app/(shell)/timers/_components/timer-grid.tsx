@@ -95,6 +95,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
       startedAt: null,
       goalReachedAt: null,
       dismissedAt: null,
+      deactivatedAt: null,
     };
     addBucket(newBucket);
     setSelectedBucketId(newBucket.id);

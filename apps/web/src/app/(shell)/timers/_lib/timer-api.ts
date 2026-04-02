@@ -46,6 +46,7 @@ export interface BucketResponse {
   colorIndex: number;
   daysOfWeek: number[];
   sortOrder: number;
+  deactivatedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -65,6 +66,7 @@ export interface UpdateBucketInput {
   colorIndex?: number;
   daysOfWeek?: number[];
   sortOrder?: number;
+  deactivatedAt?: number | null;
 }
 
 // ---------------------------------------------------------------------------

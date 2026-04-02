@@ -144,6 +144,38 @@ describe('getTodayState', () => {
     const result = await getTodayState(testDb, now);
     expect(result.buckets[0]!.daysOfWeek).toEqual([1, 3, 5]);
   });
+
+  it('excludes deactivated buckets', async () => {
+    const { updateBucket } = await import('../services/timer-bucket.js');
+
+    await seedBucket(testDb, { name: 'Active', sortOrder: 0 });
+    const deactivated = await seedBucket(testDb, { name: 'Deactivated', sortOrder: 1 });
+    await updateBucket(deactivated.id, { deactivatedAt: Date.now() }, testDb);
+
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+    const result = await getTodayState(testDb, now);
+
+    expect(result.buckets).toHaveLength(1);
+    expect(result.buckets[0]!.name).toBe('Active');
+  });
+
+  it('includes reactivated buckets', async () => {
+    const { updateBucket } = await import('../services/timer-bucket.js');
+
+    const bucket = await seedBucket(testDb, { name: 'Toggled' });
+
+    // Deactivate
+    await updateBucket(bucket.id, { deactivatedAt: Date.now() }, testDb);
+    const now = new Date(2026, 2, 24, 10, 0, 0);
+    let result = await getTodayState(testDb, now);
+    expect(result.buckets).toHaveLength(0);
+
+    // Reactivate
+    await updateBucket(bucket.id, { deactivatedAt: null }, testDb);
+    result = await getTodayState(testDb, now);
+    expect(result.buckets).toHaveLength(1);
+    expect(result.buckets[0]!.name).toBe('Toggled');
+  });
 });
 
 // ---------------------------------------------------------------------------

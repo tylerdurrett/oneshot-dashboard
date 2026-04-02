@@ -43,6 +43,7 @@ export function createTimerTestDb(): Database {
       color_index INTEGER NOT NULL,
       days_of_week TEXT NOT NULL,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      deactivated_at INTEGER,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

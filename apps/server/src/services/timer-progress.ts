@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull } from 'drizzle-orm';
 import { db as defaultDb, timerBuckets, timerDailyProgress } from '@repo/db';
 import type { Database } from './thread.js';
 
@@ -93,6 +93,8 @@ export async function getTodayState(
         eq(timerDailyProgress.date, date),
       ),
     )
+    // Exclude deactivated buckets from the timer dashboard
+    .where(isNull(timerBuckets.deactivatedAt))
     .orderBy(asc(timerBuckets.sortOrder));
 
   const buckets: TodayBucketState[] = [];

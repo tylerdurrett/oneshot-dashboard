@@ -367,4 +367,69 @@ describe('bucket CRUD', () => {
       expect(progress[0]!.bucketId).toBe(keep.id);
     });
   });
+
+  describe('deactivation', () => {
+    it('new buckets have deactivatedAt null', async () => {
+      const bucket = await createBucket(
+        { name: 'Active', totalMinutes: 60, colorIndex: 0, daysOfWeek: [1, 2, 3] },
+        testDb,
+      );
+      expect(bucket.deactivatedAt).toBeNull();
+    });
+
+    it('deactivates a bucket by setting deactivatedAt timestamp', async () => {
+      const bucket = await createBucket(
+        { name: 'Test', totalMinutes: 60, colorIndex: 0, daysOfWeek: [1] },
+        testDb,
+      );
+      const now = Date.now();
+
+      const updated = await updateBucket(bucket.id, { deactivatedAt: now }, testDb);
+      expect(updated).toBeDefined();
+      expect(updated!.deactivatedAt).toBe(now);
+    });
+
+    it('reactivates a bucket by setting deactivatedAt to null', async () => {
+      const bucket = await createBucket(
+        { name: 'Test', totalMinutes: 60, colorIndex: 0, daysOfWeek: [1] },
+        testDb,
+      );
+
+      // Deactivate first
+      await updateBucket(bucket.id, { deactivatedAt: Date.now() }, testDb);
+
+      // Reactivate
+      const reactivated = await updateBucket(bucket.id, { deactivatedAt: null }, testDb);
+      expect(reactivated).toBeDefined();
+      expect(reactivated!.deactivatedAt).toBeNull();
+    });
+
+    it('listBuckets includes deactivated buckets', async () => {
+      const active = await createBucket(
+        { name: 'Active', totalMinutes: 60, colorIndex: 0, daysOfWeek: [1] },
+        testDb,
+      );
+      const deactivated = await createBucket(
+        { name: 'Deactivated', totalMinutes: 60, colorIndex: 1, daysOfWeek: [1] },
+        testDb,
+      );
+      await updateBucket(deactivated.id, { deactivatedAt: Date.now() }, testDb);
+
+      const buckets = await listBuckets(testDb);
+      expect(buckets).toHaveLength(2);
+      expect(buckets.map((b) => b.name).sort()).toEqual(['Active', 'Deactivated']);
+    });
+
+    it('preserves schedule when deactivating', async () => {
+      const bucket = await createBucket(
+        { name: 'Test', totalMinutes: 120, colorIndex: 0, daysOfWeek: [1, 3, 5] },
+        testDb,
+      );
+
+      const updated = await updateBucket(bucket.id, { deactivatedAt: Date.now() }, testDb);
+      // Original schedule fields should be untouched
+      expect(updated!.totalMinutes).toBe(120);
+      expect(updated!.daysOfWeek).toEqual([1, 3, 5]);
+    });
+  });
 });

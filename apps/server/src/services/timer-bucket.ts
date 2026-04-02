@@ -10,6 +10,7 @@ export interface TimerBucketRow {
   colorIndex: number;
   daysOfWeek: number[];
   sortOrder: number;
+  deactivatedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -30,6 +31,7 @@ export interface UpdateBucketInput {
   colorIndex?: number;
   daysOfWeek?: number[];
   sortOrder?: number;
+  deactivatedAt?: number | null; // null to reactivate, timestamp to deactivate
 }
 
 /** Raw row shape from the timerBuckets table (daysOfWeek is a JSON string in DB). */
@@ -139,6 +141,7 @@ export async function createBucket(
     colorIndex: input.colorIndex,
     daysOfWeek: input.daysOfWeek,
     sortOrder,
+    deactivatedAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -156,6 +159,8 @@ export async function updateBucket(
   if (updates.colorIndex !== undefined) setFields.colorIndex = updates.colorIndex;
   if (updates.daysOfWeek !== undefined) setFields.daysOfWeek = JSON.stringify(updates.daysOfWeek);
   if (updates.sortOrder !== undefined) setFields.sortOrder = updates.sortOrder;
+  // Use !== undefined (not truthy check) because null is valid (reactivation)
+  if (updates.deactivatedAt !== undefined) setFields.deactivatedAt = updates.deactivatedAt;
 
   await database
     .update(timerBuckets)

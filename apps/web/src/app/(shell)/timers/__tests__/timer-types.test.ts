@@ -68,6 +68,7 @@ describe('isBucketActiveToday', () => {
     startedAt: null,
     goalReachedAt: null,
     dismissedAt: null,
+    deactivatedAt: null,
   });
 
   it('returns true when today is in the bucket daysOfWeek', () => {
@@ -218,6 +219,7 @@ describe('getTotalTimeStats', () => {
     startedAt: null,
     goalReachedAt: null,
     dismissedAt: null,
+    deactivatedAt: null,
     ...overrides,
   });
 

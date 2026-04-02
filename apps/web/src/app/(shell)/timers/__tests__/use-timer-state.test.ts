@@ -365,6 +365,7 @@ describe('useTimerState', () => {
       colorIndex: 7,
       daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
       sortOrder: 1,
+      deactivatedAt: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });
@@ -386,6 +387,7 @@ describe('useTimerState', () => {
         startedAt: null,
         goalReachedAt: null,
         dismissedAt: null,
+        deactivatedAt: null,
       }),
     );
 
@@ -427,6 +429,7 @@ describe('useTimerState', () => {
       colorIndex: 0,
       daysOfWeek: [1, 2, 3, 4, 5],
       sortOrder: 0,
+      deactivatedAt: null,
       createdAt: 1000,
       updatedAt: Date.now(),
     });
