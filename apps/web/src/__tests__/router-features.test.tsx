@@ -23,6 +23,12 @@ vi.mock('@/lib/features', () => ({
   getHomeRedirectPath: () => mockState.homePath,
 }));
 
+// Force desktop layout — jsdom has no real viewport width, so useIsMobile
+// would return true. Feature-flag tests exercise the desktop (Outlet) path.
+vi.mock('@/hooks/use-is-mobile', () => ({
+  useIsMobile: () => false,
+}));
+
 // Stub browser APIs missing in jsdom
 beforeAll(() => {
   if (!globalThis.EventSource) {

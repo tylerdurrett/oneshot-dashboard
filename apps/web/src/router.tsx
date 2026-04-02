@@ -1,7 +1,9 @@
 import { createBrowserRouter, Outlet, redirect } from 'react-router';
 
 import { AppShell } from '@/components/app-shell';
+import { MobileShellLayout } from '@/components/mobile-shell-layout';
 import { RouteErrorBoundary } from '@/components/error-boundary';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import TimersLayout from '@/app/(shell)/timers/layout';
 import TimersPage from '@/app/(shell)/timers/page';
 import TimersAllPage from '@/app/(shell)/timers/all-page';
@@ -23,11 +25,18 @@ import { features, getHomeRedirectPath } from '@/lib/features';
 // ---------------------------------------------------------------------------
 
 function ShellLayout() {
-  const content = (
+  const isMobile = useIsMobile();
+
+  // On mobile, MobileShellLayout renders all pages in a swipeable strip
+  // instead of relying on Outlet. Desktop keeps the standard Outlet flow.
+  const content = isMobile ? (
+    <MobileShellLayout />
+  ) : (
     <AppShell>
       <Outlet />
     </AppShell>
   );
+
   return features.chat ? <ChatRunProvider>{content}</ChatRunProvider> : content;
 }
 

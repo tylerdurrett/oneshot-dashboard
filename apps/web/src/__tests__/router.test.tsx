@@ -50,6 +50,12 @@ vi.mock('../app/(shell)/chat/chat-run-context', async () => {
   };
 });
 
+// Force desktop layout — jsdom has no real viewport width, so useIsMobile
+// would return true. Router tests exercise the desktop (Outlet) path.
+vi.mock('@/hooks/use-is-mobile', () => ({
+  useIsMobile: () => false,
+}));
+
 // Stub browser APIs missing in jsdom — real page components use SSE and ResizeObserver.
 beforeAll(() => {
   if (!globalThis.EventSource) {

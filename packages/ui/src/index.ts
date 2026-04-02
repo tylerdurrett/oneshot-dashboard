@@ -41,6 +41,8 @@ export { ConfirmationDialog } from './components/confirmation-dialog';
 export type { ConfirmationDialogProps } from './components/confirmation-dialog';
 
 export { Spinner } from './components/spinner';
+export { SwipeView, computeSnapIndex } from './components/swipe-view';
+export type { SwipeViewProps } from './components/swipe-view';
 
 // AI Elements
 export * from './components/ai-elements/conversation';

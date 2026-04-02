@@ -1,45 +1,12 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router';
-import { Circle, CircleCheckBig, Plus, Settings } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { motion, useTransform, type MotionValue } from 'motion/react';
 import { cn } from '@repo/ui';
 
 import { ADD_BUCKET_EVENT } from '@/app/(shell)/timers/_lib/timer-types';
-import { features } from '@/lib/features';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface NavItem {
-  href: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  matchType: 'exact' | 'prefix';
-  /** If true, a context menu with extra actions is shown on right-click / long-press. */
-  hasContextMenu?: boolean;
-  /** Feature flag key — item is hidden when its feature is disabled. */
-  feature?: keyof typeof features;
-}
-
-// ---------------------------------------------------------------------------
-// Nav items — filtered by feature flags at module load time.
-// ---------------------------------------------------------------------------
-
-const ALL_NAV_ITEMS: NavItem[] = [
-  { href: '/timers/remaining', label: 'To Do', icon: Circle, matchType: 'exact', hasContextMenu: true, feature: 'timers' },
-  { href: '/timers/all', label: 'Done', icon: CircleCheckBig, matchType: 'exact', feature: 'timers' },
-  { href: '/settings', label: 'Settings', icon: Settings, matchType: 'prefix' },
-];
-
-const NAV_ITEMS = ALL_NAV_ITEMS.filter(
-  (item) => !item.feature || features[item.feature],
-);
-
-function isItemActive(item: NavItem, pathname: string): boolean {
-  if (item.matchType === 'exact') return pathname === item.href;
-  return pathname === item.href || pathname.startsWith(item.href + '/');
-}
+import { type NavItem, NAV_ITEMS, isItemActive } from '@/lib/nav-items';
 
 // ---------------------------------------------------------------------------
 // Long-press / context-menu constants
@@ -385,7 +352,33 @@ function renderNavItem(item: NavItem, isMobile: boolean, isActive: boolean) {
 // App shell
 // ---------------------------------------------------------------------------
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+// ---------------------------------------------------------------------------
+// Nav indicator — uses MotionValue + useTransform so it follows the drag
+// position without triggering React re-renders.
+// ---------------------------------------------------------------------------
+
+const INDICATOR_WIDTH = `${100 / NAV_ITEMS.length}%`;
+
+function NavIndicator({ fractionalIndex }: { fractionalIndex: MotionValue<number> }) {
+  const x = useTransform(fractionalIndex, (v) => `${v * 100}%`);
+  return (
+    <motion.div
+      className="absolute top-0 h-0.5 bg-sidebar-foreground/50 rounded-full"
+      style={{ width: INDICATOR_WIDTH, x }}
+    />
+  );
+}
+
+export function AppShell({
+  children,
+  fractionalIndex,
+}: {
+  children: React.ReactNode;
+  /** When provided (mobile swipe mode), a sliding indicator follows the drag
+   *  position across the bottom nav. Values are fractional page indices.
+   *  Accepts a MotionValue to avoid re-renders during drag. */
+  fractionalIndex?: MotionValue<number>;
+}) {
   const { pathname } = useLocation();
   const isStandaloneMode = useStandaloneMode();
 
@@ -416,8 +409,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile bottom nav */}
       <nav
         aria-label="Bottom navigation"
-        className="app-shell-mobile-nav flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb select-none"
+        className="app-shell-mobile-nav relative flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb select-none"
       >
+        {/* Sliding indicator — driven by a MotionValue so it tracks the
+             finger without triggering React re-renders during drag. */}
+        {fractionalIndex != null && NAV_ITEMS.length > 0 && (
+          <NavIndicator fractionalIndex={fractionalIndex} />
+        )}
         {NAV_ITEMS.map((item) =>
           renderNavItem(item, true, isItemActive(item, pathname)),
         )}

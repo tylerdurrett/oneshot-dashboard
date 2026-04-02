@@ -21,6 +21,7 @@
     "@repo/video": "workspace:*",
     "@tanstack/react-query": "^5.90.21",
     "lucide-react": "^0.474.0",
+    "motion": "^12.38.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router": "^7.0.0"
