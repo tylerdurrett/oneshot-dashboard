@@ -593,6 +593,8 @@ describe('dismissBucket', () => {
     expect(rows[0]!.dismissedAt).toBe(now.toISOString());
     expect(rows[0]!.elapsedSeconds).toBe(0);
     expect(rows[0]!.startedAt).toBeNull();
+    // Dismiss sets today's goal to zero
+    expect(rows[0]!.targetMinutesOverride).toBe(0);
   });
 
   it('sets dismissedAt on an existing non-running progress row', async () => {
@@ -616,16 +618,17 @@ describe('dismissBucket', () => {
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows).toHaveLength(1);
     expect(rows[0]!.dismissedAt).toBe(now.toISOString());
-    // Elapsed should be preserved
+    // Previously tracked elapsed time is preserved
     expect(rows[0]!.elapsedSeconds).toBe(300);
+    expect(rows[0]!.targetMinutesOverride).toBe(0);
   });
 
-  it('stops a running timer and sets dismissedAt', async () => {
+  it('stops a running timer without accumulating time', async () => {
     const bucket = await seedBucket(testDb, { totalMinutes: 60 });
     const t1 = new Date(2026, 2, 24, 10, 0, 0);
     await startTimer(bucket.id, testDb, t1);
 
-    // Dismiss 5 minutes later — timer should be stopped with elapsed accumulated
+    // Dismiss 5 minutes later — active session's time should NOT be accumulated
     const t2 = new Date(2026, 2, 24, 10, 5, 0);
     const result = await dismissBucket(bucket.id, testDb, t2);
 
@@ -634,8 +637,36 @@ describe('dismissBucket', () => {
 
     const rows = await testDb.select().from(timerDailyProgress);
     expect(rows[0]!.startedAt).toBeNull();
-    expect(rows[0]!.elapsedSeconds).toBe(300); // 5 minutes accumulated
+    // Active session discarded — no time accumulated
+    expect(rows[0]!.elapsedSeconds).toBe(0);
     expect(rows[0]!.dismissedAt).toBe(t2.toISOString());
+    expect(rows[0]!.targetMinutesOverride).toBe(0);
+  });
+
+  it('preserves previously tracked time when dismissing a running timer', async () => {
+    const bucket = await seedBucket(testDb, { totalMinutes: 60 });
+    const t1 = new Date(2026, 2, 24, 10, 0, 0);
+    await startTimer(bucket.id, testDb, t1);
+
+    // Stop after 5 minutes — accumulates 300s
+    const t2 = new Date(2026, 2, 24, 10, 5, 0);
+    await stopTimer(bucket.id, testDb, t2);
+
+    // Start again, then dismiss 3 minutes later
+    const t3 = new Date(2026, 2, 24, 10, 10, 0);
+    await startTimer(bucket.id, testDb, t3);
+
+    const t4 = new Date(2026, 2, 24, 10, 13, 0);
+    const result = await dismissBucket(bucket.id, testDb, t4);
+
+    expect(result.wasStopped).toBe(true);
+
+    const rows = await testDb.select().from(timerDailyProgress);
+    // The 5 minutes from the first session is preserved,
+    // but the 3 minutes from the active session is discarded
+    expect(rows[0]!.elapsedSeconds).toBe(300);
+    expect(rows[0]!.startedAt).toBeNull();
+    expect(rows[0]!.targetMinutesOverride).toBe(0);
   });
 
   it('getTodayState includes dismissedAt', async () => {

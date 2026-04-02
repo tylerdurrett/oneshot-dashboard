@@ -491,10 +491,11 @@ export interface DismissBucketResult {
 }
 
 /**
- * Dismiss a bucket for today — hides it from the Remaining view until the
- * next 3 AM reset. If the timer is running, stops it first (accumulating
- * elapsed time). The bucket reappears automatically the next day because
- * no progress row exists for the new date.
+ * Dismiss a bucket for today — sets the goal to zero and hides it from the
+ * Remaining view until the next 3 AM reset. If the timer is running, stops
+ * it without accumulating the active session's time (previously tracked
+ * elapsed time is preserved). The bucket reappears automatically the next
+ * day because no progress row exists for the new date.
  */
 export async function dismissBucket(
   bucketId: string,
@@ -517,17 +518,16 @@ export async function dismissBucket(
 
   if (existing.length > 0) {
     const row = existing[0]!;
-    let elapsedSeconds = row.elapsedSeconds;
 
-    // If the timer is running, accumulate elapsed and stop it.
+    // If the timer is running, stop it but do NOT accumulate the active
+    // session's time — dismiss means "skip this today", not "log the time".
     if (row.startedAt) {
-      elapsedSeconds += elapsedSince(row.startedAt, now);
       wasStopped = true;
     }
 
     await database
       .update(timerDailyProgress)
-      .set({ elapsedSeconds, startedAt: null, dismissedAt })
+      .set({ startedAt: null, dismissedAt, targetMinutesOverride: 0 })
       .where(eq(timerDailyProgress.id, row.id));
   } else {
     await database.insert(timerDailyProgress).values({
@@ -537,6 +537,7 @@ export async function dismissBucket(
       elapsedSeconds: 0,
       startedAt: null,
       dismissedAt,
+      targetMinutesOverride: 0,
     });
   }
 
