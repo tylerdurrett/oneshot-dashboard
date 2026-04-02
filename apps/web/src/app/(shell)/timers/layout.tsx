@@ -19,10 +19,10 @@ export default function TimersLayout() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      <TotalTimeIndicator allBuckets={timerState.allBuckets} />
       <div className="timers-content flex-1 min-h-0 min-w-0 overflow-hidden">
         <Outlet context={timerState} />
       </div>
-      <TotalTimeIndicator allBuckets={timerState.allBuckets} />
     </div>
   );
 }
