@@ -12,7 +12,8 @@ import { TimerGridWithState } from '@/app/(shell)/timers/_components/timer-grid'
 import { AllTimerGridWithState } from '@/app/(shell)/timers/_components/all-timer-grid';
 import { TotalTimeIndicator } from '@/app/(shell)/timers/_components/total-time-indicator';
 import SettingsPage from '@/app/(shell)/settings/page';
-import { TIMERS_TITLE, ALL_TIMERS_TITLE } from '@/app/route-metadata';
+import ChatIndexPage from '@/app/(shell)/chat/page';
+import { TIMERS_TITLE, ALL_TIMERS_TITLE, CHAT_TITLE } from '@/app/route-metadata';
 
 import { AppShell } from './app-shell';
 
@@ -23,6 +24,7 @@ import { AppShell } from './app-shell';
 const PAGE_TITLES: Record<string, string> = {
   '/timers/remaining': TIMERS_TITLE,
   '/timers/all': ALL_TIMERS_TITLE,
+  '/chat': CHAT_TITLE,
   '/settings': 'Settings',
 };
 
@@ -100,6 +102,8 @@ export function MobileShellLayout() {
                 Grid={AllTimerGridWithState}
               />
             );
+          case '/chat':
+            return <ChatIndexPage key={page.href} />;
           case '/settings':
             return <SettingsPage key={page.href} />;
           default:

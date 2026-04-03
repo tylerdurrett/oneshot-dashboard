@@ -1,4 +1,4 @@
-import { Circle, CircleCheckBig, Settings } from 'lucide-react';
+import { Circle, CircleCheckBig, MessageSquare, Settings } from 'lucide-react';
 
 import { features } from '@/lib/features';
 
@@ -24,6 +24,7 @@ export interface NavItem {
 export const ALL_NAV_ITEMS: NavItem[] = [
   { href: '/timers/remaining', label: 'To Do', icon: Circle, matchType: 'exact', hasContextMenu: true, feature: 'timers' },
   { href: '/timers/all', label: 'Done', icon: CircleCheckBig, matchType: 'exact', feature: 'timers' },
+  { href: '/chat', label: 'Chat', icon: MessageSquare, matchType: 'prefix', feature: 'chat' },
   { href: '/settings', label: 'Settings', icon: Settings, matchType: 'prefix' },
 ];
 
