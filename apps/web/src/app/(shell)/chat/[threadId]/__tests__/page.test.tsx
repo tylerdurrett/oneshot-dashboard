@@ -137,6 +137,12 @@ describe('ThreadPage', () => {
     expect(hookReturn.setVisibleThreadId).toHaveBeenCalledWith('thread-1');
   });
 
+  it('uses threadId prop when provided instead of useParams', () => {
+    render(<ThreadPage threadId="thread-prop" />);
+    // The prop takes precedence — setVisibleThreadId should receive the prop value
+    expect(hookReturn.setVisibleThreadId).toHaveBeenCalledWith('thread-prop');
+  });
+
   it('submits through the run hook for the active thread', async () => {
     render(<ThreadPage />);
     fireEvent.change(screen.getByTestId('prompt-textarea'), {

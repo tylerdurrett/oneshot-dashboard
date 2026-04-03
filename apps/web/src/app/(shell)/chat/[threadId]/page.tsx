@@ -28,10 +28,11 @@ import { useDeleteThread, useThreadMessages, useThreads, threadKeys } from '../u
 import { ThreadSelector } from '../thread-selector';
 import type { ChatMessage } from '../use-chat-run';
 
-export default function ThreadPage() {
-  // React Router's useParams returns string | undefined; threadId is always
-  // present because the route definition requires it (chat/:threadId).
-  const { threadId } = useParams() as { threadId: string };
+export default function ThreadPage({ threadId: threadIdProp }: { threadId?: string }) {
+  // On desktop, threadId comes from React Router params. On mobile, it's
+  // passed as a prop by MobileChatView (which reads the URL directly).
+  const params = useParams() as { threadId?: string };
+  const threadId = threadIdProp ?? params.threadId!;
   const navigate = useNavigate();
   useDocumentTitle(CHAT_TITLE);
 
