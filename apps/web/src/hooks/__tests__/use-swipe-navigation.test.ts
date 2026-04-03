@@ -42,10 +42,16 @@ describe('useSwipeNavigation', () => {
     expect(result.current.activeIndex).toBe(1);
   });
 
-  it('maps /settings to index 2', () => {
-    currentPathname = '/settings';
+  it('maps /chat to index 2', () => {
+    currentPathname = '/chat';
     const { result } = renderHook(() => useSwipeNavigation());
     expect(result.current.activeIndex).toBe(2);
+  });
+
+  it('maps /settings to index 3', () => {
+    currentPathname = '/settings';
+    const { result } = renderHook(() => useSwipeNavigation());
+    expect(result.current.activeIndex).toBe(3);
   });
 
   it('defaults unknown paths to index 0', () => {
@@ -57,7 +63,7 @@ describe('useSwipeNavigation', () => {
   it('navigates with replace: true on index change', () => {
     const { result } = renderHook(() => useSwipeNavigation());
     act(() => {
-      result.current.onIndexChange(2);
+      result.current.onIndexChange(3);
     });
     expect(navigateMock).toHaveBeenCalledWith('/settings', { replace: true });
   });
@@ -72,14 +78,18 @@ describe('useSwipeNavigation', () => {
     expect(navigateMock).toHaveBeenCalledWith('/timers/all', { replace: true });
 
     act(() => result.current.onIndexChange(2));
+    expect(navigateMock).toHaveBeenCalledWith('/chat', { replace: true });
+
+    act(() => result.current.onIndexChange(3));
     expect(navigateMock).toHaveBeenCalledWith('/settings', { replace: true });
   });
 
   it('returns the filtered nav items as pages', () => {
     const { result } = renderHook(() => useSwipeNavigation());
-    expect(result.current.pages).toHaveLength(3);
+    expect(result.current.pages).toHaveLength(4);
     expect(result.current.pages[0]!.href).toBe('/timers/remaining');
     expect(result.current.pages[1]!.href).toBe('/timers/all');
-    expect(result.current.pages[2]!.href).toBe('/settings');
+    expect(result.current.pages[2]!.href).toBe('/chat');
+    expect(result.current.pages[3]!.href).toBe('/settings');
   });
 });

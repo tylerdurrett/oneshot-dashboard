@@ -45,7 +45,7 @@ export function MobileChatView() {
           <motion.div
             key="thread-overlay"
             className="absolute inset-0 z-10 bg-background"
-            initial={{ x: '100%' }}
+            initial={false}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}

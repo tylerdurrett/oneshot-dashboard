@@ -1,15 +1,12 @@
 import { useState } from 'react';
-import { ChevronDown, MoreVertical, Plus } from 'lucide-react';
+import { ChevronDown, Trash2, Plus } from 'lucide-react';
 import {
   Button,
+  cn,
   ConfirmationDialog,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from '@repo/ui';
 import type { Thread } from './api';
 import { formatTimeAgo } from './format-time-ago';
@@ -22,6 +19,9 @@ interface ThreadSelectorProps {
   onDeleteThread: (threadId: string) => void;
 }
 
+const ITEM_CLASS =
+  'flex min-h-[44px] w-full cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden hover:bg-accent hover:text-accent-foreground';
+
 export function ThreadSelector({
   threads,
   activeThreadId,
@@ -33,14 +33,13 @@ export function ThreadSelector({
   const displayTitle = activeThread?.title ?? 'New conversation';
 
   const [threadToDelete, setThreadToDelete] = useState<Thread | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  const handleMenuClick = (e: React.MouseEvent, thread: Thread) => {
-    // Prevent DropdownMenuItem onSelect from firing (which would select the thread)
+  const handleDeleteClick = (e: React.MouseEvent, thread: Thread) => {
     e.stopPropagation();
     e.preventDefault();
     setThreadToDelete(thread);
-    setDropdownOpen(false);
+    setOpen(false);
   };
 
   const handleConfirmDelete = () => {
@@ -53,72 +52,84 @@ export function ThreadSelector({
   return (
     <>
       <div className="flex min-w-0 items-center gap-2" data-testid="thread-selector">
-        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <DropdownMenuTrigger asChild>
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
             <Button
               variant="ghost"
               size="sm"
-              className="min-w-0 max-w-[280px] gap-1.5"
+              className="min-h-[44px] min-w-0 max-w-[280px] gap-1.5"
               data-testid="thread-selector-trigger"
             >
               <span className="truncate">{displayTitle}</span>
               <ChevronDown className="size-3.5 shrink-0 opacity-50" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-72">
-            <DropdownMenuLabel>Threads</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuGroup>
+          </PopoverTrigger>
+          <PopoverContent className="w-72">
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+              Threads
+            </div>
+            <hr className="my-1 border-border" />
+            <div role="group">
               {threads.length === 0 ? (
-                <DropdownMenuItem disabled>
+                <div className={cn(ITEM_CLASS, 'pointer-events-none opacity-50')}>
                   <span className="text-muted-foreground">No threads yet</span>
-                </DropdownMenuItem>
+                </div>
               ) : (
                 threads.map((thread) => (
-                  <DropdownMenuItem
+                  <button
                     key={thread.id}
-                    className={
-                      thread.id === activeThreadId
-                        ? 'bg-accent/50'
-                        : undefined
-                    }
-                    onSelect={() => onSelectThread(thread.id)}
+                    type="button"
+                    className={cn(
+                      ITEM_CLASS,
+                      'justify-between',
+                      thread.id === activeThreadId && 'bg-accent/50',
+                    )}
+                    onClick={() => {
+                      onSelectThread(thread.id);
+                      setOpen(false);
+                    }}
                     data-testid={`thread-item-${thread.id}`}
                   >
-                    <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                      <span className="truncate">{thread.title}</span>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <span className="text-xs text-muted-foreground">
-                          {formatTimeAgo(thread.updatedAt)}
-                        </span>
-                        <button
-                          type="button"
-                          className="rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-foreground/7 hover:text-foreground focus-visible:opacity-100 [div[role=menuitem]:hover_&]:opacity-100 [div[role=menuitem][data-highlighted]_&]:opacity-100"
-                          onClick={(e) => handleMenuClick(e, thread)}
-                          aria-label={`Thread options for ${thread.title}`}
-                          data-testid={`thread-menu-${thread.id}`}
-                        >
-                          <MoreVertical className="size-3.5" />
-                        </button>
-                      </div>
+                    <span className="min-w-0 truncate">{thread.title}</span>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="text-xs text-muted-foreground">
+                        {formatTimeAgo(thread.updatedAt)}
+                      </span>
+                      <button
+                        type="button"
+                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-muted-foreground opacity-0 transition-all hover:bg-foreground/7 hover:text-foreground focus-visible:opacity-100 [button:hover>&]:opacity-100"
+                        onClick={(e) => handleDeleteClick(e, thread)}
+                        aria-label={`Delete ${thread.title}`}
+                        data-testid={`thread-menu-${thread.id}`}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </div>
-                  </DropdownMenuItem>
+                  </button>
                 ))
               )}
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onNewThread} data-testid="new-thread-button">
+            </div>
+            <hr className="my-1 border-border" />
+            <button
+              type="button"
+              className={ITEM_CLASS}
+              onClick={() => {
+                onNewThread();
+                setOpen(false);
+              }}
+              data-testid="new-thread-button"
+            >
               <Plus className="size-4" />
               <span>New thread</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </button>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <ConfirmationDialog
         open={threadToDelete !== null}
-        onOpenChange={(open) => {
-          if (!open) setThreadToDelete(null);
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setThreadToDelete(null);
         }}
         title="Delete thread?"
         description={`"${threadToDelete?.title ?? ''}" and all its messages will be permanently deleted.`}

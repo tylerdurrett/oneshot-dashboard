@@ -9,7 +9,7 @@ const css = readFileSync(
 
 describe('PWA standalone shell layout', () => {
   it('defines a shared bottom-nav gutter token', () => {
-    expect(css).toContain('--mobile-bottom-nav-gutter: 8px;');
+    expect(css).toContain('--mobile-bottom-nav-gutter: 12px;');
   });
 
   it('adds the shared gutter to the standalone shell main padding', () => {

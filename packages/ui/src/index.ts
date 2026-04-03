@@ -12,6 +12,7 @@ export {
   CardHeader,
   CardTitle,
 } from './components/card';
+export { Popover, PopoverTrigger, PopoverContent } from './components/popover';
 export {
   DropdownMenu,
   DropdownMenuContent,

@@ -89,7 +89,7 @@ vi.mock('motion/react', () => ({
         initial, animate, exit, transition, drag, dragConstraints,
         dragElastic, dragMomentum, onDragEnd, ...domProps
       } = props as Record<string, unknown>;
-      return <div {...(domProps as React.HTMLAttributes<HTMLDivElement>)} data-testid="thread-overlay">{children}</div>;
+      return <div {...(domProps as React.HTMLAttributes<HTMLDivElement>)} data-testid="thread-overlay" data-initial={String(initial)}>{children}</div>;
     },
   },
 }));
@@ -157,6 +157,14 @@ describe('MobileChatView', () => {
     expect(screen.getByTestId('thread-overlay')).toBeDefined();
     // ThreadPage sets visibleThreadId to the thread id
     expect(hookReturn.setVisibleThreadId).toHaveBeenCalledWith('thread-1');
+  });
+
+  it('skips entrance animation on thread overlay (initial={false})', () => {
+    mockPathname = '/chat/thread-1';
+    render(<MobileChatView />);
+    // initial={false} means no slide-in animation — SwipeView handles page transitions,
+    // and in-tab thread selection should appear instantly.
+    expect(screen.getByTestId('thread-overlay').getAttribute('data-initial')).toBe('false');
   });
 
   it('passes threadId prop to ThreadPage inside overlay', () => {

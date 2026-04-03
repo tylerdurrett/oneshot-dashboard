@@ -10,9 +10,11 @@ vi.mock('../format-time-ago', () => ({
   formatTimeAgo: (ts: number) => `${ts}s ago`,
 }));
 
-// Mock @repo/ui dropdown components with testable structure
+// Mock @repo/ui components with testable structure.
+// Popover replaces DropdownMenu — items are plain buttons so no roving focus.
 vi.mock('@repo/ui', () => {
   return {
+    cn: (...inputs: unknown[]) => inputs.filter(Boolean).join(' '),
     Button: ({
       children,
       className,
@@ -30,57 +32,25 @@ vi.mock('@repo/ui', () => {
         {children}
       </button>
     ),
-    DropdownMenu: ({ children, open }: { children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) => (
-      <div data-testid="dropdown-menu" data-open={open}>{children}</div>
+    Popover: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="popover">{children}</div>
     ),
-    DropdownMenuTrigger: ({
+    PopoverTrigger: ({
       children,
     }: {
       children: React.ReactNode;
-    }) => <div data-testid="dropdown-trigger">{children}</div>,
-    DropdownMenuContent: ({
-      children,
-      align,
-      className,
-    }: {
-      children: React.ReactNode;
-      align?: string;
-      className?: string;
-    }) => (
-      <div data-testid="dropdown-content" data-align={align} className={className}>
-        {children}
-      </div>
-    ),
-    DropdownMenuGroup: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="dropdown-group">{children}</div>
-    ),
-    DropdownMenuItem: ({
+    }) => <div data-testid="popover-trigger">{children}</div>,
+    PopoverContent: ({
       children,
       className,
-      onSelect,
-      disabled,
-      ...props
     }: {
       children: React.ReactNode;
       className?: string;
-      onSelect?: () => void;
-      disabled?: boolean;
-      [key: string]: unknown;
     }) => (
-      <div
-        role="menuitem"
-        className={className}
-        data-disabled={disabled || undefined}
-        onClick={onSelect}
-        {...props}
-      >
+      <div data-testid="popover-content" className={className}>
         {children}
       </div>
     ),
-    DropdownMenuLabel: ({ children }: { children: React.ReactNode }) => (
-      <div data-testid="dropdown-label">{children}</div>
-    ),
-    DropdownMenuSeparator: () => <hr data-testid="dropdown-separator" />,
     ConfirmationDialog: ({
       open,
       title,
@@ -180,7 +150,7 @@ describe('ThreadSelector', () => {
     );
   });
 
-  it('lists all threads in dropdown', () => {
+  it('lists all threads in popover', () => {
     render(
       <ThreadSelector
         threads={threads}
@@ -269,7 +239,7 @@ describe('ThreadSelector', () => {
     expect(screen.getByText('No threads yet')).toBeDefined();
   });
 
-  it('renders "Threads" label in dropdown', () => {
+  it('renders "Threads" label', () => {
     render(
       <ThreadSelector
         threads={threads}
@@ -299,7 +269,7 @@ describe('ThreadSelector', () => {
   // Delete thread tests
   // ---------------------------------------------------------------------------
 
-  it('shows three-dot menu button on each thread item', () => {
+  it('shows delete button on each thread item', () => {
     render(
       <ThreadSelector
         threads={threads}
@@ -313,7 +283,7 @@ describe('ThreadSelector', () => {
     expect(screen.getByTestId('thread-menu-thread-2')).toBeDefined();
   });
 
-  it('opens confirmation dialog when three-dot menu is clicked', () => {
+  it('opens confirmation dialog when delete button is clicked', () => {
     render(
       <ThreadSelector
         threads={threads}
@@ -323,13 +293,10 @@ describe('ThreadSelector', () => {
         onDeleteThread={vi.fn()}
       />,
     );
-    // No confirmation dialog initially
     expect(screen.queryByTestId('confirmation-dialog')).toBeNull();
 
-    // Click the three-dot menu for thread-1
     fireEvent.click(screen.getByTestId('thread-menu-thread-1'));
 
-    // Confirmation dialog should appear
     expect(screen.getByTestId('confirmation-dialog')).toBeDefined();
     expect(screen.getByTestId('confirmation-title').textContent).toBe('Delete thread?');
     expect(screen.getByTestId('confirmation-description').textContent).toContain(
@@ -348,9 +315,7 @@ describe('ThreadSelector', () => {
         onDeleteThread={onDeleteThread}
       />,
     );
-    // Open confirmation dialog
     fireEvent.click(screen.getByTestId('thread-menu-thread-1'));
-    // Confirm
     fireEvent.click(screen.getByTestId('confirm-delete'));
     expect(onDeleteThread).toHaveBeenCalledWith('thread-1');
   });
@@ -365,16 +330,14 @@ describe('ThreadSelector', () => {
         onDeleteThread={vi.fn()}
       />,
     );
-    // Open confirmation dialog
     fireEvent.click(screen.getByTestId('thread-menu-thread-2'));
     expect(screen.getByTestId('confirmation-dialog')).toBeDefined();
 
-    // Cancel
     fireEvent.click(screen.getByTestId('cancel-delete'));
     expect(screen.queryByTestId('confirmation-dialog')).toBeNull();
   });
 
-  it('does not call onSelectThread when three-dot menu is clicked', () => {
+  it('does not call onSelectThread when delete button is clicked', () => {
     const onSelectThread = vi.fn();
     render(
       <ThreadSelector
@@ -386,7 +349,24 @@ describe('ThreadSelector', () => {
       />,
     );
     fireEvent.click(screen.getByTestId('thread-menu-thread-1'));
-    // onSelectThread should NOT have been called
     expect(onSelectThread).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Tap target size tests
+  // ---------------------------------------------------------------------------
+
+  it('has minimum 44px tap target on thread items', () => {
+    render(
+      <ThreadSelector
+        threads={threads}
+        activeThreadId="thread-1"
+        onSelectThread={vi.fn()}
+        onNewThread={vi.fn()}
+        onDeleteThread={vi.fn()}
+      />,
+    );
+    const item = screen.getByTestId('thread-item-thread-1');
+    expect(item.className).toContain('min-h-[44px]');
   });
 });
