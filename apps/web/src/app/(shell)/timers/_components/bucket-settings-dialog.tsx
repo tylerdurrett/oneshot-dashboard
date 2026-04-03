@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button, cn, Input } from '@repo/ui';
 import {
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@repo/ui/components/dialog';
 
+import { useVisualViewportOffset } from '../../../../hooks/use-visual-viewport-offset';
 import { BUCKET_COLORS, type TimeBucket } from '../_lib/timer-types';
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,10 @@ export function BucketSettingsDialog({
   onOpenChange,
   onSave,
 }: BucketSettingsDialogProps) {
+  // Keep dialog visible when the iOS on-screen keyboard is open.
+  const keyboardStyle = useVisualViewportOffset();
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
   // Local form state
   const [name, setName] = useState('');
   const [hours, setHours] = useState(0);
@@ -241,7 +246,16 @@ export function BucketSettingsDialog({
 
   return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent aria-describedby={undefined}>
+        <DialogContent
+          aria-describedby={undefined}
+          style={keyboardStyle}
+          onOpenAutoFocus={(e) => {
+            // Delay focus so the dialog renders before the keyboard triggers a
+            // viewport resize — avoids the first-open positioning race on iOS.
+            e.preventDefault();
+            setTimeout(() => nameInputRef.current?.focus(), 80);
+          }}
+        >
           <DialogHeader>
             <DialogTitle>Bucket Settings</DialogTitle>
           </DialogHeader>
@@ -256,11 +270,11 @@ export function BucketSettingsDialog({
                 Name
               </label>
               <Input
+                ref={nameInputRef}
                 id="bucket-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Bucket name"
-                autoFocus
               />
             </div>
 
