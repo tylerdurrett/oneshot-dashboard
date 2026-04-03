@@ -92,3 +92,7 @@ scripts/test-sandbox-results.md
 
 # Chrome DevTools skill screenshots
 _screenshots/
+
+# Agent workspace (contents are ephemeral, .gitkeep preserves the directory)
+workspace/*
+!workspace/.gitkeep

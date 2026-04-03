@@ -35,17 +35,35 @@ function readServerPort() {
 // ── Config ──────────────────────────────────────────────
 
 const SANDBOX_NAME = process.env.SANDBOX_NAME ?? 'oneshot-sandbox';
-// IMPORTANT: `docker sandbox run claude WORKSPACE` mounts the workspace directory into the
-// sandbox via VirtioFS at the SAME absolute path as the host (e.g. /Users/foo/project is at
-// /Users/foo/project inside the sandbox, NOT at /home/agent/workspace/).
-// The default CWD for `docker sandbox exec` is /home/agent/workspace/ which is a separate,
-// empty, persistent directory — NOT the mounted workspace.
-const SANDBOX_WORKSPACE = process.env.SANDBOX_WORKSPACE ?? ROOT;
+// Only the workspace/ subdirectory is mounted — NOT the project root.
+// This prevents the agent from accessing or modifying project source code.
+const SANDBOX_WORKSPACE = process.env.SANDBOX_WORKSPACE ?? path.join(ROOT, 'workspace');
+/** Where the MCP bundle lands inside the sandbox (used by both injection and config). */
+const MCP_BUNDLE_DEST = '/home/agent/timer-mcp-server.mjs';
 
 // ── Helpers ─────────────────────────────────────────────
 
 function run(cmd, opts = {}) {
   return execSync(cmd, { stdio: 'pipe', timeout: 15_000, ...opts }).toString().trim();
+}
+
+/**
+ * Atomic-write a file into the sandbox via stdin.
+ * Stages to a temp file then `mv`s to avoid partial reads.
+ */
+function injectFileIntoSandbox(content, destPath, { chmod, mkdir } = {}) {
+  const staging = '/tmp/.inject-staging';
+  const steps = [];
+  if (mkdir) steps.push(`mkdir -p ${mkdir}`);
+  steps.push(`cat > ${staging}`, `mv ${staging} ${destPath}`);
+  if (chmod) steps.push(`chmod ${chmod} ${destPath}`);
+
+  const result = spawnSync(
+    'docker',
+    ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', steps.join(' && ')],
+    { input: content, stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 },
+  );
+  return result.status === 0;
 }
 
 function isSandboxPluginAvailable() {
@@ -112,8 +130,9 @@ function createSandbox() {
       settled = true;
       clearInterval(poller);
       clearTimeout(deadline);
-      // Kill the process tree — SIGKILL because SIGTERM doesn't work on WSL2
-      try { process.kill(-child.pid, 'SIGKILL'); } catch {}
+      // Don't SIGKILL — the sandbox may still be loading its container image.
+      // Killing the process during initialization corrupts the sandbox state.
+      // Just detach; Claude exits on its own since there's no stdin.
       child.unref();
       resolve(success);
     };
@@ -130,15 +149,18 @@ function createSandbox() {
       }
     });
 
-    // Poll for sandbox existence — handles the WSL2 case where the process hangs
-    // but the sandbox is actually created in the background.
+    // Poll with actual exec to verify the sandbox is ready — `docker sandbox list`
+    // shows "running" before the container is fully initialized, so checking list
+    // alone leads to premature success and broken exec calls.
     const poller = setInterval(() => {
-      const state = getSandboxState();
-      if (state.exists && state.status === 'running') {
+      try {
+        execSync(`docker sandbox exec ${SANDBOX_NAME} echo ready`, { stdio: 'pipe', timeout: 5_000 });
         console.log('  ✓ Sandbox created');
         finish(true);
+      } catch {
+        // Not ready yet — keep polling
       }
-    }, 2_000);
+    }, 3_000);
 
     // Hard deadline so we don't hang forever
     const deadline = setTimeout(() => {
@@ -197,19 +219,11 @@ function tryCredentialInjection() {
     delete creds.claudeAiOauth.refreshToken;
   }
 
-  const atomicWriteCmd = [
-    'cat > /tmp/.creds-staging',
-    'mv /tmp/.creds-staging /home/agent/.claude/.credentials.json',
-    'chmod 600 /home/agent/.claude/.credentials.json',
-  ].join(' && ');
-
-  const injectionResult = spawnSync(
-    'docker',
-    ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', atomicWriteCmd],
-    { input: JSON.stringify(creds), stdio: ['pipe', 'pipe', 'pipe'], timeout: 15_000 },
+  return injectFileIntoSandbox(
+    JSON.stringify(creds),
+    '/home/agent/.claude/.credentials.json',
+    { chmod: '600', mkdir: '/home/agent/.claude' },
   );
-
-  return injectionResult.status === 0;
 }
 
 /**
@@ -245,14 +259,7 @@ function ensureProxyCACert() {
   }
 }
 
-/**
- * Inject sandbox assets that aren't available via the VirtioFS mount:
- * - Soul file → /home/agent/.claude/CLAUDE.md (agent identity, auto-loaded by Claude Code)
- * - MCP config → /home/agent/.claude/settings.json (timer tools, dynamically generated with port)
- *
- * The MCP server bundle itself is NOT injected — it's accessible at its absolute host path
- * via the VirtioFS mount (see SANDBOX_WORKSPACE comment above).
- */
+/** Inject all sandbox assets. None are available via the mount — only workspace/ is mounted. */
 function injectSandboxAssets() {
   const soulPath = path.join(ROOT, 'apps', 'server', 'src', 'chat', 'soul.md');
   let soulContent;
@@ -263,20 +270,32 @@ function injectSandboxAssets() {
     return;
   }
 
-  const atomicWriteCmd = 'mkdir -p /home/agent/.claude && cat > /tmp/.soul-staging && mv /tmp/.soul-staging /home/agent/.claude/CLAUDE.md';
-  const result = spawnSync(
-    'docker',
-    ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', atomicWriteCmd],
-    { input: soulContent, stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 },
-  );
-
-  if (result.status === 0) {
+  if (injectFileIntoSandbox(soulContent, '/home/agent/.claude/CLAUDE.md', { mkdir: '/home/agent/.claude' })) {
     console.log('  ✓ Soul file injected as CLAUDE.md');
   } else {
     console.log('  ⚠ Could not inject soul file');
   }
 
+  injectMcpBundle();
   injectMcpConfig();
+}
+
+/** Inject the pre-built MCP bundle — self-contained, no node_modules needed in sandbox. */
+function injectMcpBundle() {
+  const bundlePath = path.join(ROOT, 'apps', 'server', 'dist', 'timer-mcp-server.mjs');
+  let bundleContent;
+  try {
+    bundleContent = fs.readFileSync(bundlePath);
+  } catch {
+    console.log(`  ⚠ MCP bundle not found at ${bundlePath} — run pnpm build:mcp first`);
+    return;
+  }
+
+  if (injectFileIntoSandbox(bundleContent, MCP_BUNDLE_DEST, { chmod: '644' })) {
+    console.log('  ✓ MCP timer server bundle injected');
+  } else {
+    console.log('  ⚠ Could not inject MCP bundle — timer tools may be unavailable');
+  }
 }
 
 /**
@@ -307,24 +326,12 @@ function injectMcpConfig() {
   const mcpServers = (existing && typeof existing === 'object' && existing.mcpServers) || {};
   mcpServers['oneshot-timers'] = {
     command: 'node',
-    args: [path.join(ROOT, 'apps', 'server', 'dist', 'timer-mcp-server.mjs')],
+    args: [MCP_BUNDLE_DEST],
     env: { ONESHOT_API_BASE: `http://host.docker.internal:${serverPort}` },
   };
   const merged = { ...existing, mcpServers };
 
-  // Atomic write via temp file
-  const atomicWriteCmd = [
-    'cat > /tmp/.settings-staging',
-    'mv /tmp/.settings-staging /home/agent/.claude/settings.json',
-  ].join(' && ');
-
-  const result = spawnSync(
-    'docker',
-    ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', atomicWriteCmd],
-    { input: JSON.stringify(merged, null, 2), stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 },
-  );
-
-  if (result.status === 0) {
+  if (injectFileIntoSandbox(JSON.stringify(merged, null, 2), '/home/agent/.claude/settings.json')) {
     console.log('  ✓ MCP timer server config injected');
   } else {
     console.log('  ⚠ Could not inject MCP config — chat timer tools may be unavailable');
@@ -364,6 +371,9 @@ async function main() {
 
   console.log('');
   console.log(`  Ensuring sandbox "${SANDBOX_NAME}" is ready...`);
+
+  // Ensure the workspace directory exists before creating/starting the sandbox.
+  fs.mkdirSync(SANDBOX_WORKSPACE, { recursive: true });
 
   if (state.exists && state.status === 'stopped') {
     if (!startSandbox()) {

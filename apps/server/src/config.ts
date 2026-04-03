@@ -63,8 +63,8 @@ export const config = {
   /** Docker sandbox name. */
   sandboxName: process.env.SANDBOX_NAME ?? 'oneshot-sandbox',
 
-  /** Workspace path inside the Docker sandbox. Defaults to the monorepo root. */
-  sandboxWorkspace: process.env.SANDBOX_WORKSPACE ?? root,
+  /** Workspace path mounted into the Docker sandbox. Defaults to the workspace/ subdirectory. */
+  sandboxWorkspace: process.env.SANDBOX_WORKSPACE ?? path.join(root, 'workspace'),
 
   // -- Credential injection & circuit breaker --
 

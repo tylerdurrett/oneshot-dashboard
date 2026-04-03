@@ -7,6 +7,7 @@
  */
 
 import { execFileSync, execSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
@@ -20,7 +21,7 @@ const ROOT = path.resolve(__dirname, '..');
 
 function getConfig() {
   const name = process.env.SANDBOX_NAME ?? 'oneshot-sandbox';
-  const workspace = process.env.SANDBOX_WORKSPACE ?? ROOT;
+  const workspace = process.env.SANDBOX_WORKSPACE ?? path.join(ROOT, 'workspace');
   return { name, workspace };
 }
 
@@ -206,6 +207,7 @@ function main() {
   console.log('');
 
   // Step 2: Create sandbox if it doesn't exist
+  fs.mkdirSync(workspace, { recursive: true });
   const exists = sandboxExists(name, workspace);
   if (!exists) {
     createAndAuth(name, workspace);

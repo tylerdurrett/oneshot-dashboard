@@ -43,8 +43,22 @@ export type SpawnFn = typeof defaultSpawn;
 /** Default probe timeout: 30 seconds. */
 const DEFAULT_PROBE_TIMEOUT_MS = 30_000;
 
-/** CWD for sandbox exec — keeps the agent in its own area, not the VirtioFS-mounted project root. */
-const SANDBOX_AGENT_CWD = '/home/agent/workspace';
+/** Returns true when running under WSL2. Matches scripts/lib/sandbox-exec.mjs logic. */
+function isWsl(): boolean {
+  return process.platform === 'linux'
+    && typeof process.env.WSL_DISTRO_NAME === 'string'
+    && process.env.WSL_DISTRO_NAME.length > 0;
+}
+
+/**
+ * Build the `-w <path>` args for docker sandbox exec.
+ * On WSL2, host Linux paths don't match sandbox-internal paths, so we omit
+ * `-w` and let docker default to /home/agent (acceptable — all commands use absolute paths).
+ */
+function cwdArgs(): string[] {
+  if (isWsl()) return [];
+  return ['-w', config.sandboxWorkspace];
+}
 
 /** Default inactivity timeout for Claude invocations: 10 minutes. */
 const DEFAULT_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
@@ -167,7 +181,7 @@ export async function probeSandbox(
     const args = [
       'sandbox',
       'exec',
-      '-w', SANDBOX_AGENT_CWD,
+      ...cwdArgs(),
       config.sandboxName,
       'claude',
       'auth',
@@ -505,7 +519,7 @@ function buildClaudeArgs(prompt: string, sessionId?: string): string[] {
   const args = [
     'sandbox',
     'exec',
-    '-w', SANDBOX_AGENT_CWD,
+    ...cwdArgs(),
     config.sandboxName,
     'claude',
   ];
