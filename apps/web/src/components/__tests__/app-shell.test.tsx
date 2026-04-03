@@ -72,7 +72,7 @@ describe('AppShell', () => {
     // Two of each — one desktop, one mobile
     expect(screen.getAllByText('To Do')).toHaveLength(2);
     expect(screen.getAllByText('Done')).toHaveLength(2);
-    expect(screen.getAllByText('Settings')).toHaveLength(2);
+    expect(screen.getAllByText('All')).toHaveLength(2);
   });
 
   it('does not render a More button (hidden for now)', () => {
@@ -118,7 +118,7 @@ describe('AppShell', () => {
 
   it('highlights Settings when on settings page', () => {
     renderWithRouter('/settings');
-    const settingsLinks = screen.getAllByText('Settings');
+    const settingsLinks = screen.getAllByText('All');
     const parentLink = settingsLinks[0]!.closest('a');
     expect(parentLink).toBeDefined();
     expect(parentLink!.getAttribute('data-active')).toBe('true');

@@ -10,11 +10,13 @@ import type { BucketResponse } from '@/app/(shell)/timers/_lib/timer-api';
 // ---------------------------------------------------------------------------
 
 const mockUseBuckets = vi.fn();
+const mockCreateMutateAsync = vi.fn();
 const mockUpdateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 
 vi.mock('@/app/(shell)/timers/_hooks/use-timer-queries', () => ({
   useBuckets: () => mockUseBuckets(),
+  useCreateBucket: () => ({ mutateAsync: mockCreateMutateAsync }),
   useUpdateBucket: () => ({ mutate: mockUpdateMutate }),
   useDeleteBucket: () => ({ mutate: mockDeleteMutate }),
 }));
@@ -219,5 +221,54 @@ describe('SettingsPage', () => {
     renderPage();
     // 30 min * 7 days = 210 min = 3h 30m/week
     expect(screen.getByText('3h 30m/week · Every day')).toBeDefined();
+  });
+
+  it('renders add bucket button', () => {
+    mockUseBuckets.mockReturnValue({
+      data: [makeBucket({ id: 'b1', name: 'Work' })],
+      isLoading: false,
+    });
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Add bucket' })).toBeDefined();
+  });
+
+  it('renders add bucket button in empty state', () => {
+    mockUseBuckets.mockReturnValue({ data: [], isLoading: false });
+    renderPage();
+    expect(screen.getByRole('button', { name: 'Add bucket' })).toBeDefined();
+  });
+
+  it('creates a bucket and opens dialog when clicking add button', async () => {
+    const newBucket = makeBucket({ id: 'new-1', name: 'New Bucket' });
+    mockCreateMutateAsync.mockResolvedValue(newBucket);
+    mockUseBuckets.mockReturnValue({
+      data: [makeBucket({ id: 'b1', name: 'Work' })],
+      isLoading: false,
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add bucket' }));
+
+    expect(mockCreateMutateAsync).toHaveBeenCalledWith({
+      name: 'New Bucket',
+      totalMinutes: 60,
+      colorIndex: 1, // colorIndex 0 is used by 'Work'
+      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
+    });
+
+    // Wait for the async mutation to resolve and dialog to open
+    await screen.findByTestId('settings-dialog');
+    expect(screen.getByTestId('settings-dialog').textContent).toBe('New Bucket');
+  });
+
+  it('bucket rows have pointer cursor class', () => {
+    mockUseBuckets.mockReturnValue({
+      data: [makeBucket({ id: 'b1', name: 'Work' })],
+      isLoading: false,
+    });
+    renderPage();
+
+    const bucketRow = screen.getByText('Work').closest('button');
+    expect(bucketRow?.classList.contains('cursor-pointer')).toBe(true);
   });
 });

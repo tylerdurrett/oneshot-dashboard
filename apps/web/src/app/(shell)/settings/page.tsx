@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 
 import { cn } from '@repo/ui';
 import { Switch } from '@repo/ui/components/switch';
 
 import { BucketSettingsDialog } from '@/app/(shell)/timers/_components/bucket-settings-dialog';
 import { BUCKET_COLORS, type TimeBucket } from '@/app/(shell)/timers/_lib/timer-types';
-import type { BucketResponse, UpdateBucketInput } from '@/app/(shell)/timers/_lib/timer-api';
+import type { BucketResponse, CreateBucketInput, UpdateBucketInput } from '@/app/(shell)/timers/_lib/timer-api';
 import {
   useBuckets,
+  useCreateBucket,
   useUpdateBucket,
   useDeleteBucket,
 } from '@/app/(shell)/timers/_hooks/use-timer-queries';
@@ -49,6 +51,16 @@ function formatDuration(totalMinutes: number): string {
   return `${h}h ${m}m`;
 }
 
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+function nextAvailableColorIndex(buckets: BucketResponse[]): number {
+  const used = new Set(buckets.map((b) => b.colorIndex));
+  for (let i = 0; i < BUCKET_COLORS.length; i++) {
+    if (!used.has(i)) return i;
+  }
+  return 0;
+}
+
 /** Compute weekly commitment for sorting: sum of all per-day targets. */
 function weeklyCommitment(bucket: BucketResponse): number {
   if (bucket.weeklySchedule) {
@@ -80,6 +92,7 @@ function bucketResponseToTimeBucket(b: BucketResponse): TimeBucket {
 
 export default function SettingsPage() {
   const { data: buckets, isLoading } = useBuckets();
+  const createMutation = useCreateBucket();
   const updateMutation = useUpdateBucket();
   const deleteMutation = useDeleteBucket();
 
@@ -128,6 +141,18 @@ export default function SettingsPage() {
     deleteMutation.mutate(id);
   };
 
+  const handleAddBucket = async () => {
+    const input: CreateBucketInput = {
+      name: 'New Bucket',
+      totalMinutes: 60,
+      colorIndex: nextAvailableColorIndex(buckets ?? []),
+      daysOfWeek: ALL_DAYS,
+    };
+    const newBucket = await createMutation.mutateAsync(input);
+    setEditingBucket(bucketResponseToTimeBucket(newBucket));
+    setDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
@@ -138,8 +163,28 @@ export default function SettingsPage() {
 
   if (!buckets || buckets.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-muted-foreground">
-        <p className="text-lg">No buckets yet</p>
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="mx-auto w-full max-w-lg px-4 py-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h1 className="text-lg font-semibold">Buckets</h1>
+            <button
+              type="button"
+              aria-label="Add bucket"
+              className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              onClick={handleAddBucket}
+            >
+              <Plus className="size-5" />
+            </button>
+          </div>
+          <p className="text-muted-foreground text-center text-lg">No buckets yet</p>
+        </div>
+        <BucketSettingsDialog
+          bucket={editingBucket}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          onSave={handleSave}
+          onDelete={handleDelete}
+        />
       </div>
     );
   }
@@ -147,7 +192,17 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
       <div className="mx-auto w-full max-w-lg px-4 py-6">
-        <h1 className="mb-4 text-lg font-semibold">Buckets</h1>
+        <div className="mb-4 flex items-center justify-between">
+          <h1 className="text-lg font-semibold">Buckets</h1>
+          <button
+            type="button"
+            aria-label="Add bucket"
+            className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            onClick={handleAddBucket}
+          >
+            <Plus className="size-5" />
+          </button>
+        </div>
 
         <div className="flex flex-col divide-y divide-border">
           {sortedBuckets.map((bucket) => {
@@ -161,7 +216,7 @@ export default function SettingsPage() {
                 key={bucket.id}
                 type="button"
                 className={cn(
-                  'flex items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-muted/50',
+                  'flex cursor-pointer items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-muted/50',
                   isDeactivated && 'opacity-50',
                 )}
                 onClick={() => handleRowClick(bucket)}

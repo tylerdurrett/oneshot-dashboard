@@ -26,7 +26,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/timers/remaining': TIMERS_TITLE,
   '/timers/all': ALL_TIMERS_TITLE,
   '/chat': CHAT_TITLE,
-  '/settings': 'Settings',
+  '/settings': 'All Buckets',
 };
 
 // ---------------------------------------------------------------------------

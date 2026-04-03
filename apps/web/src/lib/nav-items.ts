@@ -25,7 +25,7 @@ export const ALL_NAV_ITEMS: NavItem[] = [
   { href: '/timers/remaining', label: 'To Do', icon: Circle, matchType: 'exact', hasContextMenu: true, feature: 'timers' },
   { href: '/timers/all', label: 'Done', icon: CircleCheckBig, matchType: 'exact', feature: 'timers' },
   { href: '/chat', label: 'Chat', icon: MessageSquare, matchType: 'prefix', feature: 'chat' },
-  { href: '/settings', label: 'Settings', icon: Settings, matchType: 'prefix' },
+  { href: '/settings', label: 'All', icon: Settings, matchType: 'prefix' },
 ];
 
 export const NAV_ITEMS = ALL_NAV_ITEMS.filter(
