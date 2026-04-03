@@ -11,6 +11,7 @@
  */
 
 import { execFileSync, execSync, spawnSync, spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
@@ -20,9 +21,25 @@ import { buildSandboxExecArgs } from './lib/sandbox-exec.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 
+/** Read server port from project.config.json (same convention as config.ts). */
+function readServerPort() {
+  try {
+    const raw = fs.readFileSync(path.join(ROOT, 'project.config.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.serverPort === 'number') return parsed.serverPort;
+    if (typeof parsed.port === 'number') return parsed.port + 2;
+  } catch { /* fall through */ }
+  return 4902;
+}
+
 // ── Config ──────────────────────────────────────────────
 
 const SANDBOX_NAME = process.env.SANDBOX_NAME ?? 'oneshot-sandbox';
+// IMPORTANT: `docker sandbox run claude WORKSPACE` mounts the workspace directory into the
+// sandbox via VirtioFS at the SAME absolute path as the host (e.g. /Users/foo/project is at
+// /Users/foo/project inside the sandbox, NOT at /home/agent/workspace/).
+// The default CWD for `docker sandbox exec` is /home/agent/workspace/ which is a separate,
+// empty, persistent directory — NOT the mounted workspace.
 const SANDBOX_WORKSPACE = process.env.SANDBOX_WORKSPACE ?? ROOT;
 
 // ── Helpers ─────────────────────────────────────────────
@@ -228,6 +245,92 @@ function ensureProxyCACert() {
   }
 }
 
+/**
+ * Inject sandbox assets that aren't available via the VirtioFS mount:
+ * - Soul file → /home/agent/.claude/CLAUDE.md (agent identity, auto-loaded by Claude Code)
+ * - MCP config → /home/agent/.claude/settings.json (timer tools, dynamically generated with port)
+ *
+ * The MCP server bundle itself is NOT injected — it's accessible at its absolute host path
+ * via the VirtioFS mount (see SANDBOX_WORKSPACE comment above).
+ */
+function injectSandboxAssets() {
+  const soulPath = path.join(ROOT, 'apps', 'server', 'src', 'chat', 'soul.md');
+  let soulContent;
+  try {
+    soulContent = fs.readFileSync(soulPath, 'utf8');
+  } catch {
+    console.log(`  ⚠ Soul file not found at ${soulPath}`);
+    return;
+  }
+
+  const atomicWriteCmd = 'mkdir -p /home/agent/.claude && cat > /tmp/.soul-staging && mv /tmp/.soul-staging /home/agent/.claude/CLAUDE.md';
+  const result = spawnSync(
+    'docker',
+    ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', atomicWriteCmd],
+    { input: soulContent, stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 },
+  );
+
+  if (result.status === 0) {
+    console.log('  ✓ Soul file injected as CLAUDE.md');
+  } else {
+    console.log('  ⚠ Could not inject soul file');
+  }
+
+  injectMcpConfig();
+}
+
+/**
+ * Inject MCP server config into the sandbox's Claude settings.
+ * Merges `mcpServers.oneshot-timers` into the existing settings.json,
+ * preserving any other settings already present.
+ */
+function injectMcpConfig() {
+  // Read existing settings (may not exist yet)
+  let existing = {};
+  try {
+    const raw = execFileSync(
+      'docker',
+      ['sandbox', 'exec', SANDBOX_NAME, 'cat', '/home/agent/.claude/settings.json'],
+      { timeout: 10_000 },
+    ).toString().trim();
+    existing = JSON.parse(raw);
+  } catch (err) {
+    // File doesn't exist → expected on first run. Invalid JSON → warn.
+    if (err?.status === 0) {
+      console.log('  ⚠ Existing settings.json was not valid JSON — starting fresh');
+    }
+  }
+
+  // Merge in our MCP server config, passing the API base URL so the
+  // MCP server connects to the correct host port.
+  const serverPort = readServerPort();
+  const mcpServers = (existing && typeof existing === 'object' && existing.mcpServers) || {};
+  mcpServers['oneshot-timers'] = {
+    command: 'node',
+    args: [path.join(ROOT, 'apps', 'server', 'dist', 'timer-mcp-server.mjs')],
+    env: { ONESHOT_API_BASE: `http://host.docker.internal:${serverPort}` },
+  };
+  const merged = { ...existing, mcpServers };
+
+  // Atomic write via temp file
+  const atomicWriteCmd = [
+    'cat > /tmp/.settings-staging',
+    'mv /tmp/.settings-staging /home/agent/.claude/settings.json',
+  ].join(' && ');
+
+  const result = spawnSync(
+    'docker',
+    ['sandbox', 'exec', '-i', SANDBOX_NAME, 'sh', '-c', atomicWriteCmd],
+    { input: JSON.stringify(merged, null, 2), stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 },
+  );
+
+  if (result.status === 0) {
+    console.log('  ✓ MCP timer server config injected');
+  } else {
+    console.log('  ⚠ Could not inject MCP config — chat timer tools may be unavailable');
+  }
+}
+
 // ── Main ────────────────────────────────────────────────
 
 async function main() {
@@ -255,6 +358,7 @@ async function main() {
       }
     }
     ensureProxyCACert();
+    injectSandboxAssets();
     return;
   }
 
@@ -291,6 +395,7 @@ async function main() {
   }
 
   ensureProxyCACert();
+  injectSandboxAssets();
 
   console.log('  ✓ Sandbox ready');
   console.log('');

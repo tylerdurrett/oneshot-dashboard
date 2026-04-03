@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@libsql/client": "^0.15.15",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^25.3.0",
@@ -28,6 +29,7 @@
     "tsx": "^4.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0",
-    "ws": "^8.19.0"
+    "ws": "^8.19.0",
+    "zod": "^3.25.76"
   }
 }

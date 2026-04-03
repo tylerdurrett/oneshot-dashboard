@@ -33,6 +33,10 @@ Uses a two-file convention, applied consistently across all apps:
 
 Small changes are one-offs. Larger features use `_tasks/` with status folders: `_ideas`, `_planning`, `_ready-to-start`, `_in-progress`, `_complete`, `_icebox`, `_abandoned`. Move the feature folder between status folders as work progresses. See `docs/dev-cycle.md`.
 
+## Sandbox
+
+The chat agent runs in a Docker sandbox. The project directory is mounted into the sandbox at the same absolute path as on the host machine — NOT at `/home/agent/workspace/` (which is a separate empty directory used as the agent's working directory). Soul file and MCP config are injected at startup by `scripts/ensure-sandbox.mjs`. See `docs/sandbox.md`.
+
 ## Restarting Dev Servers
 
 The app runs via `pnpm service:install` (persistent service — launchd on macOS, systemd on Linux/WSL2) or `pnpm go` (foreground). The safe restart sequence:

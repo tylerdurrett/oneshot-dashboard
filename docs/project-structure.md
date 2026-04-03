@@ -24,6 +24,7 @@ your-project/
 │   ├── new-video.mjs         ← Scaffold new Remotion compositions
 │   ├── get-port.mjs          ← Read dev server port from config
 │   ├── get-studio-port.mjs   ← Read Remotion Studio port from config
+│   ├── build-mcp-server.mjs   ← Bundle chat agent's timer tools for the sandbox
 │   ├── stop-dev-processes.mjs ← Stop local dev + studio processes (pnpm stop)
 │   ├── service-dispatch.sh   ← Routes service commands to macOS (launchd) or Linux (systemd)
 │   ├── install-launchd.sh    ← macOS persistent service (called via service-dispatch)
@@ -36,6 +37,14 @@ your-project/
 ```
 
 ## Where Things Live
+
+### `apps/server/src/chat/` — Chat Agent Brain
+
+This is where the chat agent's knowledge and tools live. The agent runs inside a Docker sandbox — see [Sandbox](sandbox.md) for how that works.
+
+- **`soul.md`** — The agent's identity and instructions. It knows about the timer system and how to help you manage your time. Edit this file to change how the agent behaves or what it knows. Gets injected as the agent's CLAUDE.md at sandbox startup.
+- **`timer-mcp-server.ts`** — Gives the agent the ability to read and control your timers (start, stop, create buckets, check status, etc.). Gets bundled into a single file that runs inside the Docker sandbox.
+- **`timer-mcp-helpers.ts`** — Shared utilities for the timer tools.
 
 ### `apps/web/` — Your App
 

@@ -103,6 +103,7 @@ I chose this stack for a couple of reasons.
 - [Database](docs/database.md) — Working with Drizzle ORM and SQLite
 - [Feature Flags](docs/feature-flags.md) — Enabling and disabling features
 - [Dev Cycle](docs/dev-cycle.md) — The built-in feature development workflow
+- [Sandbox](docs/sandbox.md) — How the Docker sandbox and chat agent work
 - [For Agents](docs/for-agents.md) — How the agent-friendly tooling works
 - [Advanced Topics](docs/advanced-topics.md) — Upstream updates and more
 

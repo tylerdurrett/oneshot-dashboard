@@ -260,6 +260,7 @@ describe('probeSandbox', () => {
       expect(capturedArgs).toEqual([
         'sandbox',
         'exec',
+        '-w', '/home/agent/workspace',
         config.sandboxName,
         'claude',
         'auth',
@@ -467,7 +468,7 @@ describe('invokeClaude', () => {
       await collectEvents(emitter);
 
       expect(capturedArgs).toEqual([
-        'sandbox', 'exec', config.sandboxName,
+        'sandbox', 'exec', '-w', '/home/agent/workspace', config.sandboxName,
         'claude',
         '-p', 'hello',
         '--output-format', 'stream-json',
