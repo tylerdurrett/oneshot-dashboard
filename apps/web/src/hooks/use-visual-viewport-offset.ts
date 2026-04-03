@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
-const PADDING = 16; // px margin above/below the dialog when keyboard is open
+const PADDING = 16; // px margin above/below the dialog
+const MOBILE_QUERY = '(max-width: 767.98px)';
 
 export interface KeyboardLayoutStyle {
   /** Anchor the dialog to the top of the visual viewport (+ padding). */
@@ -9,62 +10,76 @@ export interface KeyboardLayoutStyle {
    *  Tailwind v4 uses the CSS `translate` property (not `transform`),
    *  so we must override `translate` to avoid stacking. */
   translate: string;
-  /** Cap height so the dialog + footer fits within the visible area. */
+  /** Cap height so the dialog fits within the visible area. */
   maxHeight: string;
   /** Allow scrolling when content exceeds the capped height. */
   overflowY: 'auto';
 }
 
 /**
- * Returns a style object that keeps a fixed-position dialog fully visible
- * when the on-screen keyboard is open (iOS PWA), or `undefined` when no
- * adjustment is needed.
+ * On mobile, returns a style object that top-anchors a fixed-position dialog
+ * and caps its height to the visible area. When the on-screen keyboard opens
+ * (iOS PWA) the maxHeight shrinks automatically — but the dialog never jumps
+ * because it was already top-anchored.
  *
- * Spread the result onto the dialog element:
- *   `style={keyboardStyle ?? undefined}`
- *
- * When active it:
- * - Anchors the dialog to the top of the visual viewport (with padding)
- * - Caps max-height so it fits within the visible area
- * - Makes the dialog scrollable if its content is taller than the space
- * - Overrides `translateY(-50%)` so top-anchoring works correctly
+ * On desktop returns `undefined` — the CSS `top:50%; translate:-50% -50%`
+ * centering remains in effect.
  */
 export function useVisualViewportOffset(): KeyboardLayoutStyle | undefined {
-  const [style, setStyle] = useState<KeyboardLayoutStyle | undefined>(undefined);
+  const [style, setStyle] = useState<KeyboardLayoutStyle | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    if (!window.matchMedia(MOBILE_QUERY).matches) return undefined;
+    // Initial mobile style before any viewport events
+    return buildStyle(window.visualViewport);
+  });
 
   useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
+    const mq = window.matchMedia(MOBILE_QUERY);
 
     const update = () => {
-      // When the keyboard is open the visual viewport is significantly shorter
-      // than the full window. The 0.85 threshold avoids false positives from
-      // minor browser-chrome changes (e.g. Safari URL bar collapsing).
-      if (vv.height < window.innerHeight * 0.85) {
-        const top = vv.offsetTop + PADDING;
-        const maxHeight = vv.height - PADDING * 2;
-        setStyle({
-          top: `${top}px`,
-          translate: '-50% 0',
-          maxHeight: `${maxHeight}px`,
-          overflowY: 'auto',
-        });
-      } else {
+      if (!mq.matches) {
         setStyle(undefined);
+        return;
       }
+      setStyle(buildStyle(window.visualViewport));
     };
 
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
+    // React to mobile breakpoint changes (e.g. orientation change)
+    const onBreakpoint = () => update();
+    mq.addEventListener('change', onBreakpoint);
 
-    // Run once in case the keyboard is already open when the hook mounts.
+    // React to visual viewport changes (keyboard open/close)
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', update);
+      vv.addEventListener('scroll', update);
+    }
+
+    // Run once on mount
     update();
 
     return () => {
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
+      mq.removeEventListener('change', onBreakpoint);
+      if (vv) {
+        vv.removeEventListener('resize', update);
+        vv.removeEventListener('scroll', update);
+      }
     };
   }, []);
 
   return style;
+}
+
+function buildStyle(vv: VisualViewport | null): KeyboardLayoutStyle {
+  const availableHeight = vv?.height ?? window.innerHeight;
+  const offsetTop = vv?.offsetTop ?? 0;
+  // env(safe-area-inset-top) accounts for the status bar / dynamic island
+  // in iOS PWA standalone mode. Falls back to 0px on non-notched devices.
+  const safeTop = 'env(safe-area-inset-top, 0px)';
+  return {
+    top: `calc(${offsetTop + PADDING}px + ${safeTop})`,
+    translate: '-50% 0',
+    maxHeight: `calc(${availableHeight - PADDING * 2}px - ${safeTop})`,
+    overflowY: 'auto',
+  };
 }

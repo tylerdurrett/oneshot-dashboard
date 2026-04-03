@@ -5,33 +5,61 @@ import { useVisualViewportOffset } from '../use-visual-viewport-offset';
 describe('useVisualViewportOffset', () => {
   let resizeHandler: (() => void) | null = null;
   let scrollHandler: (() => void) | null = null;
-  let removeSpy: ReturnType<typeof vi.fn>;
+  let mqChangeHandler: ((e: { matches: boolean }) => void) | null = null;
+  let removeVvSpy: ReturnType<typeof vi.fn>;
+  let currentMobile = false;
 
-  const mockViewport = (height: number, offsetTop = 0) => {
-    removeSpy = vi.fn();
+  const mockSetup = (opts: {
+    mobile: boolean;
+    vvHeight?: number;
+    vvOffsetTop?: number;
+    innerHeight?: number;
+  }) => {
+    currentMobile = opts.mobile;
+    removeVvSpy = vi.fn();
+    resizeHandler = null;
+    scrollHandler = null;
+    mqChangeHandler = null;
+
+    Object.defineProperty(window, 'innerHeight', {
+      writable: true,
+      configurable: true,
+      value: opts.innerHeight ?? 800,
+    });
+
     Object.defineProperty(window, 'visualViewport', {
       writable: true,
       configurable: true,
       value: {
-        height,
-        offsetTop,
-        addEventListener: (_event: string, handler: () => void) => {
-          if (_event === 'resize') resizeHandler = handler;
-          if (_event === 'scroll') scrollHandler = handler;
+        height: opts.vvHeight ?? opts.innerHeight ?? 800,
+        offsetTop: opts.vvOffsetTop ?? 0,
+        addEventListener: (event: string, handler: () => void) => {
+          if (event === 'resize') resizeHandler = handler;
+          if (event === 'scroll') scrollHandler = handler;
         },
-        removeEventListener: removeSpy,
+        removeEventListener: removeVvSpy,
       },
     });
-    Object.defineProperty(window, 'innerHeight', {
+
+    Object.defineProperty(window, 'matchMedia', {
       writable: true,
       configurable: true,
-      value: 800,
+      value: vi.fn().mockImplementation(() => ({
+        get matches() {
+          return currentMobile;
+        },
+        addEventListener: (_: string, handler: (e: { matches: boolean }) => void) => {
+          mqChangeHandler = handler;
+        },
+        removeEventListener: vi.fn(),
+      })),
     });
   };
 
   beforeEach(() => {
     resizeHandler = null;
     scrollHandler = null;
+    mqChangeHandler = null;
   });
 
   afterEach(() => {
@@ -42,89 +70,88 @@ describe('useVisualViewportOffset', () => {
     });
   });
 
-  it('returns undefined when visualViewport is unavailable', () => {
-    Object.defineProperty(window, 'visualViewport', {
-      writable: true,
-      configurable: true,
-      value: undefined,
-    });
+  it('returns undefined on desktop', () => {
+    mockSetup({ mobile: false });
     const { result } = renderHook(() => useVisualViewportOffset());
     expect(result.current).toBeUndefined();
   });
 
-  it('returns undefined when keyboard is closed (ratio ~1.0)', () => {
-    mockViewport(800);
+  it('returns top-anchored style on mobile (keyboard closed)', () => {
+    mockSetup({ mobile: true, vvHeight: 800, innerHeight: 800 });
     const { result } = renderHook(() => useVisualViewportOffset());
-    expect(result.current).toBeUndefined();
-  });
-
-  it('returns a style object when keyboard is open', () => {
-    mockViewport(400); // 400/800 = 0.5, well below 0.85 threshold
-    const { result } = renderHook(() => useVisualViewportOffset());
-    // top = offsetTop(0) + padding(16) = 16
-    // maxHeight = 400 - 16*2 = 368
     expect(result.current).toEqual({
-      top: '16px',
+      top: 'calc(16px + env(safe-area-inset-top, 0px))',
       translate: '-50% 0',
-      maxHeight: '368px',
+      maxHeight: 'calc(768px - env(safe-area-inset-top, 0px))',
       overflowY: 'auto',
     });
   });
 
-  it('accounts for offsetTop', () => {
-    mockViewport(400, 50);
+  it('constrains maxHeight when keyboard is open on mobile', () => {
+    mockSetup({ mobile: true, vvHeight: 400, innerHeight: 800 });
     const { result } = renderHook(() => useVisualViewportOffset());
-    // top = 50 + 16 = 66
-    // maxHeight = 400 - 32 = 368
     expect(result.current).toEqual({
-      top: '66px',
+      top: 'calc(16px + env(safe-area-inset-top, 0px))',
       translate: '-50% 0',
-      maxHeight: '368px',
+      maxHeight: 'calc(368px - env(safe-area-inset-top, 0px))',
       overflowY: 'auto',
     });
   });
 
-  it('returns undefined at the threshold boundary (ratio = 0.85)', () => {
-    mockViewport(680); // 680/800 = 0.85, NOT less than 0.85
+  it('accounts for offsetTop when keyboard scrolls viewport', () => {
+    mockSetup({ mobile: true, vvHeight: 400, vvOffsetTop: 50, innerHeight: 800 });
     const { result } = renderHook(() => useVisualViewportOffset());
-    expect(result.current).toBeUndefined();
+    expect(result.current).toEqual({
+      top: 'calc(66px + env(safe-area-inset-top, 0px))', // 50 + 16
+      translate: '-50% 0',
+      maxHeight: 'calc(368px - env(safe-area-inset-top, 0px))',
+      overflowY: 'auto',
+    });
   });
 
-  it('updates reactively on resize event', () => {
-    mockViewport(800);
+  it('updates reactively on visualViewport resize', () => {
+    mockSetup({ mobile: true, vvHeight: 800, innerHeight: 800 });
     const { result } = renderHook(() => useVisualViewportOffset());
-    expect(result.current).toBeUndefined();
+    expect(result.current?.maxHeight).toBe('calc(768px - env(safe-area-inset-top, 0px))');
 
+    // Simulate keyboard opening
     act(() => {
       (window.visualViewport as any).height = 400;
       resizeHandler?.();
     });
-    expect(result.current).toEqual({
-      top: '16px',
-      translate: '-50% 0',
-      maxHeight: '368px',
-      overflowY: 'auto',
-    });
+    expect(result.current?.maxHeight).toBe('calc(368px - env(safe-area-inset-top, 0px))');
   });
 
-  it('updates reactively on scroll event', () => {
-    mockViewport(400, 0);
+  it('updates reactively on visualViewport scroll', () => {
+    mockSetup({ mobile: true, vvHeight: 400, innerHeight: 800 });
     const { result } = renderHook(() => useVisualViewportOffset());
-    expect(result.current?.top).toBe('16px');
+    expect(result.current?.top).toBe('calc(16px + env(safe-area-inset-top, 0px))');
 
     act(() => {
       (window.visualViewport as any).offsetTop = 100;
       scrollHandler?.();
     });
-    // top = 100 + 16 = 116
-    expect(result.current?.top).toBe('116px');
+    expect(result.current?.top).toBe('calc(116px + env(safe-area-inset-top, 0px))');
   });
 
-  it('cleans up listeners on unmount', () => {
-    mockViewport(800);
+  it('switches from undefined to style when viewport narrows to mobile', () => {
+    mockSetup({ mobile: false, innerHeight: 800 });
+    const { result } = renderHook(() => useVisualViewportOffset());
+    expect(result.current).toBeUndefined();
+
+    act(() => {
+      currentMobile = true;
+      mqChangeHandler?.({ matches: true });
+    });
+    expect(result.current).toBeDefined();
+    expect(result.current?.top).toBe('calc(16px + env(safe-area-inset-top, 0px))');
+  });
+
+  it('cleans up all listeners on unmount', () => {
+    mockSetup({ mobile: true, vvHeight: 800, innerHeight: 800 });
     const { unmount } = renderHook(() => useVisualViewportOffset());
     unmount();
-    expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
-    expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
+    expect(removeVvSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(removeVvSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
   });
 });
