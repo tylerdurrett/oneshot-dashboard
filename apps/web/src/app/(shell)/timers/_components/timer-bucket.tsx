@@ -112,6 +112,7 @@ export interface TimerBucketProps {
   onSetElapsedTime: (elapsedSeconds: number) => void;
   onSetDailyGoal: (targetMinutes: number) => void;
   onDismissForToday: () => void;
+  onDelete: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +132,7 @@ export function TimerBucket({
   onSetElapsedTime,
   onSetDailyGoal,
   onDismissForToday,
+  onDelete,
 }: TimerBucketProps) {
   const totalSeconds = bucket.totalMinutes * 60;
   const remainingSeconds = totalSeconds - bucket.elapsedSeconds;
@@ -142,6 +144,7 @@ export function TimerBucket({
   const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 });
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [confirmDismissOpen, setConfirmDismissOpen] = useState(false);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // -- Goal-reached animation state --
   // Shows a brief success overlay when the goal is first reached.
@@ -402,6 +405,9 @@ export function TimerBucket({
           onDismissForToday={() => {
             setConfirmDismissOpen(true);
           }}
+          onDelete={() => {
+            setConfirmDeleteOpen(true);
+          }}
           onClose={closeMenu}
         />
       )}
@@ -431,6 +437,20 @@ export function TimerBucket({
         onConfirm={() => {
           onDismissForToday();
           setConfirmDismissOpen(false);
+        }}
+      />
+
+      <ConfirmationDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete bucket?"
+        description={`This will permanently remove "${bucket.name}". This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => {
+          onDelete();
+          setConfirmDeleteOpen(false);
         }}
       />
     </>

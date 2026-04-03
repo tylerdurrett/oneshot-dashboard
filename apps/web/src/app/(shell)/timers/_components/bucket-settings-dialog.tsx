@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { Button, cn, Input } from '@repo/ui';
-import { ConfirmationDialog } from '@repo/ui/components/confirmation-dialog';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -84,7 +82,6 @@ export interface BucketSettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (id: string, updates: Partial<TimeBucket>) => void;
-  onDelete: (id: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +93,6 @@ export function BucketSettingsDialog({
   open,
   onOpenChange,
   onSave,
-  onDelete,
 }: BucketSettingsDialogProps) {
   // Local form state
   const [name, setName] = useState('');
@@ -106,7 +102,6 @@ export function BucketSettingsDialog({
   const [daysOfWeek, setDaysOfWeek] = useState<number[]>([]);
   const [scheduleMode, setScheduleMode] = useState<ScheduleMode>('uniform');
   const [perDay, setPerDay] = useState<Record<string, PerDayEntry>>({});
-  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   // Re-initialize form state when the dialog opens with a bucket
   useEffect(() => {
@@ -244,22 +239,11 @@ export function BucketSettingsDialog({
     onOpenChange(false);
   };
 
-  const handleDelete = () => {
-    if (!bucket) return;
-    onDelete(bucket.id);
-    setConfirmDeleteOpen(false);
-    onOpenChange(false);
-  };
-
   return (
-    <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Bucket Settings</DialogTitle>
-            <DialogDescription>
-              Edit the name, duration, color, and active days for this bucket.
-            </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
@@ -481,15 +465,7 @@ export function BucketSettingsDialog({
             )}
           </div>
 
-          <DialogFooter>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="mr-auto"
-              onClick={() => setConfirmDeleteOpen(true)}
-            >
-              Delete Bucket
-            </Button>
+          <DialogFooter className="flex-row justify-end">
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
@@ -502,17 +478,5 @@ export function BucketSettingsDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <ConfirmationDialog
-        open={confirmDeleteOpen}
-        onOpenChange={setConfirmDeleteOpen}
-        title="Delete bucket?"
-        description={`This will permanently remove "${bucket?.name ?? ''}". This action cannot be undone.`}
-        confirmLabel="Delete"
-        cancelLabel="Cancel"
-        variant="destructive"
-        onConfirm={handleDelete}
-      />
-    </>
   );
 }

@@ -49,7 +49,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('BucketContextMenu', () => {
-  it('renders five menu items', () => {
+  it('renders six menu items', () => {
     render(
       <BucketContextMenu
         bucket={makeBucket()}
@@ -59,6 +59,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -68,6 +69,7 @@ describe('BucketContextMenu', () => {
     expect(screen.getByText("Set Today's Goal")).toBeTruthy();
     expect(screen.getByText('Reset for Today')).toBeTruthy();
     expect(screen.getByText('Dismiss for Today')).toBeTruthy();
+    expect(screen.getByText('Delete Bucket')).toBeTruthy();
   });
 
   it('calls onOpenSettings and onClose when "Bucket Settings" is clicked', () => {
@@ -82,6 +84,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -103,6 +106,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={onResetForToday}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -124,6 +128,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={onDismissForToday}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -143,6 +148,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -165,6 +171,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -186,6 +193,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -211,6 +219,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -237,6 +246,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -259,6 +269,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -283,6 +294,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -303,6 +315,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -325,6 +338,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -348,6 +362,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={onSetDailyGoal}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -374,6 +389,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={vi.fn()}
       />,
     );
@@ -396,6 +412,7 @@ describe('BucketContextMenu', () => {
         onSetDailyGoal={vi.fn()}
         onResetForToday={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
         onClose={onClose}
       />,
     );
@@ -441,6 +458,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -467,6 +485,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -489,6 +508,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -527,6 +547,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -572,6 +593,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -595,6 +617,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -618,6 +641,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -641,6 +665,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={onDismissForToday}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -665,6 +690,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -685,6 +711,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -704,6 +731,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -734,6 +762,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 
@@ -756,6 +785,7 @@ describe('TimerBucket context menu integration', () => {
         onSetElapsedTime={vi.fn()}
         onSetDailyGoal={vi.fn()}
         onDismissForToday={vi.fn()}
+        onDelete={vi.fn()}
       />,
     );
 

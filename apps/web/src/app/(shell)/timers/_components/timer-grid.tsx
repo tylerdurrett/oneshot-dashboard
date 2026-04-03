@@ -190,6 +190,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
                 onSetElapsedTime={(s) => setElapsedTime(bucket.id, s)}
                 onSetDailyGoal={(m) => setDailyGoal(bucket.id, m)}
                 onDismissForToday={() => dismissBucketForToday(bucket.id)}
+                onDelete={() => handleDeleteBucket(bucket.id)}
               />
             </motion.div>
           );
@@ -204,7 +205,6 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
             if (!open) setSelectedBucketId(null);
           }}
           onSave={updateBucket}
-          onDelete={handleDeleteBucket}
         />
       )}
     </div>

@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@repo/ui';
+import { ConfirmationDialog } from '@repo/ui/components/confirmation-dialog';
 import { Switch } from '@repo/ui/components/switch';
 
 import { BucketSettingsDialog } from '@/app/(shell)/timers/_components/bucket-settings-dialog';
@@ -52,6 +54,9 @@ function formatDuration(totalMinutes: number): string {
 }
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
+const LONG_PRESS_MS = 800;
+const LONG_PRESS_MOVE_THRESHOLD = 10;
+const VIEWPORT_MARGIN = 8;
 
 function nextAvailableColorIndex(buckets: BucketResponse[]): number {
   const used = new Set(buckets.map((b) => b.colorIndex));
@@ -98,6 +103,105 @@ export default function SettingsPage() {
 
   const [editingBucket, setEditingBucket] = useState<TimeBucket | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Context menu state for delete action (right-click / long-press)
+  const [contextMenu, setContextMenu] = useState<{
+    bucketId: string;
+    bucketName: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [bucketToDelete, setBucketToDelete] = useState<{ id: string; name: string } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+
+  // Long-press refs for mobile context menu
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressStartRef = useRef({ x: 0, y: 0 });
+  const isLongPressRef = useRef(false);
+
+  // Viewport-edge clamping for context menu
+  useLayoutEffect(() => {
+    if (!contextMenu) return;
+    const el = menuRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    let x = contextMenu.x;
+    let y = contextMenu.y + 10;
+    if (x + rect.width > window.innerWidth - VIEWPORT_MARGIN) {
+      x = window.innerWidth - rect.width - VIEWPORT_MARGIN;
+    }
+    if (x < VIEWPORT_MARGIN) x = VIEWPORT_MARGIN;
+    if (y + rect.height > window.innerHeight - VIEWPORT_MARGIN) {
+      y = contextMenu.y - rect.height - 10;
+    }
+    if (y < VIEWPORT_MARGIN) y = VIEWPORT_MARGIN;
+    setMenuPos((prev) => (prev.x === x && prev.y === y ? prev : { x, y }));
+  }, [contextMenu]);
+
+  // Click-outside and Escape dismissal for context menu
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
+    const handleScroll = () => setContextMenu(null);
+    const id = requestAnimationFrame(() => {
+      document.addEventListener('pointerdown', handlePointerDown);
+      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('scroll', handleScroll, true);
+    });
+    return () => {
+      cancelAnimationFrame(id);
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [contextMenu]);
+
+  const openContextMenu = useCallback((bucketId: string, bucketName: string, x: number, y: number) => {
+    setContextMenu({ bucketId, bucketName, x, y });
+    setMenuPos({ x, y: y + 10 });
+  }, []);
+
+  const handleRowContextMenu = useCallback((e: React.MouseEvent, bucket: BucketResponse) => {
+    e.preventDefault();
+    openContextMenu(bucket.id, bucket.name, e.clientX, e.clientY);
+  }, [openContextMenu]);
+
+  const handleRowPointerDown = useCallback((e: React.PointerEvent, bucket: BucketResponse) => {
+    if (e.pointerType === 'mouse') return;
+    isLongPressRef.current = false;
+    pressStartRef.current = { x: e.clientX, y: e.clientY };
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      longPressTimerRef.current = null;
+      openContextMenu(bucket.id, bucket.name, e.clientX, e.clientY);
+    }, LONG_PRESS_MS);
+  }, [openContextMenu]);
+
+  const handleRowPointerMove = useCallback((e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' || !longPressTimerRef.current) return;
+    const dx = e.clientX - pressStartRef.current.x;
+    const dy = e.clientY - pressStartRef.current.y;
+    if (Math.sqrt(dx * dx + dy * dy) > LONG_PRESS_MOVE_THRESHOLD) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleRowPointerUp = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
 
   // Sort: active first (by weekly commitment desc), then deactivated (by weekly commitment desc).
   // Tie-breaker: alphabetical by name.
@@ -183,7 +287,6 @@ export default function SettingsPage() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           onSave={handleSave}
-          onDelete={handleDelete}
         />
       </div>
     );
@@ -216,10 +319,23 @@ export default function SettingsPage() {
                 key={bucket.id}
                 type="button"
                 className={cn(
-                  'flex cursor-pointer items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-muted/50',
+                  'flex cursor-pointer touch-none select-none items-center gap-3 px-2 py-3 text-left transition-colors hover:bg-muted/50',
                   isDeactivated && 'opacity-50',
                 )}
-                onClick={() => handleRowClick(bucket)}
+                style={{ WebkitTouchCallout: 'none' }}
+                onContextMenu={(e) => handleRowContextMenu(e, bucket)}
+                onPointerDown={(e) => handleRowPointerDown(e, bucket)}
+                onPointerMove={handleRowPointerMove}
+                onPointerUp={handleRowPointerUp}
+                onPointerCancel={handleRowPointerUp}
+                onClick={() => {
+                  // Skip click if this was a long-press gesture
+                  if (isLongPressRef.current) {
+                    isLongPressRef.current = false;
+                    return;
+                  }
+                  handleRowClick(bucket);
+                }}
               >
                 <span
                   className="size-3.5 shrink-0 rounded-full"
@@ -258,7 +374,44 @@ export default function SettingsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSave={handleSave}
-        onDelete={handleDelete}
+      />
+
+      {contextMenu && createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          className="fixed z-50 min-w-[180px] rounded-lg border border-border bg-popover p-1 shadow-xl"
+          style={{ left: menuPos.x, top: menuPos.y }}
+        >
+          <button
+            role="menuitem"
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-accent"
+            onClick={() => {
+              setBucketToDelete({ id: contextMenu.bucketId, name: contextMenu.bucketName });
+              setConfirmDeleteOpen(true);
+              setContextMenu(null);
+            }}
+          >
+            <Trash2 className="size-4" />
+            Delete Bucket
+          </button>
+        </div>,
+        document.body,
+      )}
+
+      <ConfirmationDialog
+        open={confirmDeleteOpen}
+        onOpenChange={setConfirmDeleteOpen}
+        title="Delete bucket?"
+        description={`This will permanently remove "${bucketToDelete?.name ?? ''}". This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={() => {
+          if (bucketToDelete) handleDelete(bucketToDelete.id);
+          setConfirmDeleteOpen(false);
+          setBucketToDelete(null);
+        }}
       />
     </div>
   );
