@@ -14,7 +14,8 @@ import { AllTimerGridWithState } from '@/app/(shell)/timers/_components/all-time
 import { TotalTimeIndicator } from '@/app/(shell)/timers/_components/total-time-indicator';
 import SettingsPage from '@/app/(shell)/settings/page';
 import { MobileChatView, extractThreadId } from '@/app/(shell)/chat/mobile-chat-view';
-import { TIMERS_TITLE, ALL_TIMERS_TITLE, CHAT_TITLE } from '@/app/route-metadata';
+import { TIMERS_TITLE, ALL_TIMERS_TITLE, CHAT_TITLE, DOCS_TITLE } from '@/app/route-metadata';
+import DocsPage from '@/app/(shell)/docs/page';
 
 import { AppShell } from './app-shell';
 
@@ -27,6 +28,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/timers/all': ALL_TIMERS_TITLE,
   '/chat': CHAT_TITLE,
   '/settings': 'All Buckets',
+  '/docs': DOCS_TITLE,
 };
 
 // ---------------------------------------------------------------------------
@@ -62,7 +64,7 @@ function TimerPageWrapper({
 // ---------------------------------------------------------------------------
 
 export function MobileShellLayout() {
-  const { activeIndex, onIndexChange, pages } = useSwipeNavigation();
+  const { activeIndex, onIndexChange, pages, currentArea } = useSwipeNavigation();
   const { pathname } = useLocation();
   const timerState = useTimerState();
 
@@ -112,6 +114,8 @@ export function MobileShellLayout() {
             return <MobileChatView key={page.href} />;
           case '/settings':
             return <SettingsPage key={page.href} />;
+          case '/docs':
+            return <DocsPage key={page.href} />;
           default:
             return <div key={page.href} />;
         }
@@ -126,7 +130,7 @@ export function MobileShellLayout() {
   );
 
   return (
-    <AppShell fractionalIndex={fractionalIndex}>
+    <AppShell fractionalIndex={fractionalIndex} currentArea={currentArea}>
       <SwipeView
         activeIndex={activeIndex}
         onIndexChange={onIndexChange}

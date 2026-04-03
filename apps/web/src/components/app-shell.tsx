@@ -1,12 +1,14 @@
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Plus } from 'lucide-react';
 import { motion, useTransform, type MotionValue } from 'motion/react';
 import { cn } from '@repo/ui';
 
 import { ADD_BUCKET_EVENT } from '@/app/(shell)/timers/_lib/timer-types';
-import { type NavItem, NAV_ITEMS, isItemActive } from '@/lib/nav-items';
+import { type NavItem, isItemActive } from '@/lib/nav-items';
+import { APP_AREAS, getAreaForPath, type AppArea } from '@/lib/app-areas';
+import { AreaSwitcher } from './area-switcher';
 
 // ---------------------------------------------------------------------------
 // Long-press / context-menu constants
@@ -357,30 +359,74 @@ function renderNavItem(item: NavItem, isMobile: boolean, isActive: boolean) {
 // position without triggering React re-renders.
 // ---------------------------------------------------------------------------
 
-const INDICATOR_WIDTH = `${100 / NAV_ITEMS.length}%`;
-
-function NavIndicator({ fractionalIndex }: { fractionalIndex: MotionValue<number> }) {
+function NavIndicator({
+  fractionalIndex,
+  pageCount,
+}: {
+  fractionalIndex: MotionValue<number>;
+  pageCount: number;
+}) {
+  const width = `${100 / pageCount}%`;
   const x = useTransform(fractionalIndex, (v) => `${v * 100}%`);
   return (
     <motion.div
       className="absolute top-0 h-0.5 bg-sidebar-foreground/50 rounded-full"
-      style={{ width: INDICATOR_WIDTH, x }}
+      style={{ width, x }}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Desktop area rail icon
+// ---------------------------------------------------------------------------
+
+function AreaRailIcon({ area, isActive }: { area: AppArea; isActive: boolean }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate(area.navItems[0]!.href)}
+      className={cn(
+        'flex flex-col items-center justify-center gap-1 w-full px-2 py-3 transition-colors select-none',
+        isActive
+          ? 'text-sidebar-foreground'
+          : 'text-sidebar-foreground/50 hover:text-sidebar-foreground',
+      )}
+      aria-label={area.label}
+    >
+      <div
+        className={cn(
+          'p-1.5 rounded-lg transition-colors',
+          isActive && 'bg-sidebar-accent',
+        )}
+      >
+        <area.icon className="size-5" />
+      </div>
+      <span className="text-[10px] font-medium">{area.label}</span>
+    </button>
   );
 }
 
 export function AppShell({
   children,
   fractionalIndex,
+  currentArea: currentAreaProp,
 }: {
   children: React.ReactNode;
   /** When provided (mobile swipe mode), a sliding indicator follows the drag
    *  position across the bottom nav. Values are fractional page indices.
    *  Accepts a MotionValue to avoid re-renders during drag. */
   fractionalIndex?: MotionValue<number>;
+  /** The current area — passed from MobileShellLayout on mobile; derived from
+   *  pathname on desktop when not provided. */
+  currentArea?: AppArea;
 }) {
   const { pathname } = useLocation();
   const isStandaloneMode = useStandaloneMode();
+
+  // On desktop (no currentArea prop), derive area from pathname.
+  const area = currentAreaProp ?? getAreaForPath(pathname);
+  const areaNavItems = area.navItems;
 
   return (
     <div
@@ -389,13 +435,19 @@ export function AppShell({
         isStandaloneMode && 'app-shell-standalone',
       )}
     >
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar — area rail + nav sidebar */}
       <nav
         aria-label="Sidebar navigation"
-        className="hidden md:flex flex-col w-16 shrink-0 bg-sidebar border-r border-sidebar-border select-none"
+        className="hidden md:flex shrink-0 bg-sidebar border-r border-sidebar-border select-none"
       >
-        <div className="flex-1 flex flex-col items-center py-4 gap-1">
-          {NAV_ITEMS.map((item) =>
+        <div className="flex flex-col items-center w-16 border-r border-sidebar-border py-4 gap-1">
+          {APP_AREAS.map((a) => (
+            <AreaRailIcon key={a.id} area={a} isActive={a.id === area.id} />
+          ))}
+        </div>
+
+        <div className="flex flex-col items-center w-16 py-4 gap-1">
+          {areaNavItems.map((item) =>
             renderNavItem(item, false, isItemActive(item, pathname)),
           )}
         </div>
@@ -413,12 +465,13 @@ export function AppShell({
       >
         {/* Sliding indicator — driven by a MotionValue so it tracks the
              finger without triggering React re-renders during drag. */}
-        {fractionalIndex != null && NAV_ITEMS.length > 0 && (
-          <NavIndicator fractionalIndex={fractionalIndex} />
+        {fractionalIndex != null && areaNavItems.length > 0 && (
+          <NavIndicator fractionalIndex={fractionalIndex} pageCount={areaNavItems.length} />
         )}
-        {NAV_ITEMS.map((item) =>
+        {areaNavItems.map((item) =>
           renderNavItem(item, true, isItemActive(item, pathname)),
         )}
+        <AreaSwitcher currentArea={area} />
       </nav>
     </div>
   );

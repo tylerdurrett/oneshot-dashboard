@@ -41,6 +41,9 @@ export {
 export { ConfirmationDialog } from './components/confirmation-dialog';
 export type { ConfirmationDialogProps } from './components/confirmation-dialog';
 
+export { Drawer } from './components/drawer';
+export type { DrawerProps } from './components/drawer';
+
 export { Spinner } from './components/spinner';
 export { SwipeView, computeSnapIndex } from './components/swipe-view';
 export type { SwipeViewProps } from './components/swipe-view';
