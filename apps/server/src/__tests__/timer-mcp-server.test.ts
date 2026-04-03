@@ -4,35 +4,44 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import http from 'node:http';
+import { EventEmitter, Readable } from 'node:stream';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveBucket, api, API_BASE } from '../chat/timer-mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
-// Mock fetch globally so the helpers use our fake
+// Mock node:http so the helpers use our fake instead of real HTTP
 // ---------------------------------------------------------------------------
 
-let mockFetch: ReturnType<typeof vi.fn>;
-
-beforeEach(() => {
-  mockFetch = vi.fn();
-  vi.stubGlobal('fetch', mockFetch);
+const { mockRequest } = vi.hoisted(() => ({ mockRequest: vi.fn() }));
+vi.mock('node:http', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:http')>();
+  return { ...actual, default: { ...actual, request: mockRequest }, request: mockRequest };
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  mockRequest.mockReset();
 });
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-function mockResponse(status: number, body: unknown) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    text: async () => JSON.stringify(body),
-  };
+/** Set up mockRequest to call the callback with a fake response. */
+function mockHttpResponse(status: number, body: unknown) {
+  const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+  mockRequest.mockImplementationOnce((_options: unknown, callback?: (res: unknown) => void) => {
+    const req = new EventEmitter() as http.ClientRequest;
+    req.write = vi.fn().mockReturnValue(true);
+    req.end = vi.fn().mockImplementation(() => {
+      const res = Readable.from([bodyStr]) as Readable & { statusCode: number };
+      res.statusCode = status;
+      callback?.(res);
+      return req;
+    });
+    return req;
+  });
 }
 
 const SAMPLE_BUCKETS = [
@@ -51,29 +60,29 @@ describe('resolveBucket', () => {
     const id = '12345678-1234-1234-1234-123456789abc';
     const result = await resolveBucket(id);
     expect(result).toEqual({ id });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockRequest).not.toHaveBeenCalled();
   });
 
   it('matches exact name (case-insensitive)', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { buckets: SAMPLE_BUCKETS }));
+    mockHttpResponse(200, { buckets: SAMPLE_BUCKETS });
     const result = await resolveBucket('school');
     expect(result).toEqual({ id: 'aaa-111' });
   });
 
   it('matches exact name with different casing', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { buckets: SAMPLE_BUCKETS }));
+    mockHttpResponse(200, { buckets: SAMPLE_BUCKETS });
     const result = await resolveBucket('EXERCISE');
     expect(result).toEqual({ id: 'bbb-222' });
   });
 
   it('matches substring when no exact match', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { buckets: SAMPLE_BUCKETS }));
+    mockHttpResponse(200, { buckets: SAMPLE_BUCKETS });
     const result = await resolveBucket('Maintenance');
     expect(result).toEqual({ id: 'ddd-444' });
   });
 
   it('returns error when multiple partial matches', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { buckets: SAMPLE_BUCKETS }));
+    mockHttpResponse(200, { buckets: SAMPLE_BUCKETS });
     const result = await resolveBucket('in');
     expect(result).toHaveProperty('error');
     expect((result as { error: string }).error).toContain('Multiple buckets match');
@@ -82,7 +91,7 @@ describe('resolveBucket', () => {
   });
 
   it('returns error when no match found', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { buckets: SAMPLE_BUCKETS }));
+    mockHttpResponse(200, { buckets: SAMPLE_BUCKETS });
     const result = await resolveBucket('Cooking');
     expect(result).toHaveProperty('error');
     expect((result as { error: string }).error).toContain('No bucket matches');
@@ -90,7 +99,7 @@ describe('resolveBucket', () => {
   });
 
   it('returns error when bucket list fetch fails', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(500, { error: 'Internal error' }));
+    mockHttpResponse(500, { error: 'Internal error' });
     const result = await resolveBucket('School');
     expect(result).toHaveProperty('error');
     expect((result as { error: string }).error).toContain('Failed to fetch buckets');
@@ -99,34 +108,30 @@ describe('resolveBucket', () => {
 
 describe('api helper', () => {
   it('makes GET requests without body or Content-Type', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { date: '2026-04-02', buckets: [] }));
+    mockHttpResponse(200, { date: '2026-04-02', buckets: [] });
     const result = await api('GET', '/timers/today');
     expect(result.ok).toBe(true);
     expect(result.status).toBe(200);
 
-    const call = mockFetch.mock.calls[0]!;
-    expect(call[0]).toBe(`${API_BASE}/timers/today`);
-    expect(call[1].method).toBe('GET');
-    expect(call[1].body).toBeUndefined();
+    const call = mockRequest.mock.calls[0]!;
+    const options = call[0] as http.RequestOptions;
+    expect(options.method).toBe('GET');
     // GET should not send Content-Type
-    expect(call[1].headers).toBeUndefined();
+    expect((options.headers as Record<string, string>)?.['Content-Type']).toBeUndefined();
   });
 
   it('makes POST requests with JSON body and Content-Type', async () => {
-    mockFetch.mockResolvedValueOnce(mockResponse(200, { bucketId: 'aaa-111', startedAt: '2026-04-02T12:00:00Z' }));
+    mockHttpResponse(200, { bucketId: 'aaa-111', startedAt: '2026-04-02T12:00:00Z' });
     await api('POST', '/timers/buckets/aaa-111/start', {});
 
-    const call = mockFetch.mock.calls[0]!;
-    expect(call[1].method).toBe('POST');
-    expect(call[1].headers).toEqual({ 'Content-Type': 'application/json' });
+    const call = mockRequest.mock.calls[0]!;
+    const options = call[0] as http.RequestOptions;
+    expect(options.method).toBe('POST');
+    expect((options.headers as Record<string, string>)?.['Content-Type']).toBe('application/json');
   });
 
   it('handles non-JSON responses', async () => {
-    mockFetch.mockResolvedValueOnce({
-      ok: false,
-      status: 502,
-      text: async () => 'Bad Gateway',
-    });
+    mockHttpResponse(502, 'Bad Gateway');
     const result = await api('GET', '/timers/today');
     expect(result.ok).toBe(false);
     expect(result.data).toBe('Bad Gateway');

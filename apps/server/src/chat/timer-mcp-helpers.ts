@@ -3,11 +3,19 @@
  * these without triggering the stdio transport connection in the entry point.
  */
 
+import http from 'node:http';
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 export const API_BASE = process.env.ONESHOT_API_BASE ?? 'http://host.docker.internal:4902';
+
+// The Docker sandbox routes HTTP through a MITM proxy. Node 20's built-in
+// fetch (undici) ignores HTTP_PROXY, so requests to host.docker.internal fail.
+// We use node:http with explicit proxy routing instead.
+const HTTP_PROXY = process.env.HTTP_PROXY || process.env.http_proxy;
+const PARSED_PROXY = HTTP_PROXY ? new URL(HTTP_PROXY) : null;
 
 // ---------------------------------------------------------------------------
 // HTTP helper
@@ -21,21 +29,39 @@ export interface ApiResult {
 
 export async function api(method: string, path: string, body?: unknown): Promise<ApiResult> {
   const url = `${API_BASE}${path}`;
-  const opts: RequestInit = { method };
-  if (body !== undefined) {
-    opts.headers = { 'Content-Type': 'application/json' };
-    opts.body = JSON.stringify(body);
-  }
+  const payload = body !== undefined ? JSON.stringify(body) : undefined;
 
-  const res = await fetch(url, opts);
-  const text = await res.text();
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = text;
-  }
-  return { ok: res.ok, status: res.status, data };
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    // When a proxy is configured, route through it: connect to the proxy host
+    // and set the full URL as the request path (HTTP forward-proxy convention).
+    const options: http.RequestOptions = {
+      hostname: PARSED_PROXY ? PARSED_PROXY.hostname : target.hostname,
+      port: PARSED_PROXY ? Number(PARSED_PROXY.port) : Number(target.port) || 80,
+      path: PARSED_PROXY ? url : target.pathname + target.search,
+      method,
+      timeout: 15_000,
+      headers: {
+        Host: target.host,
+        ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
+      res.on('end', () => {
+        let parsed: unknown;
+        try { parsed = JSON.parse(data); } catch { parsed = data; }
+        const status = res.statusCode ?? 500;
+        resolve({ ok: status >= 200 && status < 300, status, data: parsed });
+      });
+    });
+    req.on('timeout', () => { req.destroy(new Error('Request timed out')); });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -259,6 +259,24 @@ function ensureProxyCACert() {
   }
 }
 
+/**
+ * Allow the sandbox to connect to host.docker.internal (loopback).
+ * The MCP timer server calls the host API via host.docker.internal:<port>,
+ * which resolves to 127.0.0.1 — blocked by default sandbox network policy.
+ */
+function allowHostNetworking() {
+  try {
+    execFileSync(
+      'docker',
+      ['sandbox', 'network', 'proxy', SANDBOX_NAME, '--allow-cidr', '127.0.0.0/8'],
+      { stdio: 'pipe', timeout: 15_000 },
+    );
+    console.log('  ✓ Host networking allowed (127.0.0.0/8)');
+  } catch {
+    console.log('  ⚠ Could not configure sandbox network — MCP timer tools may not reach host API');
+  }
+}
+
 /** Inject all sandbox assets. None are available via the mount — only workspace/ is mounted. */
 function injectSandboxAssets() {
   const soulPath = path.join(ROOT, 'apps', 'server', 'src', 'chat', 'soul.md');
@@ -299,42 +317,33 @@ function injectMcpBundle() {
 }
 
 /**
- * Inject MCP server config into the sandbox's Claude settings.
- * Merges `mcpServers.oneshot-timers` into the existing settings.json,
- * preserving any other settings already present.
+ * Write MCP server config to the workspace's .mcp.json.
+ * Claude Code reads MCP server definitions from .mcp.json (project scope),
+ * NOT from settings.json which is for general settings only.
+ *
+ * Written to the host workspace directory (not injected via docker exec)
+ * because the server invokes Claude with `-w <host-path>` and Docker
+ * preserves the host path inside the sandbox via VirtioFS. Claude's cwd
+ * is the host path, so .mcp.json must be there.
  */
 function injectMcpConfig() {
-  // Read existing settings (may not exist yet)
-  let existing = {};
-  try {
-    const raw = execFileSync(
-      'docker',
-      ['sandbox', 'exec', SANDBOX_NAME, 'cat', '/home/agent/.claude/settings.json'],
-      { timeout: 10_000 },
-    ).toString().trim();
-    existing = JSON.parse(raw);
-  } catch (err) {
-    // File doesn't exist → expected on first run. Invalid JSON → warn.
-    if (err?.status === 0) {
-      console.log('  ⚠ Existing settings.json was not valid JSON — starting fresh');
-    }
-  }
-
-  // Merge in our MCP server config, passing the API base URL so the
-  // MCP server connects to the correct host port.
   const serverPort = readServerPort();
-  const mcpServers = (existing && typeof existing === 'object' && existing.mcpServers) || {};
-  mcpServers['oneshot-timers'] = {
-    command: 'node',
-    args: [MCP_BUNDLE_DEST],
-    env: { ONESHOT_API_BASE: `http://host.docker.internal:${serverPort}` },
+  const mcpConfig = {
+    mcpServers: {
+      'oneshot-timers': {
+        type: 'stdio',
+        command: 'node',
+        args: [MCP_BUNDLE_DEST],
+        env: { ONESHOT_API_BASE: `http://host.docker.internal:${serverPort}` },
+      },
+    },
   };
-  const merged = { ...existing, mcpServers };
 
-  if (injectFileIntoSandbox(JSON.stringify(merged, null, 2), '/home/agent/.claude/settings.json')) {
-    console.log('  ✓ MCP timer server config injected');
-  } else {
-    console.log('  ⚠ Could not inject MCP config — chat timer tools may be unavailable');
+  try {
+    fs.writeFileSync(path.join(SANDBOX_WORKSPACE, '.mcp.json'), JSON.stringify(mcpConfig, null, 2));
+    console.log('  ✓ MCP timer server config written (.mcp.json)');
+  } catch (err) {
+    console.log(`  ⚠ Could not write .mcp.json — chat timer tools may be unavailable: ${err.message}`);
   }
 }
 
@@ -365,6 +374,7 @@ async function main() {
       }
     }
     ensureProxyCACert();
+    allowHostNetworking();
     injectSandboxAssets();
     return;
   }
@@ -405,6 +415,7 @@ async function main() {
   }
 
   ensureProxyCACert();
+  allowHostNetworking();
   injectSandboxAssets();
 
   console.log('  ✓ Sandbox ready');
