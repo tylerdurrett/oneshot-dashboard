@@ -368,8 +368,8 @@ describe('useTimerState', () => {
       weeklySchedule: null,
       sortOrder: 1,
       deactivatedAt: null,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
 
     const { result } = renderHook(() => useTimerState(), {
@@ -434,8 +434,8 @@ describe('useTimerState', () => {
       weeklySchedule: null,
       sortOrder: 0,
       deactivatedAt: null,
-      createdAt: 1000,
-      updatedAt: Date.now(),
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: new Date().toISOString(),
     });
 
     const { result } = renderHook(() => useTimerState(), {

@@ -1,47 +1,47 @@
 // Database schema — source of truth for all tables.
 // After editing, run: pnpm --filter @repo/db db:generate && pnpm --filter @repo/db db:migrate
 
-import { integer, sqliteTable, text, unique } from 'drizzle-orm/sqlite-core';
+import { date, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
-export const threads = sqliteTable('threads', {
-  id: text('id').primaryKey(),
+export const threads = pgTable('threads', {
+  id: uuid('id').defaultRandom().primaryKey(),
   title: text('title').notNull(),
   claudeSessionId: text('claude_session_id'),
-  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
-  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
 });
 
-export const messages = sqliteTable('messages', {
-  id: text('id').primaryKey(),
-  threadId: text('thread_id')
+export const messages = pgTable('messages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  threadId: uuid('thread_id')
     .notNull()
     .references(() => threads.id),
   role: text('role').notNull(),
   content: text('content').notNull(),
-  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
 });
 
-export const timerBuckets = sqliteTable('timer_buckets', {
-  id: text('id').primaryKey(),
+export const timerBuckets = pgTable('timer_buckets', {
+  id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
   totalMinutes: integer('total_minutes').notNull(),
   colorIndex: integer('color_index').notNull(),
-  daysOfWeek: text('days_of_week').notNull(), // JSON array string, e.g. "[1,2,3,4,5]"
-  weeklySchedule: text('weekly_schedule'), // JSON object mapping day-of-week to minutes, e.g. '{"1":120,"2":120}'
+  daysOfWeek: jsonb('days_of_week').notNull().$type<number[]>(),
+  weeklySchedule: jsonb('weekly_schedule').$type<Record<string, number>>(),
   sortOrder: integer('sort_order').notNull().default(0),
-  deactivatedAt: integer('deactivated_at'), // nullable — null means active, timestamp means deactivated
-  createdAt: integer('created_at').notNull().$defaultFn(() => Date.now()),
-  updatedAt: integer('updated_at').notNull().$defaultFn(() => Date.now()),
+  deactivatedAt: timestamp('deactivated_at', { withTimezone: true, mode: 'string' }),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
 });
 
-export const timerDailyProgress = sqliteTable(
+export const timerDailyProgress = pgTable(
   'timer_daily_progress',
   {
-    id: text('id').primaryKey(),
-    bucketId: text('bucket_id')
+    id: uuid('id').defaultRandom().primaryKey(),
+    bucketId: uuid('bucket_id')
       .notNull()
       .references(() => timerBuckets.id),
-    date: text('date').notNull(), // YYYY-MM-DD, 3AM-adjusted
+    date: date('date', { mode: 'string' }).notNull(), // YYYY-MM-DD, 3AM-adjusted
     elapsedSeconds: integer('elapsed_seconds').notNull().default(0),
     startedAt: text('started_at'), // ISO timestamp if currently running, null if paused
     goalReachedAt: text('goal_reached_at'), // ISO timestamp when elapsed first hit totalMinutes goal, null otherwise

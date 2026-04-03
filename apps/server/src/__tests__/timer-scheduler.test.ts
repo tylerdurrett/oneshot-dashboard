@@ -15,9 +15,9 @@ describe('TimerScheduler — init()', () => {
   let resetCount: number;
   let scheduler: TimerScheduler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    testDb = createTimerTestDb();
+    testDb = await createTimerTestDb();
     goalReachedBuckets = [];
     resetCount = 0;
     scheduler = new TimerScheduler({
@@ -164,9 +164,9 @@ describe('TimerScheduler — scheduleGoalReached', () => {
   let goalReachedBuckets: string[];
   let scheduler: TimerScheduler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    testDb = createTimerTestDb();
+    testDb = await createTimerTestDb();
     goalReachedBuckets = [];
     scheduler = new TimerScheduler({
       database: testDb,
@@ -251,9 +251,9 @@ describe('TimerScheduler — cancelGoalJob', () => {
   let goalReachedBuckets: string[];
   let scheduler: TimerScheduler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    testDb = createTimerTestDb();
+    testDb = await createTimerTestDb();
     goalReachedBuckets = [];
     scheduler = new TimerScheduler({
       database: testDb,
@@ -296,9 +296,9 @@ describe('TimerScheduler — scheduleNextReset', () => {
   let resetCount: number;
   let scheduler: TimerScheduler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    testDb = createTimerTestDb();
+    testDb = await createTimerTestDb();
     resetCount = 0;
     scheduler = new TimerScheduler({
       database: testDb,
@@ -389,9 +389,9 @@ describe('TimerScheduler — destroy', () => {
   let resetCount: number;
   let scheduler: TimerScheduler;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.useFakeTimers();
-    testDb = createTimerTestDb();
+    testDb = await createTimerTestDb();
     goalReachedBuckets = [];
     resetCount = 0;
     scheduler = new TimerScheduler({

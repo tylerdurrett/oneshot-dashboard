@@ -133,8 +133,8 @@ describe('resolveTargetMinutes', () => {
 describe('weeklySchedule CRUD', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('createBucket builds uniform schedule when not provided', async () => {
@@ -247,8 +247,8 @@ describe('weeklySchedule CRUD', () => {
 describe('getTodayState with weeklySchedule', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('resolves per-day target from weeklySchedule', async () => {

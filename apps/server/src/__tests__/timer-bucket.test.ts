@@ -14,8 +14,8 @@ import { createTimerTestDb } from './timer-test-helpers.js';
 describe('seedDefaultBuckets', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('seeds 4 default buckets into an empty database', async () => {
@@ -50,12 +50,13 @@ describe('seedDefaultBuckets', () => {
     expect(sorted[3]!.colorIndex).toBe(3);
   });
 
-  it('stores daysOfWeek as JSON string for Mon-Fri', async () => {
+  it('stores daysOfWeek as native array for Mon-Fri', async () => {
     await seedDefaultBuckets(testDb);
     const buckets = await testDb.select().from(timerBuckets);
 
     for (const bucket of buckets) {
-      expect(bucket.daysOfWeek).toBe('[1,2,3,4,5]');
+      // jsonb column returns native array — no JSON.parse needed
+      expect(bucket.daysOfWeek).toEqual([1, 2, 3, 4, 5]);
     }
   });
 
@@ -95,10 +96,10 @@ describe('seedDefaultBuckets', () => {
       name: 'Custom Bucket',
       totalMinutes: 45,
       colorIndex: 5,
-      daysOfWeek: '[0,6]',
+      daysOfWeek: [0, 6],
       sortOrder: 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
 
     const seeded = await seedDefaultBuckets(testDb);
@@ -113,8 +114,8 @@ describe('seedDefaultBuckets', () => {
 describe('bucket CRUD', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   describe('createBucket', () => {
@@ -253,7 +254,8 @@ describe('bucket CRUD', () => {
 
       // Small delay to ensure timestamp differs
       const updated = await updateBucket(created.id, { name: 'Updated' }, testDb);
-      expect(updated!.updatedAt).toBeGreaterThanOrEqual(created.updatedAt);
+      // ISO string comparison — later timestamps sort after earlier ones
+      expect(updated!.updatedAt >= created.updatedAt).toBe(true);
     });
 
     it('returns undefined for nonexistent ID', async () => {
@@ -382,11 +384,11 @@ describe('bucket CRUD', () => {
         { name: 'Test', totalMinutes: 60, colorIndex: 0, daysOfWeek: [1] },
         testDb,
       );
-      const now = Date.now();
+      const now = new Date().toISOString();
 
       const updated = await updateBucket(bucket.id, { deactivatedAt: now }, testDb);
       expect(updated).toBeDefined();
-      expect(updated!.deactivatedAt).toBe(now);
+      expect(typeof updated!.deactivatedAt).toBe('string');
     });
 
     it('reactivates a bucket by setting deactivatedAt to null', async () => {
@@ -396,7 +398,7 @@ describe('bucket CRUD', () => {
       );
 
       // Deactivate first
-      await updateBucket(bucket.id, { deactivatedAt: Date.now() }, testDb);
+      await updateBucket(bucket.id, { deactivatedAt: new Date().toISOString() }, testDb);
 
       // Reactivate
       const reactivated = await updateBucket(bucket.id, { deactivatedAt: null }, testDb);
@@ -413,7 +415,7 @@ describe('bucket CRUD', () => {
         { name: 'Deactivated', totalMinutes: 60, colorIndex: 1, daysOfWeek: [1] },
         testDb,
       );
-      await updateBucket(deactivated.id, { deactivatedAt: Date.now() }, testDb);
+      await updateBucket(deactivated.id, { deactivatedAt: new Date().toISOString() }, testDb);
 
       const buckets = await listBuckets(testDb);
       expect(buckets).toHaveLength(2);
@@ -426,7 +428,7 @@ describe('bucket CRUD', () => {
         testDb,
       );
 
-      const updated = await updateBucket(bucket.id, { deactivatedAt: Date.now() }, testDb);
+      const updated = await updateBucket(bucket.id, { deactivatedAt: new Date().toISOString() }, testDb);
       // Original schedule fields should be untouched
       expect(updated!.totalMinutes).toBe(120);
       expect(updated!.daysOfWeek).toEqual([1, 3, 5]);

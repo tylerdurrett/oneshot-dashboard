@@ -9,7 +9,7 @@ const db: Database = defaultDb;
 /** Create a new thread. Returns the created thread. */
 export async function createThread(title: string, database: Database = db) {
   const id = crypto.randomUUID();
-  const now = Date.now();
+  const now = new Date().toISOString();
 
   await database.insert(threads).values({
     id,
@@ -59,7 +59,7 @@ export async function addMessage(
   database: Database = db,
 ) {
   const id = crypto.randomUUID();
-  const now = Date.now();
+  const now = new Date().toISOString();
 
   await database.insert(messages).values({
     id,
@@ -85,7 +85,7 @@ export async function updateThreadSessionId(
 ) {
   await database
     .update(threads)
-    .set({ claudeSessionId: sessionId, updatedAt: Date.now() })
+    .set({ claudeSessionId: sessionId, updatedAt: new Date().toISOString() })
     .where(eq(threads.id, threadId));
 }
 
@@ -113,6 +113,6 @@ export async function updateThreadTitle(
 ) {
   await database
     .update(threads)
-    .set({ title, updatedAt: Date.now() })
+    .set({ title, updatedAt: new Date().toISOString() })
     .where(eq(threads.id, threadId));
 }

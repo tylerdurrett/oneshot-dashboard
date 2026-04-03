@@ -19,7 +19,7 @@
     "fastify": "^5.7.0"
   },
   "devDependencies": {
-    "@libsql/client": "^0.15.15",
+    "postgres": "^3.4.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",

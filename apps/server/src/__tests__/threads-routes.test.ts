@@ -1,42 +1,14 @@
-import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { threads, messages } from '@repo/db';
 import { config } from '../config.js';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
-
-/** Create a fresh in-memory database with the schema applied. */
-function createTestDb(): Database {
-  const client = createClient({ url: ':memory:' });
-  const testDb = drizzle(client, { schema: { threads, messages } });
-
-  client.executeMultiple(`
-    CREATE TABLE threads (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      claude_session_id TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE messages (
-      id TEXT PRIMARY KEY NOT NULL,
-      thread_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (thread_id) REFERENCES threads(id)
-    );
-  `);
-
-  return testDb as unknown as Database;
-}
+import { createCleanTestDb } from './test-db.js';
 
 describe('thread routes', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTestDb();
+  beforeEach(async () => {
+    testDb = await createCleanTestDb('messages, threads');
   });
 
   describe('GET /threads', () => {
@@ -141,7 +113,7 @@ describe('thread routes', () => {
 
       const response = await server.inject({
         method: 'GET',
-        url: '/threads/nonexistent/messages',
+        url: '/threads/00000000-0000-0000-0000-000000000000/messages',
       });
 
       expect(response.statusCode).toBe(404);
@@ -210,7 +182,7 @@ describe('thread routes', () => {
 
       const response = await server.inject({
         method: 'DELETE',
-        url: '/threads/nonexistent',
+        url: '/threads/00000000-0000-0000-0000-000000000000',
       });
 
       expect(response.statusCode).toBe(404);

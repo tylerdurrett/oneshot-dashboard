@@ -51,8 +51,8 @@ function makeBucket(overrides: Partial<BucketResponse> = {}): BucketResponse {
     weeklySchedule: null,
     sortOrder: 0,
     deactivatedAt: null,
-    createdAt: 1000,
-    updatedAt: 1000,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -128,7 +128,7 @@ describe('SettingsPage', () => {
   it('sorts deactivated buckets last', () => {
     mockUseBuckets.mockReturnValue({
       data: [
-        makeBucket({ id: 'b1', name: 'Deactivated', totalMinutes: 180, daysOfWeek: [1, 2, 3, 4, 5], deactivatedAt: 1000 }),
+        makeBucket({ id: 'b1', name: 'Deactivated', totalMinutes: 180, daysOfWeek: [1, 2, 3, 4, 5], deactivatedAt: '2026-01-01T00:00:00.000Z' }),
         makeBucket({ id: 'b2', name: 'Active', totalMinutes: 60, daysOfWeek: [1] }),
       ],
       isLoading: false,
@@ -177,13 +177,13 @@ describe('SettingsPage', () => {
 
     expect(mockUpdateMutate).toHaveBeenCalledWith({
       id: 'b1',
-      updates: { deactivatedAt: expect.any(Number) },
+      updates: { deactivatedAt: expect.any(String) },
     });
   });
 
   it('calls updateBucket with null deactivatedAt when toggling switch on', () => {
     mockUseBuckets.mockReturnValue({
-      data: [makeBucket({ id: 'b1', name: 'Work', deactivatedAt: 1000 })],
+      data: [makeBucket({ id: 'b1', name: 'Work', deactivatedAt: '2026-01-01T00:00:00.000Z' })],
       isLoading: false,
     });
     renderPage();

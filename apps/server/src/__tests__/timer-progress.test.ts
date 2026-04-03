@@ -58,8 +58,8 @@ describe('getResetDate', () => {
 describe('getTodayState', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('returns all buckets with default progress when no progress rows exist', async () => {
@@ -150,7 +150,7 @@ describe('getTodayState', () => {
 
     await seedBucket(testDb, { name: 'Active', sortOrder: 0 });
     const deactivated = await seedBucket(testDb, { name: 'Deactivated', sortOrder: 1 });
-    await updateBucket(deactivated.id, { deactivatedAt: Date.now() }, testDb);
+    await updateBucket(deactivated.id, { deactivatedAt: new Date().toISOString() }, testDb);
 
     const now = new Date(2026, 2, 24, 10, 0, 0);
     const result = await getTodayState(testDb, now);
@@ -165,7 +165,7 @@ describe('getTodayState', () => {
     const bucket = await seedBucket(testDb, { name: 'Toggled' });
 
     // Deactivate
-    await updateBucket(bucket.id, { deactivatedAt: Date.now() }, testDb);
+    await updateBucket(bucket.id, { deactivatedAt: new Date().toISOString() }, testDb);
     const now = new Date(2026, 2, 24, 10, 0, 0);
     let result = await getTodayState(testDb, now);
     expect(result.buckets).toHaveLength(0);
@@ -185,8 +185,8 @@ describe('getTodayState', () => {
 describe('startTimer', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('creates a progress row and sets startedAt', async () => {
@@ -278,8 +278,8 @@ describe('startTimer', () => {
 describe('stopTimer', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('accumulates elapsed correctly', async () => {
@@ -374,8 +374,8 @@ describe('stopTimer', () => {
 describe('markGoalReached', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('sets goalReachedAt without clearing startedAt', async () => {
@@ -402,8 +402,8 @@ describe('markGoalReached', () => {
 describe('resetProgress', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('zeros out elapsed and clears goalReachedAt', async () => {
@@ -448,8 +448,8 @@ describe('resetProgress', () => {
 describe('setElapsedTime', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('sets elapsed seconds directly', async () => {
@@ -523,8 +523,8 @@ describe('setElapsedTime', () => {
 describe('stopAllRunningTimers', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('stops all active timers for a given date and returns bucket IDs', async () => {
@@ -607,8 +607,8 @@ describe('stopAllRunningTimers', () => {
 describe('dismissBucket', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('creates a progress row with dismissedAt when none exists', async () => {
@@ -729,8 +729,8 @@ describe('dismissBucket', () => {
 describe('setDailyGoal', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
   });
 
   it('sets targetMinutesOverride on an existing progress row', async () => {

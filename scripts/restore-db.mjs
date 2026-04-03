@@ -1,19 +1,21 @@
 #!/usr/bin/env node
 
 /**
- * Restores the SQLite database from the most recent backup.
+ * Restores the PostgreSQL database from the most recent backup.
  * Usage:
  *   pnpm db:restore          — restores the latest backup
  *   pnpm db:restore <file>   — restores a specific backup file
  */
 
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.resolve(__dirname, '..', 'packages', 'db', 'local.db');
 const backupDir = path.resolve(__dirname, '..', 'packages', 'db', 'backups');
+
+const pgUrl = process.env.DATABASE_URL ?? 'postgresql://oneshot:oneshot@localhost:5432/oneshot';
 
 if (!fs.existsSync(backupDir)) {
   console.error('  No backups directory found. Nothing to restore.');
@@ -21,7 +23,7 @@ if (!fs.existsSync(backupDir)) {
 }
 
 const backups = fs.readdirSync(backupDir)
-  .filter((f) => f.startsWith('local-') && f.endsWith('.db'))
+  .filter((f) => f.startsWith('backup-') && f.endsWith('.pgdump'))
   .sort()
   .reverse();
 
@@ -48,12 +50,15 @@ if (requested) {
 }
 
 const backupPath = path.join(backupDir, chosen);
-fs.copyFileSync(backupPath, dbPath);
 
-// Remove WAL/SHM files so SQLite starts clean
-for (const suffix of ['-wal', '-shm', '-journal']) {
-  const f = dbPath + suffix;
-  if (fs.existsSync(f)) fs.unlinkSync(f);
+try {
+  execSync(`pg_restore --clean --if-exists -d "${pgUrl}" "${backupPath}"`, {
+    stdio: 'inherit',
+  });
+  console.log('  Done. Restart the dev server to pick up the restored database.');
+} catch (err) {
+  // pg_restore exits non-zero for warnings (e.g., objects that don't exist yet
+  // when using --clean). The restore usually succeeds anyway.
+  console.warn(`  pg_restore finished with warnings: ${err.message}`);
+  console.log('  Check your data — the restore likely succeeded despite warnings.');
 }
-
-console.log('  Done. Restart the dev server to pick up the restored database.');

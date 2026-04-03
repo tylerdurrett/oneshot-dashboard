@@ -1,10 +1,10 @@
 import { defineConfig } from 'drizzle-kit';
 
 export default defineConfig({
-  dialect: 'sqlite',
+  dialect: 'postgresql',
   schema: './src/schema.ts',
   out: './drizzle',
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? 'file:local.db',
+    url: process.env.DATABASE_URL ?? 'postgresql://oneshot:oneshot@localhost:5432/oneshot',
   },
 });

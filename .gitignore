@@ -67,11 +67,12 @@ htmlcov/
 .cache/
 *.tsbuildinfo
 
-# SQLite databases
+# Database
 *.db
 *.db-shm
 *.db-wal
 *.db-journal
+packages/db/backups/
 
 # OS files
 .DS_Store

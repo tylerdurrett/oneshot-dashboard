@@ -25,7 +25,7 @@ Uses a two-file convention, applied consistently across all apps:
 - Package names use `@repo/*` scope
 - All packages use TypeScript strict mode and ESM (`"type": "module"`)
 - Vitest configs are per-package (for Turbo cache compatibility)
-- SQLite database files (`*.db`) are gitignored; `DATABASE_URL` env var defaults to `file:local.db`
+- PostgreSQL via Docker Compose (`pnpm db:up`); `DATABASE_URL` defaults to `postgresql://oneshot:oneshot@localhost:5432/oneshot`
 - Ports are set via `pnpm hello` and stored in `project.config.json` (agent-readable). Convention: Web = N, Remotion Studio = N+1, Agent Server = N+2. Read ports from `project.config.json`, never hardcode them.
 - Feature flags (`timers`, `chat`, `video`) live in `project.config.json` under `features`, default to enabled. Shared logic in `@repo/features`. See `docs/feature-flags.md`.
 
@@ -48,7 +48,7 @@ The app runs via `pnpm service:install` (persistent service — launchd on macOS
 
 **Do NOT** `kill` processes without first uninstalling the service — the service manager will immediately restart them with stale code, causing port conflicts. If you see `EADDRINUSE` errors, there are stale processes; use `pkill -9 -f "vite.*dev"; pkill -9 -f "tsx"` as a last resort.
 
-After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts the server. If the server is crashing after a migration, verify the migration actually applied: `sqlite3 packages/db/local.db "PRAGMA table_info(TABLE_NAME);"`.
+After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts the server. If the server is crashing after a migration, verify it applied: `psql postgresql://oneshot:oneshot@localhost:5432/oneshot -c "\d TABLE_NAME"`.
 
 ## Remember
 

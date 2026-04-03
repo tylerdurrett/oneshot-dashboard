@@ -215,8 +215,8 @@ describe('Bucket CRUD routes', () => {
   let testDb: Database;
   let server: ReturnType<typeof buildTimerTestServer>;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
     server = buildTimerTestServer(testDb);
   });
 
@@ -457,8 +457,8 @@ describe('Timer control routes', () => {
   let server: ReturnType<typeof buildTimerTestServer>;
   let mockScheduler: ReturnType<typeof createMockScheduler>;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
     mockScheduler = createMockScheduler();
     server = buildTimerTestServer(testDb, mockScheduler);
   });
@@ -838,7 +838,7 @@ describe('Timer control SSE broadcasts', () => {
 
   beforeEach(async () => {
     _resetSSEClients();
-    testDb = createTimerTestDb();
+    testDb = await createTimerTestDb();
     server = buildTimerTestServer(testDb);
     const address = await server.listen({ port: 0, host: '127.0.0.1' });
     port = Number(new URL(address).port);

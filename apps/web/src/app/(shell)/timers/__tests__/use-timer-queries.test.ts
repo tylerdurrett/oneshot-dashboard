@@ -121,8 +121,8 @@ const bucketList = [
     weeklySchedule: null,
     sortOrder: 0,
     deactivatedAt: null,
-    createdAt: 1000,
-    updatedAt: 1000,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
   },
 ];
 

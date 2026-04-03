@@ -1,1 +1,0 @@
-ALTER TABLE `timer_buckets` ADD `deactivated_at` integer;

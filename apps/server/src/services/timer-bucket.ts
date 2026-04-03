@@ -45,9 +45,9 @@ export interface TimerBucketRow {
   daysOfWeek: number[];
   weeklySchedule: WeeklySchedule | null;
   sortOrder: number;
-  deactivatedAt: number | null;
-  createdAt: number;
-  updatedAt: number;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Fields accepted when creating a new bucket. */
@@ -68,23 +68,22 @@ export interface UpdateBucketInput {
   daysOfWeek?: number[];
   weeklySchedule?: WeeklySchedule;
   sortOrder?: number;
-  deactivatedAt?: number | null; // null to reactivate, timestamp to deactivate
+  deactivatedAt?: string | null; // null to reactivate, ISO string to deactivate
 }
 
-/** Raw row shape from the timerBuckets table (daysOfWeek is a JSON string in DB). */
+/** Raw row shape from the timerBuckets table. */
 type TimerBucketDbRow = typeof timerBuckets.$inferSelect;
 
 /** Convert a raw DB row to the caller-facing shape.
- *  When weeklySchedule is present, daysOfWeek is derived from it (single source of truth). */
+ *  When weeklySchedule is present, daysOfWeek is derived from it (single source of truth).
+ *  jsonb columns return native objects — no JSON.parse needed (Postgres handles it). */
 function parseBucket(row: TimerBucketDbRow): TimerBucketRow {
-  const schedule = row.weeklySchedule
-    ? (JSON.parse(row.weeklySchedule) as WeeklySchedule)
-    : null;
+  const schedule = row.weeklySchedule ?? null;
   return {
     ...row,
     weeklySchedule: schedule,
-    // Derive daysOfWeek from schedule when available; fall back to legacy column.
-    daysOfWeek: schedule ? daysFromSchedule(schedule) : (JSON.parse(row.daysOfWeek) as number[]),
+    // Derive daysOfWeek from schedule when available; fall back to column value.
+    daysOfWeek: schedule ? daysFromSchedule(schedule) : row.daysOfWeek,
   };
 }
 
@@ -98,7 +97,6 @@ const DEFAULT_BUCKETS = [
 ] as const;
 
 const MON_FRI_DAYS = [1, 2, 3, 4, 5];
-const MON_FRI = JSON.stringify(MON_FRI_DAYS);
 
 /**
  * Seed the default timer buckets if the table is empty.
@@ -110,7 +108,7 @@ export async function seedDefaultBuckets(
   const existing = await database.select({ id: timerBuckets.id }).from(timerBuckets).limit(1);
   if (existing.length > 0) return false;
 
-  const now = Date.now();
+  const now = new Date().toISOString();
 
   await database.insert(timerBuckets).values(
     DEFAULT_BUCKETS.map((b, i) => ({
@@ -118,8 +116,8 @@ export async function seedDefaultBuckets(
       name: b.name,
       totalMinutes: b.totalMinutes,
       colorIndex: b.colorIndex,
-      daysOfWeek: MON_FRI,
-      weeklySchedule: JSON.stringify(scheduleFromUniform(b.totalMinutes, MON_FRI_DAYS)),
+      daysOfWeek: MON_FRI_DAYS,
+      weeklySchedule: scheduleFromUniform(b.totalMinutes, MON_FRI_DAYS),
       sortOrder: i,
       createdAt: now,
       updatedAt: now,
@@ -158,7 +156,7 @@ export async function createBucket(
   database: Database = defaultDb,
 ): Promise<TimerBucketRow> {
   const id = crypto.randomUUID();
-  const now = Date.now();
+  const now = new Date().toISOString();
 
   let sortOrder = input.sortOrder;
   if (sortOrder === undefined) {
@@ -179,8 +177,8 @@ export async function createBucket(
     name: input.name,
     totalMinutes: derivedTotalMinutes,
     colorIndex: input.colorIndex,
-    daysOfWeek: JSON.stringify(derivedDays),
-    weeklySchedule: JSON.stringify(schedule),
+    daysOfWeek: derivedDays,
+    weeklySchedule: schedule,
     sortOrder,
     createdAt: now,
     updatedAt: now,
@@ -206,7 +204,7 @@ export async function updateBucket(
   updates: UpdateBucketInput,
   database: Database = defaultDb,
 ): Promise<TimerBucketRow | undefined> {
-  const setFields: Partial<TimerBucketDbRow> = { updatedAt: Date.now() };
+  const setFields: Partial<TimerBucketDbRow> = { updatedAt: new Date().toISOString() };
   if (updates.name !== undefined) setFields.name = updates.name;
   if (updates.colorIndex !== undefined) setFields.colorIndex = updates.colorIndex;
   if (updates.sortOrder !== undefined) setFields.sortOrder = updates.sortOrder;
@@ -215,19 +213,19 @@ export async function updateBucket(
 
   if (updates.weeklySchedule !== undefined) {
     // weeklySchedule provided — it's the source of truth; derive the legacy fields.
-    setFields.weeklySchedule = JSON.stringify(updates.weeklySchedule);
-    setFields.daysOfWeek = JSON.stringify(daysFromSchedule(updates.weeklySchedule));
+    setFields.weeklySchedule = updates.weeklySchedule;
+    setFields.daysOfWeek = daysFromSchedule(updates.weeklySchedule);
     setFields.totalMinutes = Math.max(...Object.values(updates.weeklySchedule), 0);
   } else if (updates.totalMinutes !== undefined || updates.daysOfWeek !== undefined) {
     // Legacy callers updating totalMinutes/daysOfWeek — rebuild weeklySchedule.
     // We need the current bucket state to fill in what wasn't provided.
     const existing = await database.select().from(timerBuckets).where(eq(timerBuckets.id, id));
     if (existing[0]) {
-      const currentDays = updates.daysOfWeek ?? (JSON.parse(existing[0].daysOfWeek) as number[]);
+      const currentDays = updates.daysOfWeek ?? existing[0].daysOfWeek;
       const currentMinutes = updates.totalMinutes ?? existing[0].totalMinutes;
-      setFields.weeklySchedule = JSON.stringify(scheduleFromUniform(currentMinutes, currentDays));
+      setFields.weeklySchedule = scheduleFromUniform(currentMinutes, currentDays);
       if (updates.totalMinutes !== undefined) setFields.totalMinutes = updates.totalMinutes;
-      if (updates.daysOfWeek !== undefined) setFields.daysOfWeek = JSON.stringify(updates.daysOfWeek);
+      if (updates.daysOfWeek !== undefined) setFields.daysOfWeek = updates.daysOfWeek;
     }
   }
 

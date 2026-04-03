@@ -130,9 +130,7 @@ export async function getTodayState(
   for (const row of rows) {
     const bucket = row.timer_buckets;
     const progress = row.timer_daily_progress;
-    const schedule = bucket.weeklySchedule
-      ? (JSON.parse(bucket.weeklySchedule) as Record<string, number>)
-      : null;
+    const schedule = bucket.weeklySchedule ?? null;
 
     buckets.push({
       id: bucket.id,
@@ -146,7 +144,7 @@ export async function getTodayState(
       colorIndex: bucket.colorIndex,
       daysOfWeek: schedule
         ? daysFromSchedule(schedule)
-        : (JSON.parse(bucket.daysOfWeek) as number[]),
+        : bucket.daysOfWeek,
       weeklySchedule: schedule,
       sortOrder: bucket.sortOrder,
       elapsedSeconds: progress?.elapsedSeconds ?? 0,
@@ -268,7 +266,7 @@ export async function stopTimer(
 
   const row = rows[0]!;
   const elapsedSeconds = row.elapsedSeconds + elapsedSince(row.startedAt!, now);
-  const schedule = row.weeklySchedule ? (JSON.parse(row.weeklySchedule) as Record<string, number>) : null;
+  const schedule = row.weeklySchedule ?? null;
   const totalSeconds = resolveTargetMinutes(
     row.targetMinutesOverride,
     schedule,
@@ -466,7 +464,7 @@ export async function computeGoalMs(
   if (rows.length === 0 || !rows[0]!.startedAt) return null;
   if (rows[0]!.goalReachedAt) return null;
 
-  const schedule = rows[0]!.weeklySchedule ? (JSON.parse(rows[0]!.weeklySchedule) as Record<string, number>) : null;
+  const schedule = rows[0]!.weeklySchedule ?? null;
   const totalSeconds = resolveTargetMinutes(
     rows[0]!.targetMinutesOverride,
     schedule,

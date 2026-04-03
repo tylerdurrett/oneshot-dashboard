@@ -1,54 +1,12 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1771692115132,
-      "tag": "0000_petite_charles_xavier",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1774406443677,
-      "tag": "0001_lyrical_cyclops",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1774800000000,
-      "tag": "0002_rename_completed_at",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1774900000000,
-      "tag": "0003_wise_wendell_vaughn",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "6",
-      "when": 1775077325450,
-      "tag": "0004_nappy_bruce_banner",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "6",
-      "when": 1775133167410,
-      "tag": "0005_sharp_squadron_supreme",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "6",
-      "when": 1775138471894,
-      "tag": "0006_silky_manta",
+      "version": "7",
+      "when": 1775243617588,
+      "tag": "0000_whole_sphinx",
       "breakpoints": true
     }
   ]

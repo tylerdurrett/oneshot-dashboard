@@ -16,8 +16,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.0",
-    "drizzle-orm": "^0.41.0"
+    "drizzle-orm": "^0.41.0",
+    "postgres": "^3.4.5"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",

@@ -48,9 +48,9 @@ export interface BucketResponse {
   daysOfWeek: number[];
   weeklySchedule: Record<string, number> | null;
   sortOrder: number;
-  deactivatedAt: number | null;
-  createdAt: number;
-  updatedAt: number;
+  deactivatedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Input for creating a new bucket. */
@@ -70,7 +70,7 @@ export interface UpdateBucketInput {
   daysOfWeek?: number[];
   weeklySchedule?: Record<string, number>;
   sortOrder?: number;
-  deactivatedAt?: number | null;
+  deactivatedAt?: string | null;
 }
 
 // ---------------------------------------------------------------------------

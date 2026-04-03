@@ -1,7 +1,7 @@
 import 'dotenv/config';
 
 import cors from '@fastify/cors';
-import { db as defaultDb, enableWalMode, getJournalMode } from '@repo/db';
+import { db as defaultDb } from '@repo/db';
 import type { FeatureFlags } from '@repo/features';
 import Fastify from 'fastify';
 import { config, isAllowedOrigin } from './config.js';
@@ -178,23 +178,6 @@ if (!process.env.VITEST) {
     .filter(([, v]) => v)
     .map(([k]) => k);
   server.log.info(`Feature flags: ${enabledNames.length ? enabledNames.join(', ') : 'none'}`);
-
-  // Enable WAL mode for concurrent read/write access
-  try {
-    const mode = await enableWalMode();
-    if (mode === 'wal') {
-      server.log.info('SQLite WAL mode enabled');
-    } else {
-      server.log.warn(
-        `SQLite journal mode is "${mode}", expected "wal". Concurrent access may cause locking errors.`,
-      );
-    }
-  } catch (err) {
-    const journalMode = await getJournalMode().catch(() => 'unknown');
-    server.log.warn(
-      `Failed to enable WAL mode (current: ${journalMode}): ${err}`,
-    );
-  }
 
   // Seed default timer buckets before starting (idempotent — no-op if buckets exist)
   if (features.timers) {

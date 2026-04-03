@@ -91,7 +91,7 @@ export class TimerScheduler {
           })
           .where(eq(timerDailyProgress.id, row.progressId));
       } else {
-        const schedule = row.weeklySchedule ? (JSON.parse(row.weeklySchedule) as Record<string, number>) : null;
+        const schedule = row.weeklySchedule ?? null;
         const totalSeconds = resolveTargetMinutes(
           row.targetMinutesOverride,
           schedule,

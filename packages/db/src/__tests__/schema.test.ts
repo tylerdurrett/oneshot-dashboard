@@ -44,13 +44,13 @@ describe('threads table', () => {
     expect(columns.claudeSessionId.notNull).toBe(false);
   });
 
-  it('has createdAt column as non-null integer', () => {
-    expect(columns.createdAt.dataType).toBe('number');
+  it('has createdAt column as non-null timestamp', () => {
+    expect(columns.createdAt.dataType).toBe('string');
     expect(columns.createdAt.notNull).toBe(true);
   });
 
-  it('has updatedAt column as non-null integer', () => {
-    expect(columns.updatedAt.dataType).toBe('number');
+  it('has updatedAt column as non-null timestamp', () => {
+    expect(columns.updatedAt.dataType).toBe('string');
     expect(columns.updatedAt.notNull).toBe(true);
   });
 });
@@ -78,8 +78,8 @@ describe('messages table', () => {
     expect(columns.content.notNull).toBe(true);
   });
 
-  it('has createdAt column as non-null integer', () => {
-    expect(columns.createdAt.dataType).toBe('number');
+  it('has createdAt column as non-null timestamp', () => {
+    expect(columns.createdAt.dataType).toBe('string');
     expect(columns.createdAt.notNull).toBe(true);
   });
 });
@@ -107,8 +107,8 @@ describe('timerBuckets table', () => {
     expect(columns.colorIndex.notNull).toBe(true);
   });
 
-  it('has daysOfWeek column as non-null text', () => {
-    expect(columns.daysOfWeek.dataType).toBe('string');
+  it('has daysOfWeek column as non-null jsonb', () => {
+    expect(columns.daysOfWeek.dataType).toBe('json');
     expect(columns.daysOfWeek.notNull).toBe(true);
   });
 
@@ -118,13 +118,13 @@ describe('timerBuckets table', () => {
     expect(columns.sortOrder.hasDefault).toBe(true);
   });
 
-  it('has createdAt column as non-null integer', () => {
-    expect(columns.createdAt.dataType).toBe('number');
+  it('has createdAt column as non-null timestamp', () => {
+    expect(columns.createdAt.dataType).toBe('string');
     expect(columns.createdAt.notNull).toBe(true);
   });
 
-  it('has updatedAt column as non-null integer', () => {
-    expect(columns.updatedAt.dataType).toBe('number');
+  it('has updatedAt column as non-null timestamp', () => {
+    expect(columns.updatedAt.dataType).toBe('string');
     expect(columns.updatedAt.notNull).toBe(true);
   });
 });
@@ -142,7 +142,7 @@ describe('timerDailyProgress table', () => {
     expect(columns.bucketId.notNull).toBe(true);
   });
 
-  it('has date column as non-null text', () => {
+  it('has date column as non-null date', () => {
     expect(columns.date.dataType).toBe('string');
     expect(columns.date.notNull).toBe(true);
   });

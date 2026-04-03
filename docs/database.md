@@ -1,31 +1,36 @@
 # Database
 
-The `packages/db/` package provides a ready-to-use database layer with [Drizzle ORM](https://orm.drizzle.team/) and SQLite. No servers to run, no Docker containers — just a local file.
+The `packages/db/` package provides a ready-to-use database layer with [Drizzle ORM](https://orm.drizzle.team/) and PostgreSQL (with pgvector for future vector/embedding features).
 
-## How It Works
+## Getting Started
 
-- **Drizzle ORM** handles queries with full TypeScript type safety
-- **SQLite** (via libsql) stores data in a local file (`local.db`)
-- **Migrations** let you evolve your database schema over time
+Start the database:
 
-The database file is gitignored, so each developer gets their own local copy.
+```bash
+pnpm db:up
+```
+
+This runs `docker compose up -d`, which starts a PostgreSQL 17 container with the pgvector extension pre-installed. The container uses a named volume (`pgdata`) so your data persists across restarts.
+
+To stop it:
+
+```bash
+pnpm db:down
+```
 
 ## Using the Database
 
 Import `db` and your tables in your app:
 
 ```tsx
-import { db, users } from '@repo/db';
+import { db, timerBuckets } from '@repo/db';
 import { eq } from 'drizzle-orm';
 
-// Insert a user
-await db.insert(users).values({ name: 'Alice', email: 'alice@example.com' });
+// Insert a bucket
+await db.insert(timerBuckets).values({ name: 'Study', totalMinutes: 120, colorIndex: 0, daysOfWeek: [1, 2, 3, 4, 5], sortOrder: 0 });
 
-// Query users
-const allUsers = await db.select().from(users);
-
-// Query with a filter
-const alice = await db.select().from(users).where(eq(users.email, 'alice@example.com'));
+// Query buckets
+const allBuckets = await db.select().from(timerBuckets);
 ```
 
 Everything is type-safe — your editor will autocomplete column names and catch typos at compile time.
@@ -35,16 +40,14 @@ Everything is type-safe — your editor will autocomplete column names and catch
 Tables are defined in `packages/db/src/schema.ts` using Drizzle's schema builder:
 
 ```typescript
-import { sqliteTable, integer, text } from 'drizzle-orm/sqlite-core';
+import { pgTable, integer, text, uuid, timestamp } from 'drizzle-orm/pg-core';
 
-export const users = sqliteTable('users', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const myTable = pgTable('my_table', {
+  id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
-  email: text('email').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull(),
 });
 ```
-
-The starter kit includes a `users` table as an example. Add your own tables in the same file, or create new files and export them from `packages/db/src/index.ts`.
 
 > **Tip:** Just tell Claude Code what you need — "Add a posts table with title, body, and a foreign key to users" — and it'll create the schema, generate the migration, and apply it.
 
@@ -62,16 +65,6 @@ pnpm --filter @repo/db db:migrate
 
 Migrations are stored in `packages/db/drizzle/` and are committed to git so everyone stays in sync.
 
-### Quick Schema Push (Development Only)
-
-During rapid development, you can skip migrations and push schema changes directly:
-
-```bash
-pnpm --filter @repo/db db:push
-```
-
-This updates your local database to match the schema without creating a migration file. Handy for prototyping, but use proper migrations for anything you want to keep.
-
 ## Renaming Columns
 
 `drizzle-kit generate` can't tell the difference between "renamed a column" and "deleted one column, added another." It will ask interactively, which doesn't work in agent or CI environments.
@@ -81,24 +74,37 @@ This updates your local database to match the schema without creating a migratio
 1. **Add the new column** alongside the old one in `schema.ts`. Run `db:generate` + `db:migrate`. No prompt.
 2. **Remove the old column** from `schema.ts`. Run `db:generate` + `db:migrate`. No prompt.
 
-If you need to preserve data, add a backfill step between the two migrations. This is also the standard pattern for zero-downtime deploys (add new → backfill → cut over → drop old).
-
-> **Never hand-write migration SQL or snapshot files.** Let drizzle-kit generate everything so snapshots stay in sync. Hand-written snapshots risk corrupting future migration diffs.
+> **Never hand-write migration SQL or snapshot files.** Let drizzle-kit generate everything so snapshots stay in sync.
 
 ## Configuration
 
 The database connection is configured via the `DATABASE_URL` environment variable:
 
 ```bash
-DATABASE_URL=file:local.db   # Default — a local SQLite file
+DATABASE_URL=postgresql://oneshot:oneshot@localhost:5432/oneshot   # Default
 ```
 
-If you don't set this variable, it defaults to `file:local.db` in the project root.
+Tests use `TEST_DATABASE_URL`, which defaults to the `oneshot_test` database (created automatically by Docker Compose's init script).
+
+## Backups
+
+Backups happen automatically before migrations run. They use `pg_dump` and are stored in `packages/db/backups/`. The last 5 backups are kept.
+
+To restore from a backup:
+
+```bash
+pnpm db:restore           # Restores the latest backup
+pnpm db:restore <file>    # Restores a specific backup file
+```
+
+## pgvector
+
+The initial migration enables the `vector` extension. This is available for future use with embeddings and semantic search — no vector columns are defined yet, but the extension is ready when needed.
 
 ## Testing
 
-The database package includes tests that verify the schema exports and client initialization:
+Tests run against the `oneshot_test` database. Make sure Postgres is running (`pnpm db:up`) before running tests:
 
 ```bash
-pnpm --filter @repo/db test
+pnpm test
 ```

@@ -224,7 +224,7 @@ export default function SettingsPage() {
 
   const handleToggleActive = (bucket: BucketResponse) => {
     const updates: UpdateBucketInput = {
-      deactivatedAt: bucket.deactivatedAt !== null ? null : Date.now(),
+      deactivatedAt: bucket.deactivatedAt !== null ? null : new Date().toISOString(),
     };
     updateMutation.mutate({ id: bucket.id, updates });
   };

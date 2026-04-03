@@ -23,8 +23,8 @@ describe('timer server wiring', () => {
   let testDb: Database;
   let server: TestServer;
 
-  beforeEach(() => {
-    testDb = createTimerTestDb();
+  beforeEach(async () => {
+    testDb = await createTimerTestDb();
     server = buildTestServer(testDb);
   });
 

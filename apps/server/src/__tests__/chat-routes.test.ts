@@ -1,37 +1,10 @@
 import { EventEmitter } from 'node:events';
-import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { messages, threads } from '@repo/db';
 import { buildServer } from '../index.js';
 import type { Database } from '../services/thread.js';
 import type { SpawnFn } from '../services/sandbox.js';
 import { createFakeSpawn, ndjson } from './helpers.js';
-
-function createTestDb(): Database {
-  const client = createClient({ url: ':memory:' });
-  const testDb = drizzle(client, { schema: { threads, messages } });
-
-  client.executeMultiple(`
-    CREATE TABLE threads (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      claude_session_id TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE messages (
-      id TEXT PRIMARY KEY NOT NULL,
-      thread_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (thread_id) REFERENCES threads(id)
-    );
-  `);
-
-  return testDb as unknown as Database;
-}
+import { createCleanTestDb } from './test-db.js';
 
 function healthySpawnForInvocation(invocationSpawn: SpawnFn): SpawnFn {
   const healthyAuth = JSON.stringify({
@@ -142,8 +115,8 @@ describe('chat run routes', () => {
   let testDb: Database;
   let server: ReturnType<typeof buildServer>;
 
-  beforeEach(() => {
-    testDb = createTestDb();
+  beforeEach(async () => {
+    testDb = await createCleanTestDb('messages, threads');
   });
 
   afterEach(async () => {

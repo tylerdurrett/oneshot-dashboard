@@ -1,7 +1,4 @@
-import { createClient } from '@libsql/client';
-import { drizzle } from 'drizzle-orm/libsql';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { threads, messages } from '@repo/db';
 import {
   addMessage,
   createThread,
@@ -13,39 +10,13 @@ import {
   updateThreadTitle,
   type Database,
 } from '../services/thread.js';
-
-/** Create a fresh in-memory database with the schema applied. */
-function createTestDb(): Database {
-  const client = createClient({ url: ':memory:' });
-  const testDb = drizzle(client, { schema: { threads, messages } });
-
-  // Apply schema via raw SQL
-  client.executeMultiple(`
-    CREATE TABLE threads (
-      id TEXT PRIMARY KEY NOT NULL,
-      title TEXT NOT NULL,
-      claude_session_id TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    CREATE TABLE messages (
-      id TEXT PRIMARY KEY NOT NULL,
-      thread_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (thread_id) REFERENCES threads(id)
-    );
-  `);
-
-  return testDb as unknown as Database;
-}
+import { createCleanTestDb } from './test-db.js';
 
 describe('thread service', () => {
   let testDb: Database;
 
-  beforeEach(() => {
-    testDb = createTestDb();
+  beforeEach(async () => {
+    testDb = await createCleanTestDb('messages, threads');
   });
 
   describe('createThread', () => {
@@ -57,8 +28,8 @@ describe('thread service', () => {
       );
       expect(thread.title).toBe('My thread');
       expect(thread.claudeSessionId).toBeNull();
-      expect(thread.createdAt).toBeTypeOf('number');
-      expect(thread.updatedAt).toBeTypeOf('number');
+      expect(thread.createdAt).toBeTypeOf('string');
+      expect(thread.updatedAt).toBeTypeOf('string');
     });
 
     it('persists the thread to the database', async () => {
@@ -81,7 +52,7 @@ describe('thread service', () => {
     });
 
     it('returns undefined for nonexistent ID', async () => {
-      const found = await getThread('nonexistent', testDb);
+      const found = await getThread('00000000-0000-0000-0000-000000000000', testDb);
       expect(found).toBeUndefined();
     });
   });
@@ -151,7 +122,7 @@ describe('thread service', () => {
       expect(msg.threadId).toBe(thread.id);
       expect(msg.role).toBe('user');
       expect(msg.content).toBe('Hello world');
-      expect(msg.createdAt).toBeTypeOf('number');
+      expect(msg.createdAt).toBeTypeOf('string');
     });
 
     it('updates the thread updatedAt timestamp', async () => {
@@ -162,7 +133,8 @@ describe('thread service', () => {
       await addMessage(thread.id, 'user', 'New message', testDb);
 
       const updated = await getThread(thread.id, testDb);
-      expect(updated!.updatedAt).toBeGreaterThan(originalUpdatedAt);
+      // ISO string comparison — later timestamps sort after earlier ones
+      expect(updated!.updatedAt > originalUpdatedAt).toBe(true);
     });
   });
 
@@ -185,7 +157,7 @@ describe('thread service', () => {
       await updateThreadSessionId(thread.id, 'session-xyz', testDb);
 
       const updated = await getThread(thread.id, testDb);
-      expect(updated!.updatedAt).toBeGreaterThan(original);
+      expect(updated!.updatedAt > original).toBe(true);
     });
   });
 
@@ -203,7 +175,7 @@ describe('thread service', () => {
     });
 
     it('returns false for nonexistent thread', async () => {
-      const result = await deleteThread('nonexistent', testDb);
+      const result = await deleteThread('00000000-0000-0000-0000-000000000000', testDb);
       expect(result).toBe(false);
     });
 
@@ -238,7 +210,7 @@ describe('thread service', () => {
       await updateThreadTitle(thread.id, 'Updated title', testDb);
 
       const updated = await getThread(thread.id, testDb);
-      expect(updated!.updatedAt).toBeGreaterThan(original);
+      expect(updated!.updatedAt > original).toBe(true);
     });
   });
 });

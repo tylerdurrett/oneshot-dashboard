@@ -25,8 +25,8 @@ export interface TimeBucket {
   goalReachedAt: string | null;
   /** ISO timestamp when the user dismissed this bucket for today, null if not dismissed. */
   dismissedAt: string | null;
-  /** Timestamp when bucket was deactivated (removed from schedules), null if active. */
-  deactivatedAt: number | null;
+  /** ISO timestamp when bucket was deactivated (removed from schedules), null if active. */
+  deactivatedAt: string | null;
 }
 
 // ---------------------------------------------------------------------------
