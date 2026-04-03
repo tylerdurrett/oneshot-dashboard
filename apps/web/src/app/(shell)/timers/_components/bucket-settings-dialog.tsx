@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@repo/ui/components/dialog';
 
+import { useIsMobile } from '../../../../hooks/use-is-mobile';
 import { useVisualViewportOffset } from '../../../../hooks/use-visual-viewport-offset';
 import { BUCKET_COLORS, type TimeBucket } from '../_lib/timer-types';
 
@@ -97,6 +98,7 @@ export function BucketSettingsDialog({
 }: BucketSettingsDialogProps) {
   // Keep dialog visible when the iOS on-screen keyboard is open.
   const keyboardStyle = useVisualViewportOffset();
+  const isMobile = useIsMobile();
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Local form state
@@ -278,29 +280,31 @@ export function BucketSettingsDialog({
               />
             </div>
 
-            {/* Color */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Color</span>
-              <div className="flex flex-wrap gap-2">
-                {BUCKET_COLORS.map((color, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    aria-label={`Color ${i + 1}`}
-                    aria-pressed={colorIndex === i}
-                    className="size-8 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    style={{
-                      backgroundColor: color.vibrant,
-                      boxShadow:
-                        colorIndex === i
-                          ? '0 0 0 2px var(--background), 0 0 0 4px currentColor'
-                          : undefined,
-                    }}
-                    onClick={() => setColorIndex(i)}
-                  />
-                ))}
+            {/* Color — hidden on mobile to save space */}
+            {!isMobile && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">Color</span>
+                <div className="flex flex-wrap gap-2">
+                  {BUCKET_COLORS.map((color, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      aria-label={`Color ${i + 1}`}
+                      aria-pressed={colorIndex === i}
+                      className="size-8 rounded-full transition-transform hover:scale-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      style={{
+                        backgroundColor: color.vibrant,
+                        boxShadow:
+                          colorIndex === i
+                            ? '0 0 0 2px var(--background), 0 0 0 4px currentColor'
+                            : undefined,
+                      }}
+                      onClick={() => setColorIndex(i)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Schedule Mode Toggle */}
             <div className="flex flex-col gap-1.5">
