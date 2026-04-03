@@ -33,8 +33,7 @@ The chat feature (`/chat`) connects to a Claude agent running inside a Docker sa
 pnpm sandbox
 ```
 
-It will create the sandbox, open a browser for login, and verify everything is working. The sandbox stays authenticated across restarts — you only need to do this once.
-On WSL2, the setup scripts keep Docker's own sandbox workspace path automatically, so you should not need to hand-tune sandbox paths.
+It will create the sandbox, open a browser for login, and verify everything is working. The sandbox stays authenticated across restarts — you only need to do this once. The sandbox only has access to the `workspace/` directory — it cannot see or modify project source code.
 
 ## How Chat Reliability Works
 

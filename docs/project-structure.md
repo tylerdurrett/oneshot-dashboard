@@ -29,6 +29,7 @@ your-project/
 │   ├── service-dispatch.sh   ← Routes service commands to macOS (launchd) or Linux (systemd)
 │   ├── install-launchd.sh    ← macOS persistent service (called via service-dispatch)
 │   └── install-systemd.sh    ← Linux persistent service (called via service-dispatch)
+├── workspace/             ← Chat agent's isolated workspace (mounted into sandbox)
 ├── _tasks/                ← Feature planning (for larger features)
 ├── .claude/                  ← Claude Code skills and configuration
 ├── package.json              ← Root-level scripts and dependencies
