@@ -5,8 +5,10 @@ import './editor.css';
 import type { Block } from '@blocknote/core';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { saveDocument } from '../_lib/docs-api';
+import { docKeys } from '../_hooks/use-doc-query';
 
 interface DocEditorProps {
   docId: string;
@@ -20,6 +22,7 @@ export function DocEditor({ docId, initialContent, onSave }: DocEditorProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Capture docId at mount so the unmount cleanup always targets the correct doc
   const docIdRef = useRef(docId);
+  const queryClient = useQueryClient();
 
   const editor = useCreateBlockNote({
     initialContent: initialContent.length > 0 ? initialContent : undefined,
@@ -43,6 +46,10 @@ export function DocEditor({ docId, initialContent, onSave }: DocEditorProps) {
         timerRef.current = null;
         saveDocument(docIdRef.current, {
           content: editor.document as unknown[],
+        }).then(() => {
+          queryClient.invalidateQueries({
+            queryKey: docKeys.detail(docIdRef.current),
+          });
         }).catch(() => {
           // Fire-and-forget — component is unmounting so we can't retry,
           // but log so the failed save isn't completely silent.

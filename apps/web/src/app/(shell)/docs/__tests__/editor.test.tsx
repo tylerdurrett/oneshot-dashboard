@@ -24,12 +24,20 @@ vi.mock('../_lib/docs-api', () => ({
   saveDocument: (...args: unknown[]) => mockSaveDocument(...args),
 }));
 
+const mockInvalidateQueries = vi.fn().mockResolvedValue(undefined);
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: mockInvalidateQueries }),
+  useQuery: vi.fn(),
+  useMutation: vi.fn(),
+}));
+
 import { DocEditor } from '../_components/editor';
 
 describe('DocEditor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockSaveDocument.mockClear().mockResolvedValue({});
+    mockInvalidateQueries.mockClear();
   });
 
   afterEach(() => {
@@ -38,7 +46,7 @@ describe('DocEditor', () => {
     vi.restoreAllMocks();
   });
 
-  it('flushes pending save on unmount via direct API call with correct docId', () => {
+  it('flushes pending save on unmount via direct API call with correct docId', async () => {
     const onSave = vi.fn();
     const { getByTestId, unmount } = render(
       <DocEditor docId="doc-123" initialContent={[]} onSave={onSave} />,
@@ -57,6 +65,13 @@ describe('DocEditor', () => {
     expect(mockSaveDocument).toHaveBeenCalledTimes(1);
     expect(mockSaveDocument).toHaveBeenCalledWith('doc-123', {
       content: mockDocument,
+    });
+
+    // Flush the microtask from saveDocument's .then() so the cache invalidation runs
+    await Promise.resolve();
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['docs', 'detail', 'doc-123'],
     });
   });
 

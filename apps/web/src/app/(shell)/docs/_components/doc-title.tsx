@@ -1,5 +1,7 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { saveDocument } from '../_lib/docs-api';
+import { docKeys } from '../_hooks/use-doc-query';
 
 interface DocTitleProps {
   docId: string;
@@ -21,6 +23,7 @@ export function DocTitle({ docId, title, onSave }: DocTitleProps) {
   const valueRef = useRef(value);
   // Capture docId at mount so the unmount cleanup always targets the correct doc
   const docIdRef = useRef(docId);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     onSaveRef.current = onSave;
@@ -46,7 +49,11 @@ export function DocTitle({ docId, title, onSave }: DocTitleProps) {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
-        saveDocument(docIdRef.current, { title: valueRef.current }).catch(() => {
+        saveDocument(docIdRef.current, { title: valueRef.current }).then(() => {
+          queryClient.invalidateQueries({
+            queryKey: docKeys.detail(docIdRef.current),
+          });
+        }).catch(() => {
           // Fire-and-forget — component is unmounting so we can't retry,
           // but log so the failed save isn't completely silent.
           console.error(`Failed to flush pending title save for doc ${docIdRef.current}`);
