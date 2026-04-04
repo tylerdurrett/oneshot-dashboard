@@ -214,9 +214,11 @@ apps/web/src/
 
 ### 4.2 Desktop inner left nav
 
-- [ ] Update `apps/web/src/app/(shell)/docs/_components/docs-layout.tsx` — add a left panel for the doc list on desktop. Use the existing `react-resizable-panels` pattern. Doc list in a narrow left panel (~240px), editor + chat in the main area.
-- [ ] Remove `hideDesktopSecondaryNav: true` from the docs area config if the inner left nav replaces it, or keep it if the inner nav is self-contained within the docs layout.
-- [ ] Add a "+" button at the top of the left nav to create a new doc. On click: calls `createDocument()`, navigates to the new doc's URL.
+- [x] Update `apps/web/src/app/(shell)/docs/_components/docs-layout.tsx` — add a left panel for the doc list on desktop. Use the existing `react-resizable-panels` pattern. Doc list in a narrow left panel (~240px), editor + chat in the main area.
+- [x] Remove `hideDesktopSecondaryNav: true` from the docs area config if the inner left nav replaces it, or keep it if the inner nav is self-contained within the docs layout.
+- [x] Add a "+" button at the top of the left nav to create a new doc. On click: calls `createDocument()`, navigates to the new doc's URL.
+
+> **Notes (4.2):** Used a **nested Group** approach: outer Group (`docs-nav` + `docs-main`) wraps an inner Group (`docs-editor` + `docs-chat`) when chat is enabled. This allows independent resize persistence via separate `useDefaultLayout` calls (`docs-outer-layout` and `docs-inner-layout`). The `docs-nav` panel uses `defaultSize="240px"`, `minSize="180px"`, `collapsible`, `collapsedSize={0}`, `groupResizeBehavior="preserve-pixel-size"`. New `DocsNavPanel` component has a header bar matching the `docs-chat-panel` pattern ("Documents" label + Plus icon button), with `disabled={isPending}` to prevent double-click. `hideDesktopSecondaryNav: true` kept as-is since the inner nav is self-contained within `DocsLayout`. `SEPARATOR_CLASS` extracted as a shared constant within the file. 4 tests in `docs-nav-panel.test.tsx` (header, button, DocList render, create+navigate flow), 3 updated tests in `docs-layout.test.tsx` (nested Groups with chat, nav+editor without chat, mobile fallback). All 351 web tests pass, type-check clean.
 
 **Acceptance Criteria:**
 - Desktop shows a left sidebar with the doc list alongside the editor.
