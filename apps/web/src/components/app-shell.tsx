@@ -446,11 +446,13 @@ export function AppShell({
           ))}
         </div>
 
-        <div className="flex flex-col items-center w-16 py-4 gap-1">
-          {areaNavItems.map((item) =>
-            renderNavItem(item, false, isItemActive(item, pathname)),
-          )}
-        </div>
+        {areaNavItems.length > 1 && (
+          <div className="flex flex-col items-center w-16 py-4 gap-1">
+            {areaNavItems.map((item) =>
+              renderNavItem(item, false, isItemActive(item, pathname)),
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Main content */}
