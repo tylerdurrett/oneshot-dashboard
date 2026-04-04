@@ -111,15 +111,17 @@ apps/web/src/
 
 ### 2.2 Route endpoints
 
-- [ ] Add `GET /docs` → list documents (calls `listDocuments` with default workspace).
-- [ ] Add `GET /docs/recent` → most recently edited doc (calls `getMostRecentDocument`).
-- [ ] Add `GET /docs/:id` → single document by ID. 404 if not found.
-- [ ] Add `POST /docs` → create document. Optional `{ title }` body. Returns 201.
-- [ ] Add `PATCH /docs/:id` → update document. Body can include `content` and/or `title`. Updates `updatedAt`.
-- [ ] Add `DELETE /docs/:id` → delete document. 404 if not found.
-- [ ] Add `POST /docs/:id/pin` → pin document. `DELETE /docs/:id/pin` → unpin.
-- [ ] Keep existing `GET /docs/default` and `PATCH /docs/default` working (backward compat during transition — remove in a later cleanup).
-- [ ] Write route-level tests in `apps/server/src/__tests__/document.test.ts` (or a new `docs-routes.test.ts`) using `server.inject()`.
+- [x] Add `GET /docs` → list documents (calls `listDocuments` with default workspace).
+- [x] Add `GET /docs/recent` → most recently edited doc (calls `getMostRecentDocument`).
+- [x] Add `GET /docs/:id` → single document by ID. 404 if not found.
+- [x] Add `POST /docs` → create document. Optional `{ title }` body. Returns 201.
+- [x] Add `PATCH /docs/:id` → update document. Body can include `content` and/or `title`. Updates `updatedAt`.
+- [x] Add `DELETE /docs/:id` → delete document. 404 if not found.
+- [x] Add `POST /docs/:id/pin` → pin document. `DELETE /docs/:id/pin` → unpin.
+- [x] Keep existing `GET /docs/default` and `PATCH /docs/default` working (backward compat during transition — remove in a later cleanup).
+- [x] Write route-level tests in `apps/server/src/__tests__/document.test.ts` (or a new `docs-routes.test.ts`) using `server.inject()`.
+
+> **Notes (2.2):** All 8 endpoints added to `routes/docs.ts`. Route tests in `docs-routes.test.ts` with 20 tests covering all endpoints, 404 cases, and backward compat. `requireWorkspaceId()` helper caches workspace ID in closure after first lookup (it's static after startup). `/docs/recent` registered before `/docs/:id` so Fastify doesn't treat "recent" as a param. PATCH `/docs/:id` accepts both `content` and `title` in a single call. All 45 doc-related tests pass (20 routes + 20 service + 5 workspace), type-check clean.
 
 **Acceptance Criteria:**
 - All endpoints return correct status codes (200, 201, 404).
