@@ -200,9 +200,11 @@ apps/web/src/
 
 ### 4.1 Doc list component
 
-- [ ] Create `apps/web/src/app/(shell)/docs/_components/doc-list.tsx` — renders two sections: "Pinned" (if any pinned docs) and "Recent". Each section is a list of doc items. Uses `useDocuments()` hook. Highlights the currently active doc (match against URL param).
-- [ ] Create `apps/web/src/app/(shell)/docs/_components/doc-list-item.tsx` — single doc row: title (truncated) + relative timestamp. Clicking navigates to `/docs/:id`. Active state: `bg-accent/50`.
-- [ ] "Pinned" section label only shows when there are pinned docs. Visual separator between pinned and recent sections.
+- [x] Create `apps/web/src/app/(shell)/docs/_components/doc-list.tsx` — renders two sections: "Pinned" (if any pinned docs) and "Recent". Each section is a list of doc items. Uses `useDocuments()` hook. Highlights the currently active doc (match against URL param).
+- [x] Create `apps/web/src/app/(shell)/docs/_components/doc-list-item.tsx` — single doc row: title (truncated) + relative timestamp. Clicking navigates to `/docs/:id`. Active state: `bg-accent/50`.
+- [x] "Pinned" section label only shows when there are pinned docs. Visual separator between pinned and recent sections.
+
+> **Notes (4.1):** `DocListItem` mirrors ThreadSelector's item pattern: `min-h-[44px]`, `bg-accent/50` active state, truncated title + `formatTimeAgo` timestamp. Moved `formatTimeAgo` from `chat/` to shared `@/lib/format-time-ago.ts` since it's now used by both features (old location re-exports for backward compat). `DocList` splits docs into pinned/recent arrays with `filter()`, shows "Pinned" header + separator only when pinned docs exist. 12 tests in `doc-list.test.tsx` (5 for DocListItem, 7 for DocList) cover sections, active state, navigation, loading, and empty state. All 347 web tests pass, type-check clean.
 
 **Acceptance Criteria:**
 - Doc list renders pinned docs at top, recent docs below.
