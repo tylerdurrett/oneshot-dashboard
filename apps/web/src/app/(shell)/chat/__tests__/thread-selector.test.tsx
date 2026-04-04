@@ -7,7 +7,7 @@ import type { Thread } from '../api';
 // ---------------------------------------------------------------------------
 
 vi.mock('../format-time-ago', () => ({
-  formatTimeAgo: (ts: number) => `${ts}s ago`,
+  formatTimeAgo: (ts: string | number) => `${ts}s ago`,
 }));
 
 // Mock @repo/ui components with testable structure.
@@ -98,15 +98,15 @@ const threads: Thread[] = [
     id: 'thread-1',
     title: 'First conversation',
     claudeSessionId: null,
-    createdAt: 1000,
-    updatedAt: 3000,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:03.000Z',
   },
   {
     id: 'thread-2',
     title: 'Second conversation',
     claudeSessionId: 'sess-1',
-    createdAt: 2000,
-    updatedAt: 2000,
+    createdAt: '2026-01-01T00:00:02.000Z',
+    updatedAt: '2026-01-01T00:00:02.000Z',
   },
 ];
 
@@ -175,8 +175,8 @@ describe('ThreadSelector', () => {
         onDeleteThread={vi.fn()}
       />,
     );
-    expect(screen.getByText('3000s ago')).toBeDefined();
-    expect(screen.getByText('2000s ago')).toBeDefined();
+    expect(screen.getByText('2026-01-01T00:00:03.000Zs ago')).toBeDefined();
+    expect(screen.getByText('2026-01-01T00:00:02.000Zs ago')).toBeDefined();
   });
 
   it('highlights active thread with bg-accent/50 class', () => {

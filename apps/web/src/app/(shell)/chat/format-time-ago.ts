@@ -1,10 +1,17 @@
 /**
- * Converts a Unix timestamp (seconds) to a relative time string.
+ * Converts a timestamp to a relative time string.
+ * Accepts an ISO 8601 string or a Unix timestamp in seconds.
  * Examples: "just now", "2m ago", "3h ago", "5d ago", "2w ago"
  */
-export function formatTimeAgo(timestampSeconds: number): string {
+export function formatTimeAgo(timestamp: string | number): string {
   const now = Date.now();
-  const diffMs = now - timestampSeconds * 1000;
+  const ms = typeof timestamp === 'string'
+    ? new Date(timestamp).getTime()
+    : timestamp * 1000;
+
+  if (Number.isNaN(ms)) return '';
+
+  const diffMs = now - ms;
 
   if (diffMs < 0) return 'just now';
 

@@ -36,7 +36,7 @@ export function DocEditor({ initialContent, onSave }: DocEditorProps) {
   }, [editor, onSave]);
 
   return (
-    <div className="docs-editor flex-1 overflow-auto p-8">
+    <div className="docs-editor flex-1 overflow-auto pl-0 pr-4 py-4">
       <BlockNoteView
         editor={editor}
         theme="dark"

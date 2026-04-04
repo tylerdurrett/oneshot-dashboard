@@ -14,6 +14,8 @@ export interface AppArea {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   navItems: NavItem[];
+  /** When true the desktop sidebar skips the secondary-nav column for this area. */
+  hideDesktopSecondaryNav?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +52,8 @@ export const APP_AREAS: AppArea[] = [
     label: 'Docs',
     icon: FileText,
     navItems: [DOCS_NAV_ITEM, ...(features.chat ? [DOCS_CHAT_NAV_ITEM] : [])],
+    // Chat is embedded in the docs page on desktop, so no secondary nav needed
+    hideDesktopSecondaryNav: true,
   },
 ];
 

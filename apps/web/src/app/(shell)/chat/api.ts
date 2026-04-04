@@ -6,8 +6,8 @@ export interface Thread {
   id: string;
   title: string;
   claudeSessionId: string | null;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ThreadMessage {
@@ -15,7 +15,7 @@ export interface ThreadMessage {
   threadId: string;
   role: string;
   content: string;
-  createdAt: number;
+  createdAt: string;
 }
 
 export interface ChatRunError {

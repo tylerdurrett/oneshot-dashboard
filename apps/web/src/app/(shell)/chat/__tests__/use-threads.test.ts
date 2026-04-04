@@ -62,7 +62,7 @@ afterEach(() => {
 describe('useThreads', () => {
   it('fetches and returns thread list', async () => {
     const threads = [
-      { id: 't1', title: 'Thread 1', claudeSessionId: null, createdAt: 1, updatedAt: 1 },
+      { id: 't1', title: 'Thread 1', claudeSessionId: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' },
     ];
     mockFetchThreads.mockResolvedValue(threads);
 
@@ -86,7 +86,7 @@ describe('useThreads', () => {
 describe('useThreadMessages', () => {
   it('fetches messages for a given thread ID', async () => {
     const messages = [
-      { id: 'm1', threadId: 't1', role: 'user', content: 'Hello', createdAt: 1 },
+      { id: 'm1', threadId: 't1', role: 'user', content: 'Hello', createdAt: '2026-01-01T00:00:00.000Z' },
     ];
     mockFetchThreadMessages.mockResolvedValue(messages);
 
@@ -122,7 +122,7 @@ describe('useThreadMessages', () => {
 
 describe('useCreateThread', () => {
   it('creates a thread and returns it', async () => {
-    const thread = { id: 't1', title: 'New conversation', claudeSessionId: null, createdAt: 1, updatedAt: 1 };
+    const thread = { id: 't1', title: 'New conversation', claudeSessionId: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     mockCreateThread.mockResolvedValue(thread);
 
     const { result } = renderHook(() => useCreateThread(), {
@@ -137,7 +137,7 @@ describe('useCreateThread', () => {
   });
 
   it('creates a thread with a custom title', async () => {
-    const thread = { id: 't2', title: 'My topic', claudeSessionId: null, createdAt: 1, updatedAt: 1 };
+    const thread = { id: 't2', title: 'My topic', claudeSessionId: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     mockCreateThread.mockResolvedValue(thread);
 
     const { result } = renderHook(() => useCreateThread(), {
@@ -151,7 +151,7 @@ describe('useCreateThread', () => {
   });
 
   it('invalidates thread list cache on success', async () => {
-    const thread = { id: 't1', title: 'New', claudeSessionId: null, createdAt: 1, updatedAt: 1 };
+    const thread = { id: 't1', title: 'New', claudeSessionId: null, createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z' };
     mockCreateThread.mockResolvedValue(thread);
     mockFetchThreads.mockResolvedValue([]);
 

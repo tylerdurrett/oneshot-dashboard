@@ -48,4 +48,15 @@ describe('formatTimeAgo', () => {
     expect(formatTimeAgo(now - 400 * 86400)).toBe('1y ago');
     expect(formatTimeAgo(now - 800 * 86400)).toBe('2y ago');
   });
+
+  // ISO string support — the server returns ISO 8601 strings, not Unix seconds
+  it('handles ISO 8601 string timestamps', () => {
+    const twoMinutesAgo = new Date(Date.now() - 120_000).toISOString();
+    expect(formatTimeAgo(twoMinutesAgo)).toBe('2m ago');
+  });
+
+  it('returns "just now" for recent ISO string timestamps', () => {
+    const justNow = new Date().toISOString();
+    expect(formatTimeAgo(justNow)).toBe('just now');
+  });
 });

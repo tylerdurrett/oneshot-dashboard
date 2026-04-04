@@ -446,7 +446,7 @@ export function AppShell({
           ))}
         </div>
 
-        {areaNavItems.length > 1 && (
+        {areaNavItems.length > 1 && !area.hideDesktopSecondaryNav && (
           <div className="flex flex-col items-center w-16 py-4 gap-1">
             {areaNavItems.map((item) =>
               renderNavItem(item, false, isItemActive(item, pathname)),
