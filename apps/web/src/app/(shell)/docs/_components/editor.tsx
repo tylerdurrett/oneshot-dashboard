@@ -21,19 +21,41 @@ export function DocEditor({ initialContent, onSave }: DocEditorProps) {
     initialContent: initialContent.length > 0 ? initialContent : undefined,
   });
 
-  // Clear pending save on unmount to avoid firing on a stale component
+  // Ref keeps unmount/beforeunload from closing over a stale callback
+  const onSaveRef = useRef(onSave);
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
+
+  // Flush pending save on unmount (in-app navigation) instead of discarding it
   useEffect(() => {
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+        onSaveRef.current(editor.document);
+      }
     };
+  }, []);
+
+  // Block refresh/tab close when the debounce hasn't fired yet —
+  // we can't flush here because the save is async
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (timerRef.current) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
   const handleChange = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      onSave(editor.document);
+      onSaveRef.current(editor.document);
+      timerRef.current = null;
     }, DEBOUNCE_MS);
-  }, [editor, onSave]);
+  }, [editor]);
 
   return (
     <div className="docs-editor flex-1 overflow-auto pl-0 pr-4 py-4">
