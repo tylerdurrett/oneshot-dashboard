@@ -8,7 +8,7 @@ interface DocListItemProps {
   onClick: () => void;
 }
 
-const ITEM_CLASS =
+export const ITEM_CLASS =
   'flex min-h-[44px] w-full cursor-default items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden hover:bg-accent hover:text-accent-foreground';
 
 export function DocListItem({ doc, isActive, onClick }: DocListItemProps) {

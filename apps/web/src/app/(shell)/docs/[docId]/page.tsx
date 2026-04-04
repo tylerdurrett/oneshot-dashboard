@@ -2,10 +2,12 @@ import { useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import type { Block } from '@blocknote/core';
 import { Button, Spinner } from '@repo/ui';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useDocument, useSaveDocument } from '../_hooks/use-doc-query';
 import { DocEditor } from '../_components/editor';
 import { DocTitle } from '../_components/doc-title';
 import { DocsLayout } from '../_components/docs-layout';
+import { MobileDocSelector } from '../_components/mobile-doc-selector';
 
 /**
  * Single-doc view — loads a document by ID from the URL param (desktop) or
@@ -16,6 +18,7 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
   const params = useParams() as { docId?: string };
   const docId = docIdProp ?? params.docId!;
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const { data: doc, isLoading, isError, error } = useDocument(docId);
   const saveMutation = useSaveDocument(docId);
@@ -68,6 +71,11 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
+      {isMobile && (
+        <div className="flex items-center border-b border-border px-2 py-1">
+          <MobileDocSelector activeDocId={docId} activeDocTitle={doc.title} />
+        </div>
+      )}
       <DocsLayout>
         <div className="flex flex-1 flex-col overflow-hidden">
           <DocTitle key={`title-${docId}`} title={doc.title} onSave={handleSaveTitle} />

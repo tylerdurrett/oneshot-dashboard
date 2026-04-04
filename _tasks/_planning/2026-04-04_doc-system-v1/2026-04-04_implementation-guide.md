@@ -228,9 +228,11 @@ apps/web/src/
 
 ### 4.3 Mobile doc switcher
 
-- [ ] Create `apps/web/src/app/(shell)/docs/_components/mobile-doc-selector.tsx` — mirrors the ThreadSelector pattern. Popover trigger shows current doc title + chevron. Popover content lists docs in pinned/recent layout. Tapping a doc closes popover and navigates.
-- [ ] Place the selector in the top bar area of the mobile docs view. Add a "+" icon button next to it for creating new docs.
-- [ ] Ensure 44px minimum tap targets for accessibility.
+- [x] Create `apps/web/src/app/(shell)/docs/_components/mobile-doc-selector.tsx` — mirrors the ThreadSelector pattern. Popover trigger shows current doc title + chevron. Popover content lists docs in pinned/recent layout. Tapping a doc closes popover and navigates.
+- [x] Place the selector in the top bar area of the mobile docs view. Add a "+" icon button next to it for creating new docs.
+- [x] Ensure 44px minimum tap targets for accessibility.
+
+> **Notes (4.3):** `MobileDocSelector` mirrors ThreadSelector's structure: Popover trigger (ghost Button, `min-h-[44px]`, truncated title + ChevronDown) with PopoverContent listing pinned/recent sections. Reuses `DocListItem` component and exported `ITEM_CLASS` from `doc-list-item.tsx` — no duplicate item component. "+" icon button (`size-11` = 44px) sits next to the trigger for quick doc creation; a second "New document" action also appears at the bottom of the popover (matching ThreadSelector's "New thread" pattern). Wired into `DocViewPage` via `useIsMobile()` — renders a border-bottom top bar above `DocsLayout` on mobile only. 10 tests in `mobile-doc-selector.test.tsx` cover trigger display, popover open/close, pinned/recent sections, active highlight, navigation, create flow, and touch target sizes. All 361 web tests pass, type-check clean.
 
 **Acceptance Criteria:**
 - Mobile shows current doc title as a tappable trigger.
