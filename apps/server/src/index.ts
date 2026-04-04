@@ -8,6 +8,7 @@ import { config, isAllowedOrigin } from './config.js';
 import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
+import { docsRoutes } from './routes/docs.js';
 import { timerRoutes, broadcast, SSE_EVENTS } from './routes/timers.js';
 import { supportsHostCredentialInjection, refreshAndInjectCredentials } from './services/credentials.js';
 import {
@@ -84,6 +85,9 @@ export function buildServer(opts?: BuildServerOptions) {
     if (opts?.spawnFn) chatOpts.spawnFn = opts.spawnFn;
     server.register(chatRoutes, chatOpts);
   }
+
+  // -- Docs routes (no feature flag — always active) --
+  server.register(docsRoutes, { database: opts?.database ?? defaultDb });
 
   // -- Timer system: scheduler + routes --
   let scheduler: TimerScheduler | null = null;

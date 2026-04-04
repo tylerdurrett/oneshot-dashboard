@@ -52,3 +52,10 @@ export const timerDailyProgress = pgTable(
     unique('uq_bucket_date').on(table.bucketId, table.date),
   ],
 );
+
+export const documents = pgTable('documents', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  content: jsonb('content').notNull().$type<unknown[]>(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
+});

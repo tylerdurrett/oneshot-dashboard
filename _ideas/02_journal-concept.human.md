@@ -114,3 +114,10 @@ Agent integration depth — The chat agent can read journal content, but can it 
 DECISION:
 We're using BlockNote for the journal editor. It's built on Tiptap/ProseMirror and gives us a Notion-style block editor out of the box — slash commands, drag-and-drop blocks, formatting toolbar, dark theme support. The free tier (MPL-2.0) covers everything we need. Content is stored as JSON blocks in SQLite, which is lossless and easy to query. Markdown export is available (lossy, but fine for feeding the agent/knowledgebase since we never need to import it back). Bundle size is ~357KB gzipped — heavier than alternatives but acceptable for a personal PWA. Other candidates considered: Tiptap (too much UI to build yourself), MDXEditor (single maintainer, no slash commands, mobile bugs), Lexical (a framework, not an editor — way too much custom work).
 ---
+OKAY - before we go and implement a ton of stuff, I want to focus purely on simple doc editing to make sure that works.
+
+Let's just create the absolute simplest of pages that is a full-screen doc editor.
+Use BlockNote.
+Save it to a default doc in the db.
+All else will come afterward.
+Let's discuss.

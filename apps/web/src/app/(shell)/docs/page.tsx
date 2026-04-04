@@ -1,15 +1,42 @@
-import { FileText } from 'lucide-react';
+import { useCallback } from 'react';
+import type { Block } from '@blocknote/core';
+import { Spinner } from '@repo/ui';
+import { useDefaultDocument, useSaveDocument } from './_hooks/use-doc-query';
+import { DocEditor } from './_components/editor';
 
 export default function DocsPage() {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-      <div className="rounded-2xl bg-sidebar-accent/50 p-6">
-        <FileText className="size-12 text-sidebar-foreground/50" />
+  const { data: doc, isLoading, error } = useDefaultDocument();
+  const saveMutation = useSaveDocument();
+
+  const handleSave = useCallback(
+    (content: Block[]) => {
+      saveMutation.mutate(content as unknown[]);
+    },
+    [saveMutation],
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <Spinner />
       </div>
-      <h1 className="text-xl font-semibold text-foreground">Docs</h1>
-      <p className="max-w-sm text-sm text-muted-foreground">
-        Coming soon — a place for guides, notes, and reference material.
-      </p>
+    );
+  }
+
+  if (error || !doc) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-sm text-destructive">Failed to load document.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <DocEditor
+        initialContent={doc.content as Block[]}
+        onSave={handleSave}
+      />
     </div>
   );
 }
