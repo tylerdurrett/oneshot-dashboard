@@ -5,14 +5,14 @@
 
 ## Overview
 
-Evolve the existing single-doc BlockNote editor into a multi-doc system with a taxonomy/terms classification system, on-idle AI processing that automatically tags documents, and folder organization. A `workspaceId` column exists on all tables for future partitioning, but workspace management is not in scope — everything lives in a single auto-seeded default workspace.
+Evolve the existing single-doc BlockNote editor into a multi-doc system with a taxonomy/terms classification system, on-idle AI processing that incrementally tags documents via block-level diffing, and folder organization. A `workspaceId` column exists on all tables for future partitioning, but workspace management is not in scope — everything lives in a single auto-seeded default workspace.
 
 ## End-User Capabilities
 
 1. Create multiple docs with titles. Switch between them.
 2. Tap "Journal" to open a pinned doc instantly — no file picker.
 3. Browse docs in a library view. Organize them into folders.
-4. After going idle or leaving a doc, the system automatically assigns tags across multiple taxonomies (topic, mood, type).
+4. After going idle or leaving a doc, the system automatically assigns tags across multiple taxonomies (topic, mood, type) — only processing what changed.
 5. Filter and search docs by AI-assigned tags.
 
 ## Architecture
@@ -50,23 +50,38 @@ Docs and fragments can both have terms applied via join tables.
 
 **Trigger:** Idle detection (configurable, likely 30-60 min) or navigating away from the doc. Frontend detects and pings the server. Server-side fallback polls `updatedAt` for cases where frontend can't fire (tab killed, phone sleep).
 
-**Process (start simple):**
-1. Read the full doc content.
-2. Send to LLM with the taxonomy list and existing terms.
-3. LLM returns: tag assignments for the doc, and optionally extracted fragments with per-fragment tags.
-4. Store results.
+**Block-level incremental processing:**
 
-Start with whole-doc processing. If docs grow large enough that this is wasteful, add diff-based processing later (the vision doc preserves that design).
+Rather than reprocessing the entire doc on every change, the system uses block-level content hashing to process only what changed. BlockNote gives every block a stable ID. On each processing run:
 
-**Re-processing:** If a doc is edited after processing, mark it dirty. Next idle trigger re-processes. Old fragment/term associations are replaced.
+1. Hash each block's content.
+2. Compare against stored hashes from the last processing run (`document_block_states` table).
+3. **New blocks** (no stored hash) → send to the agent for extraction.
+4. **Changed blocks** (hash mismatch) → delete old fragments for those blocks, re-extract.
+5. **Unchanged blocks** → skip entirely. Existing fragments and terms stay untouched.
+6. **Deleted blocks** (stored hash but block gone from doc) → delete associated fragments and terms.
+
+This solves two problems at once:
+- **No waste:** only the delta goes to the AI. A one-sentence edit doesn't reprocess a 5,000-token doc.
+- **No tag flicker:** unchanged content keeps its tags permanently. The AI never gets a chance to reclassify stable content differently across runs.
+
+**Agent-based processing, not a single LLM call:**
+
+Processing is handled by a Claude Code agent invocation, not a raw API call. The agent receives the changed blocks and the doc's metadata (taxonomy list, existing terms), but also has tools to read additional context from the doc if needed. This means we don't have to perfectly engineer the context window upfront — the agent can pull surrounding blocks, read the full doc, or check other docs in the workspace if it judges that's necessary for accurate classification.
+
+**Re-processing:** Only changed blocks are reprocessed. Fragments are linked to source block IDs. When a block changes, only its fragments are replaced. Everything else is stable.
 
 **Model choice:** Claude Code (same model the chat agent uses). Low volume, background processing, cost is negligible.
+
+**Future: full changeset diffs.** Block-level hashing solves "what needs reprocessing" but doesn't capture "what happened in this session as a narrative." Full snapshot/changeset diffs (preserved in the vision doc) serve a different purpose — session summarization, activity timelines. They can be layered on top of block hashing later without changing how tagging works. The two approaches are complementary, not competing.
 
 ### Fragments
 
 Fragments are the sub-doc classified unit. A single doc might cover 3 topics — the AI splits them into separate searchable fragments, each with its own term assignments.
 
-For v1, fragments are extracted during the same on-idle processing call. The LLM decides how to split the content. Short single-topic docs may produce one fragment identical to the doc. Longer docs produce multiple.
+Fragments are linked to their source block IDs. This is what enables incremental processing — when a block changes, the system knows exactly which fragments to delete and re-extract.
+
+For short single-topic content, the fragment may be 1:1 with the block. For longer blocks touching multiple topics, the AI splits them. The AI decides.
 
 ### Agent Access
 
@@ -90,7 +105,8 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 - `fragment_terms` — fragmentId (FK), termId (FK)
 
 **Pipeline:**
-- `fragments` — id, documentId (FK), workspaceId (FK), title, content (text), createdAt
+- `document_block_states` — documentId (FK), blockId (text), contentHash (text), processedAt (timestamp)
+- `fragments` — id, documentId (FK), workspaceId (FK), title, content (text), sourceBlockIds (text[]), createdAt
 
 ## Implementation Sequence
 
@@ -104,13 +120,15 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 **Testable:** Create multiple docs, give them titles, switch between them. Journal still works as before.
 
 ### Phase 2: Taxonomy/Terms + On-Idle Processing
-- Create `taxonomies`, `terms`, `fragments`, `document_terms`, `fragment_terms` tables.
+- Create `taxonomies`, `terms`, `fragments`, `document_block_states`, `document_terms`, `fragment_terms` tables.
 - Seed initial taxonomies (Topic, Mood, Type) in the default workspace.
 - Build the on-idle processing trigger (frontend idle detection + server endpoint).
-- Build the LLM extraction call: send doc content + taxonomy/term list, receive fragment + term assignments.
-- Store fragments and term associations.
+- Build block-level hashing and diff logic.
+- Build the Claude Code agent invocation for extraction: pass changed blocks + taxonomy/term list, agent has tools to read more context if needed.
+- Store fragments with source block IDs and term associations.
+- Update `document_block_states` with new hashes after processing.
 
-**Testable:** Write in a doc, go idle, check the database. Fragments and terms should appear. Verify the AI produced reasonable classifications.
+**Testable:** Write in a doc, go idle, check the database. Fragments and terms should appear for the new/changed blocks. Edit one block, go idle again — only that block's fragments should change. Everything else stays stable.
 
 ### Phase 3: Tag Filtering + Search
 - Build UI to display assigned terms on docs (tag chips, sidebar, etc.).
@@ -129,24 +147,26 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 ## Key Decisions
 
-1. **Start with whole-doc processing, not diffs.** At personal journal scale, sending the full doc to the LLM is simple and cheap. Add diff-based processing only if docs grow large enough to need it.
-2. **workspaceId on everything, but no workspace features.** The column is there. A default workspace is seeded. That's it. Workspace management comes later.
-3. **Taxonomy/terms, not flat tags.** Proper system with named taxonomies, hierarchy support, AI-managed flag. Worth the small upfront cost to avoid retrofitting.
-4. **Folders separate from taxonomies.** Different cardinality, different management model. Keep them separate.
-5. **Journal is a pinned doc.** Same table, same editor, same pipeline. Navigation gives it special treatment.
-6. **Fragments extracted during processing.** The AI decides how to split doc content. One call per doc, not a separate pipeline.
+1. **Block-level incremental processing.** Content hashing per block, not whole-doc reprocessing. Only changed blocks go to the AI. Unchanged content keeps its tags permanently — no flicker.
+2. **Agent-based extraction, not a raw LLM call.** Claude Code agent with tools to read additional context as needed. We don't have to perfectly engineer the context window — the agent has judgment and can pull more information.
+3. **Full changeset diffs remain additive.** Block hashing and full changesets serve different purposes (incremental tagging vs session narrative). They can be layered together later without conflict.
+4. **workspaceId on everything, but no workspace features.** The column is there. A default workspace is seeded. That's it. Workspace management comes later.
+5. **Taxonomy/terms, not flat tags.** Proper system with named taxonomies, hierarchy support, AI-managed flag. Worth the small upfront cost to avoid retrofitting.
+6. **Folders separate from taxonomies.** Different cardinality, different management model. Keep them separate.
+7. **Journal is a pinned doc.** Same table, same editor, same pipeline. Navigation gives it special treatment.
+8. **Fragments linked to source blocks.** Enables incremental processing — when a block changes, the system knows exactly which fragments to replace.
 
 ## Risks and Considerations
 
-- **Extraction quality** — bad tags erode trust. Start simple (just topic assignment), iterate on the prompt. Store raw LLM responses for debugging.
-- **Re-processing churn** — editing a doc triggers re-processing, which replaces all fragments/terms. If the AI is inconsistent across runs, tags may flicker. Consider only re-processing if content changed significantly.
-- **Whole-doc processing limits** — works fine for typical journal entries (hundreds to low thousands of tokens). Will become wasteful if docs grow to tens of thousands of tokens. The diff-based approach is the escape hatch (preserved in the vision doc).
+- **Extraction quality** — bad tags erode trust. Start simple (just topic assignment), iterate on the prompt. Store raw agent responses for debugging.
+- **Block ID stability** — the system depends on BlockNote block IDs being stable across saves. If BlockNote regenerates IDs (e.g., on paste or certain operations), the hash comparison breaks and triggers unnecessary reprocessing. Needs validation during Phase 2.
+- **Agent cost at scale** — a Claude Code agent invocation is heavier than a Haiku API call. At personal journal volume this is fine, but worth monitoring if usage patterns change.
 - **Folder + tag interaction** — users may expect folders and tags to work together in filtering (show me docs in "Work" folder tagged "urgent"). Make sure the query layer supports this.
 
 ## Non-Goals (This Iteration)
 
 - Workspace management UI / multi-workspace features — column exists, features deferred.
-- Snapshot/diff pipeline — preserved in vision doc, add when needed.
+- Full snapshot/changeset pipeline — block hashing handles incremental tagging; session-level summarization deferred.
 - Notes-as-atoms / feed UX — significant complexity, deferred until real usage shows it's needed.
 - Knowledge base extraction (goals, beliefs, concerns) — build after basic tagging proves useful.
 - Agent write access to docs — read access only for now.
@@ -159,9 +179,10 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 - Idle timeout duration (30 min? 60 min?)
 - How to display tags in the doc editor UI — inline chips? sidebar panel? both?
-- Should processing run on every save or truly only on idle?
+- Should processing trigger on every idle or only when `document_block_states` shows changes?
 - How to handle the journal doc's special status in the doc list — always pinned at top? separate section?
 - Term consolidation — when and how to merge near-duplicate terms?
+- How much context should the agent receive by default vs pull on-demand via tools?
 
 ## Related
 
