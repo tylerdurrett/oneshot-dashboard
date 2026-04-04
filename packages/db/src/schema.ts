@@ -1,7 +1,7 @@
 // Database schema — source of truth for all tables.
 // After editing, run: pnpm --filter @repo/db db:generate && pnpm --filter @repo/db db:migrate
 
-import { date, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { boolean, date, integer, jsonb, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 export const threads = pgTable('threads', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -53,9 +53,23 @@ export const timerDailyProgress = pgTable(
   ],
 );
 
+export const workspaces = pgTable('workspaces', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  name: text('name').notNull(),
+  isDefault: boolean('is_default').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
+});
+
 export const documents = pgTable('documents', {
   id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull().default(''),
   content: jsonb('content').notNull().$type<unknown[]>(),
+  workspaceId: uuid('workspace_id').references(() => workspaces.id),
+  folderId: uuid('folder_id'),
+  pinnedAt: timestamp('pinned_at', { withTimezone: true, mode: 'string' }),
+  pipelineEnabled: boolean('pipeline_enabled').notNull().default(true),
+  processedAt: timestamp('processed_at', { withTimezone: true, mode: 'string' }),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
 });

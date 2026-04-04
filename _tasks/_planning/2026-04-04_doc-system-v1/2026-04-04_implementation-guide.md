@@ -52,12 +52,14 @@ apps/web/src/
 
 ### 1.1 Create `workspaces` table and evolve `documents`
 
-- [ ] Add `workspaces` table to `packages/db/src/schema.ts`: id (uuid PK), name (text), isDefault (boolean), createdAt, updatedAt. Follow existing naming conventions (snake_case columns, ISO string timestamps).
-- [ ] Add columns to `documents` table: `title` (text, not null, default `''`), `workspaceId` (uuid FK → workspaces, nullable initially for migration), `folderId` (uuid, nullable — FK target doesn't exist yet, add as plain column), `pinnedAt` (timestamp, nullable), `pipelineEnabled` (boolean, default true), `processedAt` (timestamp, nullable).
-- [ ] Run `pnpm --filter @repo/db db:generate` to generate the migration SQL.
-- [ ] Review the generated SQL. Verify the `when` timestamp in `drizzle/meta/_journal.json` is after all previous entries.
-- [ ] Run `pnpm --filter @repo/db db:migrate` to apply.
-- [ ] Verify tables with `psql`: `\d workspaces` and `\d documents`.
+- [x] Add `workspaces` table to `packages/db/src/schema.ts`: id (uuid PK), name (text), isDefault (boolean), createdAt, updatedAt. Follow existing naming conventions (snake_case columns, ISO string timestamps).
+- [x] Add columns to `documents` table: `title` (text, not null, default `''`), `workspaceId` (uuid FK → workspaces, nullable initially for migration), `folderId` (uuid, nullable — FK target doesn't exist yet, add as plain column), `pinnedAt` (timestamp, nullable), `pipelineEnabled` (boolean, default true), `processedAt` (timestamp, nullable).
+- [x] Run `pnpm --filter @repo/db db:generate` to generate the migration SQL.
+- [x] Review the generated SQL. Verify the `when` timestamp in `drizzle/meta/_journal.json` is after all previous entries.
+- [x] Run `pnpm --filter @repo/db db:migrate` to apply.
+- [x] Verify tables with `psql`: `\d workspaces` and `\d documents`.
+
+> **Notes (1.1):** Migration `0002_overrated_newton_destine.sql` generated and applied. Journal timestamps in order (1775243617588 → 1775252891547 → 1775318548150). `isDefault` column uses `default(false)` following drizzle boolean conventions. Verified via tsx script since psql CLI not installed — existing document row preserved with safe defaults/nulls. All 4 document tests pass, type-check clean.
 
 **Acceptance Criteria:**
 - `workspaces` table exists with all columns.

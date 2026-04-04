@@ -15,6 +15,13 @@
       "when": 1775252891547,
       "tag": "0001_sparkling_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775318548150,
+      "tag": "0002_overrated_newton_destine",
+      "breakpoints": true
     }
   ]
 }
