@@ -372,29 +372,39 @@ So to answer your question directly
 You don't need to worry about changeset boundaries being too granular. The diff is just an index — "look here, here, and here." The LLM always gets full blocks with surrounding context. Even a one-word change gets the full paragraph plus neighbors, which is enough to understand intent.
 ---
 Feature: Journal Intelligence Pipeline
-Date: 2026-04-03
+Date: 2026-04-04
 Status: Scoped
 
 Overview
-Build an AI-powered intelligence layer on top of the app's document system. The user writes freely in BlockNote docs — one continuous journal doc with a fast-path "home base" entry point, plus additional standalone docs as needed. Behind the scenes, the system detects idle periods, diffs what changed, and uses an LLM to extract semantic fragments, tags, and knowledge — building a searchable, structured knowledge base without any manual organization.
+Build an AI-powered intelligence layer on top of the app's document system. The user writes freely in BlockNote docs — one continuous journal doc with a fast-path "home base" entry point, plus additional standalone docs as needed. Behind the scenes, the system detects idle periods, diffs what changed, and uses an LLM to extract semantic fragments and classify them across multiple taxonomies — building a searchable, structured knowledge base without any manual organization. All data is partitioned by workspace, with a default "Personal" workspace out of the box.
 
 End-User Capabilities
-Tap "Journal" and immediately start writing — no file picker, no decisions. The journal doc (or current week's doc) opens directly.
+Tap "Journal" and immediately start writing — no file picker, no decisions.
 Create, browse, and organize additional docs in a library view with a folder hierarchy.
 See auto-inserted day and week headings in journal docs as temporal landmarks.
-After going idle or leaving, the system automatically processes what you wrote — across any doc.
-Search and browse by topics, themes, or knowledge areas (goals, concerns, beliefs) that the AI identified — without ever having created a tag or folder yourself.
-The chat agent can access doc content, fragments, and knowledge base entries for context-aware conversation.
+After going idle or leaving, the system automatically processes what you wrote.
+Search and browse by topics, moods, types, or any other taxonomy the AI has populated — without ever manually tagging or organizing.
+Access a knowledge base of extracted goals, concerns, beliefs, and other durable areas that the AI maintains from your writing.
+Work across multiple workspaces (Personal, Client A, Client B) with hard boundaries — taxonomies, fragments, and knowledge never bleed across workspaces.
+Optionally search across workspace boundaries when needed, with explicit intent.
+The chat agent operates within the current workspace by default. Cross-workspace agent tools require explicit permission.
 Architecture
+Workspaces
+All docs, folders, taxonomies, terms, fragments, and knowledge entries belong to a workspace. Workspaces are hard-partitioned — every query is workspace-scoped by default. There is no implicit cross-workspace data access.
+
+A default "Personal" workspace is created automatically and cannot be deleted. Additional workspaces can be created for clients, projects, or any other domain the user wants to keep isolated.
+
+The initial implementation is single-user. The data model uses workspaceId as the partition key on all relevant tables. When multi-user is needed later, adding a users table and workspace_members join table is additive — no existing schema changes required.
+
 Multi-Doc System
-The foundation is a general-purpose document system. Every doc lives in the same table and goes through the same editor, save pipeline, and (optionally) intelligence pipeline. The journal is not a separate feature — it's a pinned doc with a privileged nav entry point and "just start writing" UX. The distinction between "journal" and "docs" is in the navigation layer, not the data layer.
+The foundation is a general-purpose document system. Every doc lives in the same table and goes through the same editor, save pipeline, and (optionally) intelligence pipeline. The journal is not a separate feature — it's a pinned doc with a privileged nav entry point and "just start writing" UX. The distinction between "journal" and "docs library" is in the navigation layer, not the data layer.
 
 The intelligence pipeline (snapshots, diffs, fragment extraction) is per-document and runs on any doc where it's enabled. Default: on. Quick scratch docs can opt out.
 
-Folder Taxonomy
-Docs are organized via a dedicated folders table with a proper hierarchical structure (parent references). This supports performant subtree operations — moving a folder reparents it and all descendants without rewriting tags. Docs belong to a folder via foreign key. A doc can optionally exist outside any folder (unfiled).
+Folders
+Docs are organized via a dedicated folders table with a proper hierarchical structure (parent references). A doc belongs to at most one folder via a direct foreign key. This supports performant subtree operations — moving a folder reparents it and all descendants in a single update. Folders are workspace-scoped.
 
-The folder hierarchy is one organizational axis. AI-generated tags are another, independent axis. Folders are user-managed structure; tags are AI-managed structure. Both coexist.
+Folders are intentionally separate from the taxonomy system. They have different semantics (single-parent, hierarchical, user-managed) and different cardinality (one folder per doc via FK). The taxonomy system is many-to-many. No reason to force them together.
 
 Auto-Headings
 When the user opens a journal doc and begins typing:
@@ -420,60 +430,97 @@ Input to the LLM:
 The full content of each changed block, plus 2-3 surrounding blocks for context (not raw diff tokens).
 Adjacent changed blocks merge into a single context window to avoid redundancy.
 For deleted blocks, the previous snapshot's content is included so the LLM understands what was removed.
-The existing tag list, with instructions to reuse when appropriate and create new ones sparingly.
+The list of all taxonomies and their existing terms for the current workspace, with instructions to reuse existing terms when appropriate and create new ones sparingly.
 Output from the LLM:
 
-A list of fragments, each with: a brief title, the relevant text, and suggested tags.
-Model choice: Haiku. Volume is low (a few changesets per day), latency is irrelevant (background processing), and cost is negligible.
+A list of fragments, each with: a brief title, the relevant text, and suggested terms across all applicable taxonomies.
+Model choice: Claude Code (same model the chat agent uses). Volume is low (a few changesets per day), latency is irrelevant (background processing), and cost is negligible at personal journal scale.
 
-Tags
-Tags emerge organically from the AI's extraction. The system starts with zero tags. Over time, a taxonomy grows that reflects what you actually write about. Tags are global across all docs — mentioning "health" in your journal and in a standalone doc produces fragments that share the same tag.
+Taxonomy & Terms System
+Classification is handled by a general-purpose taxonomy/terms system rather than a flat tags table. A taxonomy is a named classification axis. A term is a value within that taxonomy. Both docs and fragments can have terms applied to them via join tables.
 
-Tags have a taxonomy field for categorization (topic, area, mood, etc.). Periodic LLM-driven consolidation merges near-duplicates and cleans up the taxonomy.
+Each taxonomy declares:
 
+isHierarchical — whether terms can have parent/child relationships (e.g., subtopics).
+isAIManaged — whether the AI creates and maintains terms (vs user-managed).
+Expected initial taxonomies:
+
+Topic — AI-managed, optionally hierarchical. Terms: health, career, product-ideas, relationships...
+Mood — AI-managed, flat. Terms: reflective, anxious, excited, frustrated...
+Type — AI-managed, flat. Terms: goal, concern, belief, idea, question, observation, decision...
+Additional taxonomies can be added at any time — just another row in the table.
+Terms are workspace-scoped (inherited through their taxonomy). The AI receives the full taxonomy + term list during extraction and assigns terms across all applicable taxonomies per fragment. Periodic LLM-driven consolidation merges near-duplicate terms within each taxonomy.
+
+Terms can apply at two levels:
+
+Document-level — broad classification of what a doc is about.
+Fragment-level — granular classification of individual extracted ideas.
 Knowledge Base
-Certain fragments map to durable knowledge areas — goals, concerns, beliefs, feelings. When the LLM identifies a fragment as one of these, it upserts a knowledge base entry. If a previously stated goal is deleted from a doc, the knowledge base reflects that removal. Knowledge is global — your goals are your goals regardless of which doc they came from.
+Certain fragments map to durable knowledge areas — goals, concerns, beliefs, feelings. When the LLM identifies a fragment as one of these (via the "Type" taxonomy), it upserts a knowledge base entry. If a previously stated goal is deleted from a doc, the knowledge base reflects that removal. Knowledge is workspace-scoped.
+
+Agent Workspace Scoping
+The chat agent operates within the current workspace by default. All agent search and retrieval tools (doc content, fragments, terms, knowledge) are workspace-scoped. Cross-workspace tools are a separate capability that requires explicit user permission per-conversation or per-query.
 
 Data Model
 Existing (evolve):
 
-documents — add: title, folderId (FK, nullable), pipelineEnabled (boolean, default true)
+documents — add: title, workspaceId (FK), folderId (FK, nullable), pipelineEnabled (boolean, default true)
 New tables:
 
-folders — id, name, parentId (FK self-referencing, nullable), sortOrder, createdAt, updatedAt
-journal_snapshots — id, documentId, content (JSONB), capturedAt, processedAt
-journal_changesets — id, documentId, snapshotBeforeId, snapshotAfterId, diff (JSONB), summary, createdAt, processedAt
-journal_fragments — id, changesetId, title, content, sourceBlockIds, createdAt
-journal_tags — id, name, taxonomy
-journal_fragment_tags — fragmentId, tagId
-journal_knowledge — id, area, content, sourceFragmentId, createdAt, updatedAt
+Core:
+
+workspaces — id, name, icon, color, isDefault (boolean), createdAt, updatedAt
+folders — id, workspaceId (FK), name, parentId (FK self-referencing, nullable), sortOrder, createdAt, updatedAt
+Taxonomy:
+
+taxonomies — id, workspaceId (FK), name, description, isHierarchical (boolean), isAIManaged (boolean), createdAt
+terms — id, taxonomyId (FK), name, parentId (FK self-referencing, nullable), sortOrder, createdAt
+document_terms — documentId (FK), termId (FK)
+fragment_terms — fragmentId (FK), termId (FK)
+Pipeline:
+
+journal_snapshots — id, documentId (FK), content (JSONB), capturedAt, processedAt
+journal_changesets — id, documentId (FK), snapshotBeforeId (FK), snapshotAfterId (FK), diff (JSONB), summary, createdAt, processedAt
+journal_fragments — id, changesetId (FK), workspaceId (FK), title, content, sourceBlockIds, createdAt
+Knowledge:
+
+journal_knowledge — id, workspaceId (FK), area, content, sourceFragmentId (FK), createdAt, updatedAt
+Workspace scoping: workspaceId is a direct FK on documents, folders, taxonomies, fragments, and knowledge. Terms inherit workspace scope through their taxonomy. Changesets and snapshots inherit workspace scope through their document. All queries filter by workspace.
+
 Key Decisions
+Workspaces are hard boundaries. Taxonomies, terms, fragments, knowledge never cross workspace walls. Data isolation guarantee, not just a UI filter.
+Single-user for now, multi-user ready. workspaceId on everything. Users and membership are additive when needed — no refactor.
+Default "Personal" workspace. Always exists, can't be deleted.
+Taxonomy/terms system, not flat tags. A proper system of named taxonomies with typed terms. Supports multiple classification axes (topic, mood, type, etc.), hierarchy within a taxonomy, and AI-managed vs user-managed taxonomies. Replaces the need for a one-dimensional tags table.
+Folders stay separate from taxonomies. Different cardinality (single-parent FK vs many-to-many join), different management model (always user-managed, always hierarchical). Unifying them adds abstraction without payoff.
 One doc system, two entry points. Journal is a pinned doc with fast-path UX. The library is the full-power view. Same editor, same pipeline, same data.
-Folders are proper hierarchy. Dedicated table with parent references, not tag naming conventions. Supports performant reparenting and subtree moves.
-Tags and folders are independent axes. Folders are user-managed organization. Tags are AI-managed emergent structure. Both apply to all docs.
 Diff identifies, LLM reads. Structural diff finds which blocks changed. The LLM receives full block content with surrounding context.
-Fragments, not changesets, are the tagged unit. A single writing session might contain 3 distinct topics. The AI splits them into separate searchable fragments.
-Tags emerge, not defined. No manual taxonomy management. The AI builds and maintains the tag system.
+Fragments are the classified unit. A single writing session might contain 3 distinct topics. The AI splits them into separate searchable fragments and classifies each across all taxonomies.
+Taxonomies and terms emerge, not predefined. The AI builds and maintains terms per workspace. New taxonomies can be added at any time.
 LLM over embeddings for extraction. Embeddings can't distinguish a goal from an observation about the same topic. LLM extraction costs almost nothing at personal journal volume.
-Pipeline is per-doc and opt-in/out. Runs on all docs by default. Can be disabled for scratch docs.
-Global tags and knowledge. Cross-doc searchability by default. A thought is a thought regardless of where you wrote it.
+Agent is workspace-scoped by default. Cross-workspace access is explicit and permission-gated.
 Agent Access (Planned)
-The doc system will expose full CRUD APIs — list, read, create, write. The chat agent will be able to read any doc's content, query fragments and tags, and access the knowledge base. Agent writing to docs (creating docs, appending entries) is a natural extension of the same API surface. This is out of scope for the initial build but the API design should not preclude it.
+The doc system will expose full CRUD APIs — list, read, create, write — all workspace-scoped. The chat agent will be able to read any doc's content, query fragments and terms, and access the knowledge base within the current workspace. Cross-workspace tools are a separate, permission-gated capability. Agent writing to docs is a natural extension of the same API surface. Out of scope for initial build but the API design should not preclude it.
 
 Risks and Considerations
-Extraction quality — bad fragments/tags erode trust. Prompt engineering is critical and will need iteration. Store raw LLM responses for debugging.
-Snapshot storage growth — full JSONB snapshots of growing docs add up. May need a retention policy (keep last N full snapshots, discard older ones once changesets are processed).
-Block ID stability — fragments reference source blocks. Must use BlockNote's block IDs, not array indices, since positions shift as content is added.
+Extraction quality — bad fragments/terms erode trust. Prompt engineering is critical. Store raw LLM responses for debugging.
+Snapshot storage growth — full JSONB snapshots add up. May need retention policy (keep last N full snapshots per doc).
+Block ID stability — fragments reference source blocks by BlockNote block IDs, not array indices, since positions shift.
 Idle detection edge cases — phone sleep, tab killed, laptop closed. Server-side updatedAt polling is the safety net.
-Folder operations at scale — reparenting a deep subtree is a single UPDATE on parentId, but UI tree rendering and sort order maintenance need attention.
+Workspace switching UX — needs to feel lightweight, not like logging into a different app.
+Taxonomy proliferation — the AI could create too many taxonomies or terms. May need guardrails (max taxonomies per workspace, term count thresholds before consolidation runs).
 Non-Goals (This Iteration)
-Views (tag browser, knowledge dashboard, timeline) — these consume the data this pipeline produces but are scoped separately.
-Embedding-based search — useful for "find similar" queries later, not needed for extraction.
+Multi-user / shared workspaces — schema ready, not building yet.
+Views (taxonomy browser, knowledge dashboard, timeline) — consume the pipeline's output, scoped separately.
+Embedding-based search — useful later for "find similar" queries.
 Agent write access — accounted for in API design, built separately.
-Weekly doc rotation — the journal may start as one doc; auto-rotating to a fresh doc weekly is a UX decision to make after using it.
+Cross-workspace agent tools — permission model defined, implementation deferred.
+User-created taxonomies — initially only AI-managed taxonomies. User-managed taxonomies (beyond folders) can come later.
 Open Questions
-Exact idle timeout duration (30 min? 60 min? configurable by user?)
+Exact idle timeout duration (30 min? 60 min? configurable?)
 Which knowledge areas to extract initially (goals, concerns, beliefs — others?)
-Should the user be able to see/correct extracted fragments and tags, or is it fully hands-off?
-Tag consolidation frequency and trigger (weekly? when tag count exceeds threshold?)
-Journal as a single forever-doc or weekly rotation? May depend on how it feels in practice.
+Should the user be able to see/correct extracted fragments and terms, or fully hands-off?
+Term consolidation frequency and trigger
+Journal as a single forever-doc or periodic fresh starts?
+Workspace switcher UX — nav rail icon? dropdown? separate screen on mobile?
+Should initial taxonomies (Topic, Mood, Type) be seeded per workspace, or should the AI create them organically on first extraction?
