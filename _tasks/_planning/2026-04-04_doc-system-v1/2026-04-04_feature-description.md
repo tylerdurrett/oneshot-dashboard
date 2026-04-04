@@ -1,11 +1,11 @@
-# Feature: Doc System v1 — Multi-Doc, Workspaces, Auto-Tagging
+# Feature: Doc System v1 — Multi-Doc, Auto-Tagging, Folders
 
 **Date:** 2026-04-04
 **Status:** Scoped
 
 ## Overview
 
-Evolve the existing single-doc BlockNote editor into a multi-doc system with workspaces, a taxonomy/terms classification system, and on-idle AI processing that automatically tags documents. The goal is to get the infrastructure in place and start using it — let real friction guide future complexity like the snapshot/diff pipeline, notes-as-atoms feed, and knowledge base extraction.
+Evolve the existing single-doc BlockNote editor into a multi-doc system with a taxonomy/terms classification system, on-idle AI processing that automatically tags documents, and folder organization. A `workspaceId` column exists on all tables for future partitioning, but workspace management is not in scope — everything lives in a single auto-seeded default workspace.
 
 ## End-User Capabilities
 
@@ -14,25 +14,20 @@ Evolve the existing single-doc BlockNote editor into a multi-doc system with wor
 3. Browse docs in a library view. Organize them into folders.
 4. After going idle or leaving a doc, the system automatically assigns tags across multiple taxonomies (topic, mood, type).
 5. Filter and search docs by AI-assigned tags.
-6. All data lives in a workspace. Default "Personal" workspace out of the box. Additional workspaces for clients/projects with hard data boundaries.
 
 ## Architecture
-
-### Workspaces
-
-All docs, folders, taxonomies, terms, and fragments belong to a workspace. Workspaces are hard-partitioned — every query is workspace-scoped by default. No implicit cross-workspace data access.
-
-A default "Personal" workspace is auto-created and cannot be deleted. Additional workspaces can be created for clients, projects, or any other domain.
-
-Single-user for now. `workspaceId` on all relevant tables. Multi-user (users table, workspace_members) is additive later — no schema refactor.
 
 ### Multi-Doc
 
 The existing `documents` table evolves to support multiple docs with titles. Each doc is a BlockNote editor with JSONB content, same as today. The journal is a pinned doc (`isJournal: true`) with a fast-path nav entry point. Additional docs are accessed through a library view.
 
+### Workspace Column (Schema Only)
+
+All new tables include a `workspaceId` FK pointing to a `workspaces` table. A single default workspace is auto-seeded on first run. There is no workspace CRUD, no switcher UI, no multi-workspace features — just the column so the schema doesn't need a retrofit when workspaces become a real feature later.
+
 ### Folders
 
-A `folders` table with proper hierarchical structure (parent references). A doc belongs to at most one folder via direct FK. Performant reparenting — moving a folder updates one `parentId`. Folders are workspace-scoped and user-managed.
+A `folders` table with proper hierarchical structure (parent references). A doc belongs to at most one folder via direct FK. Performant reparenting — moving a folder updates one `parentId`. Folders are user-managed.
 
 Folders are separate from the taxonomy system. Different semantics (single-parent, hierarchical, always user-managed) and different cardinality (one folder per doc) vs taxonomies (many-to-many, AI-managed).
 
@@ -44,12 +39,12 @@ Each taxonomy declares:
 - `isHierarchical` — whether terms can have parent/child relationships.
 - `isAIManaged` — whether the AI creates and maintains terms (vs user-managed).
 
-**Initial taxonomies (seeded per workspace):**
+**Initial taxonomies (seeded with default workspace):**
 - **Topic** — AI-managed, optionally hierarchical. Terms emerge from content: health, career, product-ideas...
 - **Mood** — AI-managed, flat. Terms: reflective, anxious, excited...
 - **Type** — AI-managed, flat. Terms: goal, concern, belief, idea, question, observation, decision...
 
-Terms are workspace-scoped (through their taxonomy). Docs and fragments can both have terms applied via join tables.
+Docs and fragments can both have terms applied via join tables.
 
 ### On-Idle Processing
 
@@ -57,7 +52,7 @@ Terms are workspace-scoped (through their taxonomy). Docs and fragments can both
 
 **Process (start simple):**
 1. Read the full doc content.
-2. Send to LLM with the workspace's taxonomy list and existing terms.
+2. Send to LLM with the taxonomy list and existing terms.
 3. LLM returns: tag assignments for the doc, and optionally extracted fragments with per-fragment tags.
 4. Store results.
 
@@ -75,7 +70,7 @@ For v1, fragments are extracted during the same on-idle processing call. The LLM
 
 ### Agent Access
 
-The chat agent already exists. In this phase, it gains read access to doc content and taxonomy terms within the current workspace. This is additive API surface on the existing chat system.
+The chat agent already exists. In this phase, it gains read access to doc content and taxonomy terms. This is additive API surface on the existing chat system.
 
 ## Data Model
 
@@ -85,7 +80,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 **New tables:**
 
 **Core:**
-- `workspaces` — id, name, icon (nullable), color (nullable), isDefault (boolean), createdAt, updatedAt
+- `workspaces` — id, name, isDefault (boolean), createdAt, updatedAt *(minimal — just enough to be an FK target; icon/color added when workspace management is built)*
 - `folders` — id, workspaceId (FK), name, parentId (FK self-ref, nullable), sortOrder (float), createdAt, updatedAt
 
 **Taxonomy:**
@@ -97,17 +92,14 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 **Pipeline:**
 - `fragments` — id, documentId (FK), workspaceId (FK), title, content (text), createdAt
 
-**Workspace scoping:** `workspaceId` is a direct FK on documents, folders, taxonomies, and fragments. Terms inherit scope through their taxonomy. All queries filter by workspace.
-
 ## Implementation Sequence
 
-### Phase 1: Multi-Doc + Workspaces
-- Create `workspaces` table, seed default "Personal" workspace.
+### Phase 1: Multi-Doc
+- Create `workspaces` table (minimal), seed default workspace on first run.
 - Add `title`, `workspaceId`, `isJournal`, `pipelineEnabled`, `processedAt` to `documents`.
-- Migrate existing default doc: give it a title, assign to Personal workspace, mark as journal.
+- Migrate existing default doc: give it a title, assign to default workspace, mark as journal.
 - Build doc CRUD APIs (create, list, read, update, delete).
 - Build doc list UI in the docs area. Journal remains the pinned fast-path entry.
-- Build basic workspace seeding (just the default for now — workspace CRUD and switcher UI come later).
 
 **Testable:** Create multiple docs, give them titles, switch between them. Journal still works as before.
 
@@ -135,23 +127,14 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Create folders, move docs into them, rearrange the hierarchy.
 
-### Phase 5: Workspace Management
-- Build workspace CRUD APIs.
-- Build workspace switcher UI.
-- Seed taxonomies on new workspace creation.
-- Verify hard partitioning — switching workspace shows only that workspace's data.
-
-**Testable:** Create a "Client A" workspace, add docs there. Switch between Personal and Client A. Data is completely separate.
-
 ## Key Decisions
 
 1. **Start with whole-doc processing, not diffs.** At personal journal scale, sending the full doc to the LLM is simple and cheap. Add diff-based processing only if docs grow large enough to need it.
-2. **Workspaces from day one.** The `workspaceId` column goes on everything now. Even with just the default workspace, the partition key is in place.
+2. **workspaceId on everything, but no workspace features.** The column is there. A default workspace is seeded. That's it. Workspace management comes later.
 3. **Taxonomy/terms, not flat tags.** Proper system with named taxonomies, hierarchy support, AI-managed flag. Worth the small upfront cost to avoid retrofitting.
 4. **Folders separate from taxonomies.** Different cardinality, different management model. Keep them separate.
 5. **Journal is a pinned doc.** Same table, same editor, same pipeline. Navigation gives it special treatment.
 6. **Fragments extracted during processing.** The AI decides how to split doc content. One call per doc, not a separate pipeline.
-7. **Single-user, multi-user ready.** No users table yet. workspaceId on everything. Users + membership is additive.
 
 ## Risks and Considerations
 
@@ -159,17 +142,17 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 - **Re-processing churn** — editing a doc triggers re-processing, which replaces all fragments/terms. If the AI is inconsistent across runs, tags may flicker. Consider only re-processing if content changed significantly.
 - **Whole-doc processing limits** — works fine for typical journal entries (hundreds to low thousands of tokens). Will become wasteful if docs grow to tens of thousands of tokens. The diff-based approach is the escape hatch (preserved in the vision doc).
 - **Folder + tag interaction** — users may expect folders and tags to work together in filtering (show me docs in "Work" folder tagged "urgent"). Make sure the query layer supports this.
-- **Workspace switching UX** — deferred to Phase 5, but needs to feel lightweight when built.
 
 ## Non-Goals (This Iteration)
 
+- Workspace management UI / multi-workspace features — column exists, features deferred.
 - Snapshot/diff pipeline — preserved in vision doc, add when needed.
 - Notes-as-atoms / feed UX — significant complexity, deferred until real usage shows it's needed.
 - Knowledge base extraction (goals, beliefs, concerns) — build after basic tagging proves useful.
 - Agent write access to docs — read access only for now.
-- Cross-workspace agent tools — workspace-scoped only.
-- Multi-user / shared workspaces — schema ready, not building.
-- Embedding-based search — later.
+- Cross-workspace agent tools.
+- Multi-user / shared workspaces.
+- Embedding-based search.
 - Auto-headings — dropped. Let usage show if temporal landmarks are needed.
 
 ## Open Questions
