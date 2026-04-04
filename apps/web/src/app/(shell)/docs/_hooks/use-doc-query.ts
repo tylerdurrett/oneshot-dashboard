@@ -3,6 +3,7 @@ import {
   fetchDefaultDocument,
   saveDocumentContent,
   fetchDocuments,
+  fetchRecentDocument,
   fetchDocument,
   createDocument,
   saveDocument,
@@ -56,6 +57,13 @@ export function useDocuments() {
   return useQuery({
     queryKey: docKeys.list,
     queryFn: fetchDocuments,
+  });
+}
+
+export function useRecentDocument() {
+  return useQuery({
+    queryKey: docKeys.recent,
+    queryFn: fetchRecentDocument,
   });
 }
 

@@ -165,10 +165,12 @@ apps/web/src/
 
 ### 3.2 Routing — `/docs` redirect and `/docs/:id` page
 
-- [ ] Update `apps/web/src/router.tsx`: change `/docs` route to render a redirect component, add `/docs/:docId` route for the doc view.
-- [ ] Create `apps/web/src/app/(shell)/docs/[docId]/page.tsx` — the single-doc view. Fetches doc by ID from URL param, renders editor + layout.
-- [ ] Update `apps/web/src/app/(shell)/docs/page.tsx` — fetches most recent doc via `fetchRecentDocument()`, redirects to `/docs/:id` using the returned ID. Shows spinner during fetch.
-- [ ] Update nav items in `apps/web/src/lib/app-areas.ts` if needed — `/docs` should still be the entry point.
+- [x] Update `apps/web/src/router.tsx`: change `/docs` route to render a redirect component, add `/docs/:docId` route for the doc view.
+- [x] Create `apps/web/src/app/(shell)/docs/[docId]/page.tsx` — the single-doc view. Fetches doc by ID from URL param, renders editor + layout.
+- [x] Update `apps/web/src/app/(shell)/docs/page.tsx` — fetches most recent doc via `fetchRecentDocument()`, redirects to `/docs/:id` using the returned ID. Shows spinner during fetch.
+- [x] Update nav items in `apps/web/src/lib/app-areas.ts` if needed — `/docs` should still be the entry point.
+
+> **Notes (3.2):** `DOCS_NAV_ITEM` matchType changed from `'exact'` to `'prefix'` so `/docs/:docId` URLs resolve to the docs area on mobile. Added two-pass activeIndex logic in `useSwipeNavigation` (exact match first, then prefix) to prevent `/docs` from shadowing `/docs/chat`. `DocsPage` serves dual role: on desktop it's a redirect to most recent doc; on mobile the SwipeView mounts it for all `/docs/*` paths, so it extracts the docId from the URL and renders `DocViewPage` inline (same pattern as `MobileChatView` + `ThreadPage`). `DocViewPage` accepts docId from URL params (desktop) or prop (mobile), handles 404 with a "not found" page and nav back to `/docs`. `useRecentDocument` hook added to query hooks. `key={docId}` on `DocEditor` forces remount when switching docs. All 328 web tests pass (including 2 new swipe-nav tests + 1 updated app-areas test), type-check clean.
 
 **Acceptance Criteria:**
 - `/docs` redirects to `/docs/:id` where `:id` is the most recently edited doc.

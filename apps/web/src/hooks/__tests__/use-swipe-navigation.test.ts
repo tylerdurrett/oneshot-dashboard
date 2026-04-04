@@ -122,6 +122,20 @@ describe('useSwipeNavigation', () => {
     expect(result.current.pages).toHaveLength(2);
   });
 
+  it('maps /docs/:docId to index 0 (docs page) via prefix match', () => {
+    currentPathname = '/docs/some-doc-id';
+    const { result } = renderHook(() => useSwipeNavigation());
+    expect(result.current.activeIndex).toBe(0);
+    expect(result.current.currentArea.id).toBe('docs');
+  });
+
+  it('maps /docs/chat to index 1 (exact match preferred over prefix)', () => {
+    currentPathname = '/docs/chat';
+    const { result } = renderHook(() => useSwipeNavigation());
+    expect(result.current.activeIndex).toBe(1);
+    expect(result.current.currentArea.id).toBe('docs');
+  });
+
   // --- Area persistence ---
 
   it('persists area ID to localStorage', () => {

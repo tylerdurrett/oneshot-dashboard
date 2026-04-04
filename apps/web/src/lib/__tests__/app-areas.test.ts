@@ -35,9 +35,9 @@ describe('getAreaForPath', () => {
     expect(getAreaForPath('/docs/chat').id).toBe('docs');
   });
 
-  it('falls back to Timers area for unknown /docs sub-path', () => {
-    // /docs uses exact match, so arbitrary sub-paths don't match
-    expect(getAreaForPath('/docs/some-page').id).toBe('timers');
+  it('returns Docs area for /docs/:docId sub-paths', () => {
+    // /docs uses prefix match so /docs/:docId routes resolve to docs area
+    expect(getAreaForPath('/docs/some-doc-id').id).toBe('docs');
   });
 
   it('falls back to first area (Timers) for unknown paths', () => {

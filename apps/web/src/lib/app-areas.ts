@@ -30,7 +30,8 @@ const DOCS_NAV_ITEM: NavItem = {
   href: '/docs',
   label: 'Docs',
   icon: FileText,
-  matchType: 'exact',
+  // Prefix match so /docs/:docId routes resolve to the docs area on mobile.
+  matchType: 'prefix',
 };
 
 const DOCS_CHAT_NAV_ITEM: NavItem = {

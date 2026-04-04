@@ -29,8 +29,11 @@ export function useSwipeNavigation(): UseSwipeNavigationReturn {
   const pages = currentArea.navItems;
 
   const activeIndex = useMemo(() => {
+    // Two-pass: prefer exact href match before prefix match so that
+    // /docs/chat (exact) wins over /docs (prefix) when both exist.
+    const exactIdx = pages.findIndex((item) => pathname === item.href);
+    if (exactIdx >= 0) return exactIdx;
     const idx = pages.findIndex((item) => isItemActive(item, pathname));
-    // Default to 0 if the current route doesn't match any nav item in the area.
     return idx >= 0 ? idx : 0;
   }, [pathname, pages]);
 
