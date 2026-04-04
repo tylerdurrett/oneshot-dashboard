@@ -1,5 +1,6 @@
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
+import './editor.css';
 
 import type { Block } from '@blocknote/core';
 import { useCreateBlockNote } from '@blocknote/react';
@@ -35,10 +36,12 @@ export function DocEditor({ initialContent, onSave }: DocEditorProps) {
   }, [editor, onSave]);
 
   return (
-    <BlockNoteView
-      editor={editor}
-      theme="dark"
-      onChange={handleChange}
-    />
+    <div className="docs-editor flex-1 overflow-auto p-8">
+      <BlockNoteView
+        editor={editor}
+        theme="dark"
+        onChange={handleChange}
+      />
+    </div>
   );
 }
