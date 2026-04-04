@@ -81,7 +81,7 @@ export function ThreadSelector({
                     type="button"
                     className={cn(
                       ITEM_CLASS,
-                      'justify-between',
+                      'justify-between pr-1',
                       thread.id === activeThreadId && 'bg-accent/50',
                     )}
                     onClick={() => {
@@ -91,13 +91,13 @@ export function ThreadSelector({
                     data-testid={`thread-item-${thread.id}`}
                   >
                     <span className="min-w-0 truncate">{thread.title}</span>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       <span className="text-xs text-muted-foreground">
                         {formatTimeAgo(thread.updatedAt)}
                       </span>
                       <button
                         type="button"
-                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-muted-foreground opacity-0 transition-all hover:bg-foreground/7 hover:text-foreground focus-visible:opacity-100 [button:hover>&]:opacity-100"
+                        className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md p-2 text-muted-foreground transition-colors hover:bg-foreground/7 hover:text-foreground"
                         onClick={(e) => handleDeleteClick(e, thread)}
                         aria-label={`Delete ${thread.title}`}
                         data-testid={`thread-menu-${thread.id}`}
