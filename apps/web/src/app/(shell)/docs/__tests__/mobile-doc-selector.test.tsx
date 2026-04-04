@@ -20,6 +20,10 @@ const mockCreateMutate = vi.fn();
 vi.mock('../_hooks/use-doc-query', () => ({
   useDocuments: () => ({ data: mockDocs, isLoading: mockIsLoading }),
   useCreateDocument: () => ({ mutate: mockCreateMutate, isPending: false }),
+  // Stubs for DocItemContextMenu (imported by MobileDocSelector)
+  usePinDocument: () => ({ mutate: vi.fn() }),
+  useUnpinDocument: () => ({ mutate: vi.fn() }),
+  useDeleteDocument: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('@/lib/format-time-ago', () => ({

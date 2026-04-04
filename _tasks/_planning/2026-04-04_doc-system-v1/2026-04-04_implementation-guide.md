@@ -242,10 +242,12 @@ apps/web/src/
 
 ### 4.4 Context menu — delete and pin/unpin
 
-- [ ] Add a context menu to doc list items (right-click on desktop, long-press on mobile). Actions: "Pin" / "Unpin" (toggle based on current state), "Delete".
-- [ ] Pin/unpin calls the respective mutation, which invalidates the list (doc moves between sections).
-- [ ] Delete shows a confirmation dialog (use existing ConfirmationDialog from `@repo/ui`). After deletion, if the deleted doc was active, navigate to the most recent remaining doc.
-- [ ] Prevent deleting the last doc — either disable the option or show a message.
+- [x] Add a context menu to doc list items (right-click on desktop, long-press on mobile). Actions: "Pin" / "Unpin" (toggle based on current state), "Delete".
+- [x] Pin/unpin calls the respective mutation, which invalidates the list (doc moves between sections).
+- [x] Delete shows a confirmation dialog (use existing ConfirmationDialog from `@repo/ui`). After deletion, if the deleted doc was active, navigate to the most recent remaining doc.
+- [x] Prevent deleting the last doc — either disable the option or show a message.
+
+> **Notes (4.4):** Created `ContextMenu` primitive in `@repo/ui` (`context-menu.tsx`) following the exact `DropdownMenu` pattern — 5 components (ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator). `DocItemContextMenu` wrapper component uses `ContextMenuTrigger asChild` to merge right-click/long-press handlers onto `DocListItem`'s button — this required extending `DocListItemProps` to `extends React.ComponentPropsWithoutRef<'button'>` and spreading `...props` so Radix's Slot can compose. The `ConfirmationDialog` renders as a sibling to `<ContextMenu>` (not inside ContextMenuContent) since Radix unmounts content on item select. Delete option uses `disabled` prop when `isLastDoc` is true (Radix handles `data-[disabled]` styling natively). Pin/Unpin toggles based on `doc.pinnedAt !== null`. Integrated into both `DocList` (desktop sidebar) and `MobileDocSelector` (mobile popover). 10 tests in `doc-item-context-menu.test.tsx` cover pin/unpin toggling, delete confirmation flow, active doc redirect, non-active doc no-redirect, and last-doc protection. Existing test files updated with mutation hook stubs for `DocItemContextMenu` dependency. All 371 web tests pass, type-check clean.
 
 **Acceptance Criteria:**
 - Right-click (desktop) / long-press (mobile) opens context menu.

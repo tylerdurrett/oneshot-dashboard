@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router';
 import { Spinner } from '@repo/ui';
 import { useDocuments } from '../_hooks/use-doc-query';
 import { DocListItem } from './doc-list-item';
+import { DocItemContextMenu } from './doc-item-context-menu';
 
 export function DocList() {
   const params = useParams() as { docId?: string };
@@ -19,6 +20,7 @@ export function DocList() {
   const allDocs = docs ?? [];
   const pinned = allDocs.filter((d) => d.pinnedAt !== null);
   const recent = allDocs.filter((d) => d.pinnedAt === null);
+  const isLastDoc = allDocs.length === 1;
 
   if (allDocs.length === 0) {
     return (
@@ -37,12 +39,18 @@ export function DocList() {
           </div>
           <div role="group" data-testid="doc-list-pinned">
             {pinned.map((doc) => (
-              <DocListItem
+              <DocItemContextMenu
                 key={doc.id}
                 doc={doc}
-                isActive={doc.id === params.docId}
-                onClick={() => navigate(`/docs/${doc.id}`)}
-              />
+                isLastDoc={isLastDoc}
+                isActiveDoc={doc.id === params.docId}
+              >
+                <DocListItem
+                  doc={doc}
+                  isActive={doc.id === params.docId}
+                  onClick={() => navigate(`/docs/${doc.id}`)}
+                />
+              </DocItemContextMenu>
             ))}
           </div>
           <hr className="my-1 border-border" />
@@ -53,12 +61,18 @@ export function DocList() {
       </div>
       <div role="group" data-testid="doc-list-recent">
         {recent.map((doc) => (
-          <DocListItem
+          <DocItemContextMenu
             key={doc.id}
             doc={doc}
-            isActive={doc.id === params.docId}
-            onClick={() => navigate(`/docs/${doc.id}`)}
-          />
+            isLastDoc={isLastDoc}
+            isActiveDoc={doc.id === params.docId}
+          >
+            <DocListItem
+              doc={doc}
+              isActive={doc.id === params.docId}
+              onClick={() => navigate(`/docs/${doc.id}`)}
+            />
+          </DocItemContextMenu>
         ))}
       </div>
     </div>

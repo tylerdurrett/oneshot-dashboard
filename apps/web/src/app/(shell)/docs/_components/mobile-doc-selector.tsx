@@ -11,6 +11,7 @@ import {
 } from '@repo/ui';
 import { useDocuments, useCreateDocument } from '../_hooks/use-doc-query';
 import { DocListItem, ITEM_CLASS } from './doc-list-item';
+import { DocItemContextMenu } from './doc-item-context-menu';
 
 interface MobileDocSelectorProps {
   activeDocId: string;
@@ -31,6 +32,7 @@ export function MobileDocSelector({
   const allDocs = docs ?? [];
   const pinned = allDocs.filter((d) => d.pinnedAt !== null);
   const recent = allDocs.filter((d) => d.pinnedAt === null);
+  const isLastDoc = allDocs.length === 1;
 
   function handleSelect(id: string) {
     navigate(`/docs/${id}`);
@@ -77,12 +79,18 @@ export function MobileDocSelector({
                   </div>
                   <div role="group" data-testid="mobile-doc-selector-pinned">
                     {pinned.map((doc) => (
-                      <DocListItem
+                      <DocItemContextMenu
                         key={doc.id}
                         doc={doc}
-                        isActive={doc.id === activeDocId}
-                        onClick={() => handleSelect(doc.id)}
-                      />
+                        isLastDoc={isLastDoc}
+                        isActiveDoc={doc.id === activeDocId}
+                      >
+                        <DocListItem
+                          doc={doc}
+                          isActive={doc.id === activeDocId}
+                          onClick={() => handleSelect(doc.id)}
+                        />
+                      </DocItemContextMenu>
                     ))}
                   </div>
                   <hr className="my-1 border-border" />
@@ -102,12 +110,18 @@ export function MobileDocSelector({
                   </div>
                 ) : (
                   recent.map((doc) => (
-                    <DocListItem
+                    <DocItemContextMenu
                       key={doc.id}
                       doc={doc}
-                      isActive={doc.id === activeDocId}
-                      onClick={() => handleSelect(doc.id)}
-                    />
+                      isLastDoc={isLastDoc}
+                      isActiveDoc={doc.id === activeDocId}
+                    >
+                      <DocListItem
+                        doc={doc}
+                        isActive={doc.id === activeDocId}
+                        onClick={() => handleSelect(doc.id)}
+                      />
+                    </DocItemContextMenu>
                   ))
                 )}
               </div>

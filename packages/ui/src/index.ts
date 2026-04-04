@@ -26,6 +26,13 @@ export {
   DropdownMenuTrigger,
 } from './components/dropdown-menu';
 export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from './components/context-menu';
+export {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,

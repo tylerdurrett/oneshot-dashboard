@@ -2,24 +2,27 @@ import { cn } from '@repo/ui';
 import type { DocumentResponse } from '../_lib/docs-api';
 import { formatTimeAgo } from '@/lib/format-time-ago';
 
-interface DocListItemProps {
+interface DocListItemProps extends React.ComponentPropsWithoutRef<'button'> {
   doc: DocumentResponse;
   isActive: boolean;
-  onClick: () => void;
 }
 
 export const ITEM_CLASS =
   'flex min-h-[44px] w-full cursor-default items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden hover:bg-accent hover:text-accent-foreground';
 
-export function DocListItem({ doc, isActive, onClick }: DocListItemProps) {
+/**
+ * Single doc row in the doc list. Extends native button props so Radix
+ * ContextMenuTrigger (asChild) can merge event handlers onto the button.
+ */
+export function DocListItem({ doc, isActive, className, ...props }: DocListItemProps) {
   const displayTitle = doc.title || 'Untitled';
 
   return (
     <button
       type="button"
-      className={cn(ITEM_CLASS, isActive && 'bg-accent/50')}
-      onClick={onClick}
+      className={cn(ITEM_CLASS, isActive && 'bg-accent/50', className)}
       data-testid={`doc-item-${doc.id}`}
+      {...props}
     >
       <span className="min-w-0 truncate">{displayTitle}</span>
       <span className="shrink-0 text-xs text-muted-foreground">

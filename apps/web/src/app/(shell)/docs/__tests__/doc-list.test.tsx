@@ -19,6 +19,10 @@ let mockIsLoading = false;
 
 vi.mock('../_hooks/use-doc-query', () => ({
   useDocuments: () => ({ data: mockDocs, isLoading: mockIsLoading }),
+  // Stubs for DocItemContextMenu (imported by DocList)
+  usePinDocument: () => ({ mutate: vi.fn() }),
+  useUnpinDocument: () => ({ mutate: vi.fn() }),
+  useDeleteDocument: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('@/lib/format-time-ago', () => ({
