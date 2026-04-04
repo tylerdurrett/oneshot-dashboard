@@ -19,11 +19,17 @@ vi.mock('@blocknote/mantine', () => ({
   ),
 }));
 
+const mockSaveDocument = vi.fn().mockResolvedValue({});
+vi.mock('../_lib/docs-api', () => ({
+  saveDocument: (...args: unknown[]) => mockSaveDocument(...args),
+}));
+
 import { DocEditor } from '../_components/editor';
 
 describe('DocEditor', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mockSaveDocument.mockClear().mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -32,10 +38,10 @@ describe('DocEditor', () => {
     vi.restoreAllMocks();
   });
 
-  it('flushes pending save on unmount instead of discarding it', () => {
+  it('flushes pending save on unmount via direct API call with correct docId', () => {
     const onSave = vi.fn();
     const { getByTestId, unmount } = render(
-      <DocEditor initialContent={[]} onSave={onSave} />,
+      <DocEditor docId="doc-123" initialContent={[]} onSave={onSave} />,
     );
 
     // Trigger a change to start the debounce timer
@@ -43,28 +49,33 @@ describe('DocEditor', () => {
       getByTestId('editor').click();
     });
 
-    // Unmount before debounce fires — should flush immediately
+    // Unmount before debounce fires — should flush via direct API, not onSave
     unmount();
 
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave).toHaveBeenCalledWith(mockDocument);
+    // Must use saveDocument directly to avoid saving to wrong doc on quick switch
+    expect(onSave).not.toHaveBeenCalled();
+    expect(mockSaveDocument).toHaveBeenCalledTimes(1);
+    expect(mockSaveDocument).toHaveBeenCalledWith('doc-123', {
+      content: mockDocument,
+    });
   });
 
-  it('does not call onSave on unmount when there are no pending changes', () => {
+  it('does not save on unmount when there are no pending changes', () => {
     const onSave = vi.fn();
     const { unmount } = render(
-      <DocEditor initialContent={[]} onSave={onSave} />,
+      <DocEditor docId="doc-123" initialContent={[]} onSave={onSave} />,
     );
 
     unmount();
 
     expect(onSave).not.toHaveBeenCalled();
+    expect(mockSaveDocument).not.toHaveBeenCalled();
   });
 
   it('calls onSave after debounce delay', () => {
     const onSave = vi.fn();
     const { getByTestId } = render(
-      <DocEditor initialContent={[]} onSave={onSave} />,
+      <DocEditor docId="doc-123" initialContent={[]} onSave={onSave} />,
     );
 
     act(() => {
@@ -84,7 +95,7 @@ describe('DocEditor', () => {
   it('prevents beforeunload when there are pending changes', () => {
     const onSave = vi.fn();
     const { getByTestId } = render(
-      <DocEditor initialContent={[]} onSave={onSave} />,
+      <DocEditor docId="doc-123" initialContent={[]} onSave={onSave} />,
     );
 
     act(() => {
@@ -100,7 +111,7 @@ describe('DocEditor', () => {
 
   it('does not prevent beforeunload when there are no pending changes', () => {
     const onSave = vi.fn();
-    render(<DocEditor initialContent={[]} onSave={onSave} />);
+    render(<DocEditor docId="doc-123" initialContent={[]} onSave={onSave} />);
 
     const event = new Event('beforeunload') as BeforeUnloadEvent;
     const preventDefaultSpy = vi.spyOn(event, 'preventDefault');

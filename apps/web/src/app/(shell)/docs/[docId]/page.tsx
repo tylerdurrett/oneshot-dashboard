@@ -78,11 +78,12 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
       )}
       <DocsLayout>
         <div className="flex flex-1 flex-col overflow-hidden">
-          <DocTitle key={`title-${docId}`} title={doc.title} onSave={handleSaveTitle} />
+          <DocTitle key={`title-${docId}`} docId={docId} title={doc.title} onSave={handleSaveTitle} />
           {/* key forces editor remount when switching docs so BlockNote
               reinitializes with the new document's content */}
           <DocEditor
             key={docId}
+            docId={docId}
             initialContent={doc.content as Block[]}
             onSave={handleSave}
           />

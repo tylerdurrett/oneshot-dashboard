@@ -53,14 +53,14 @@ export function DocsLayout({ children }: DocsLayoutProps) {
         <DocsNavPanel />
       </Panel>
       <Separator className={SEPARATOR_CLASS} />
-      <Panel id="docs-main" defaultSize="100%" minSize="50%">
+      <Panel id="docs-main" defaultSize="100%" minSize="50%" className="flex flex-col">
         {features.chat ? (
           <Group
             orientation="horizontal"
             defaultLayout={innerLayout.defaultLayout}
             onLayoutChanged={innerLayout.onLayoutChanged}
           >
-            <Panel id="docs-editor" defaultSize="60%" minSize="30%">
+            <Panel id="docs-editor" defaultSize="60%" minSize="30%" className="flex flex-col">
               {children}
             </Panel>
             <Separator className={SEPARATOR_CLASS} />

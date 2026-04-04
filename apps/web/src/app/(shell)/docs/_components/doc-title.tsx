@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { saveDocument } from '../_lib/docs-api';
 
 interface DocTitleProps {
+  docId: string;
   title: string;
   onSave: (title: string) => void;
 }
@@ -12,11 +14,13 @@ const DEBOUNCE_MS = 1500;
  * above the editor. Debounced save on change (same 1500ms as the editor).
  * Blurs on Enter so the user can quickly dismiss and start typing content.
  */
-export function DocTitle({ title, onSave }: DocTitleProps) {
+export function DocTitle({ docId, title, onSave }: DocTitleProps) {
   const [value, setValue] = useState(title);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   const valueRef = useRef(value);
+  // Capture docId at mount so the unmount cleanup always targets the correct doc
+  const docIdRef = useRef(docId);
 
   useEffect(() => {
     onSaveRef.current = onSave;
@@ -30,13 +34,23 @@ export function DocTitle({ title, onSave }: DocTitleProps) {
     setValue(title);
   }, [title]);
 
-  // Flush pending save on unmount (in-app navigation)
+  // Flush pending save on unmount (in-app navigation).
+  // IMPORTANT: We call saveDocument() directly instead of going through
+  // onSave/mutation. When switching docs, React unmounts the old title AFTER
+  // the parent re-renders with the new docId. TanStack Query's mutate() is
+  // referentially stable but calls the latest mutationFn, which would save
+  // the old title to the NEW document — causing data corruption. The direct
+  // API call with the captured docId avoids this entirely.
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
-        onSaveRef.current(valueRef.current);
+        saveDocument(docIdRef.current, { title: valueRef.current }).catch(() => {
+          // Fire-and-forget — component is unmounting so we can't retry,
+          // but log so the failed save isn't completely silent.
+          console.error(`Failed to flush pending title save for doc ${docIdRef.current}`);
+        });
       }
     };
   }, []);

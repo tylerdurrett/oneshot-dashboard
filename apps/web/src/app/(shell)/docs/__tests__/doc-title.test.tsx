@@ -1,10 +1,17 @@
 import { cleanup, fireEvent, render, act } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockSaveDocument = vi.fn().mockResolvedValue({});
+vi.mock('../_lib/docs-api', () => ({
+  saveDocument: (...args: unknown[]) => mockSaveDocument(...args),
+}));
+
 import { DocTitle } from '../_components/doc-title';
 
 describe('DocTitle', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mockSaveDocument.mockClear().mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -15,7 +22,7 @@ describe('DocTitle', () => {
 
   it('renders the title value', () => {
     const { getByDisplayValue } = render(
-      <DocTitle title="My Doc" onSave={vi.fn()} />,
+      <DocTitle docId="doc-123" title="My Doc" onSave={vi.fn()} />,
     );
     expect(getByDisplayValue('My Doc')).toBeTruthy();
   });
@@ -23,7 +30,7 @@ describe('DocTitle', () => {
   it('calls onSave after debounce delay', () => {
     const onSave = vi.fn();
     const { getByDisplayValue } = render(
-      <DocTitle title="Original" onSave={onSave} />,
+      <DocTitle docId="doc-123" title="Original" onSave={onSave} />,
     );
 
     const input = getByDisplayValue('Original');
@@ -39,37 +46,42 @@ describe('DocTitle', () => {
     expect(onSave).toHaveBeenCalledWith('Updated');
   });
 
-  it('flushes pending save on unmount', () => {
+  it('flushes pending save on unmount via direct API call with correct docId', () => {
     const onSave = vi.fn();
     const { getByDisplayValue, unmount } = render(
-      <DocTitle title="Original" onSave={onSave} />,
+      <DocTitle docId="doc-456" title="Original" onSave={onSave} />,
     );
 
     const input = getByDisplayValue('Original');
     fireEvent.change(input, { target: { value: 'Changed' } });
 
-    // Unmount before debounce fires — should flush immediately
+    // Unmount before debounce fires — should flush via direct API, not onSave
     unmount();
 
-    expect(onSave).toHaveBeenCalledTimes(1);
-    expect(onSave).toHaveBeenCalledWith('Changed');
+    // Must use saveDocument directly to avoid saving to wrong doc on quick switch
+    expect(onSave).not.toHaveBeenCalled();
+    expect(mockSaveDocument).toHaveBeenCalledTimes(1);
+    expect(mockSaveDocument).toHaveBeenCalledWith('doc-456', {
+      title: 'Changed',
+    });
   });
 
-  it('does not call onSave on unmount when there are no pending changes', () => {
+  it('does not save on unmount when there are no pending changes', () => {
     const onSave = vi.fn();
     const { unmount } = render(
-      <DocTitle title="Stable" onSave={onSave} />,
+      <DocTitle docId="doc-123" title="Stable" onSave={onSave} />,
     );
 
     unmount();
 
     expect(onSave).not.toHaveBeenCalled();
+    expect(mockSaveDocument).not.toHaveBeenCalled();
   });
 
   it('blurs input on Enter key', () => {
     const onSave = vi.fn();
     const { getByDisplayValue } = render(
-      <DocTitle title="Test" onSave={onSave} />,
+      <DocTitle docId="doc-123" title="Test" onSave={onSave} />,
     );
 
     const input = getByDisplayValue('Test') as HTMLInputElement;
@@ -83,7 +95,7 @@ describe('DocTitle', () => {
   it('resets debounce timer on rapid changes', () => {
     const onSave = vi.fn();
     const { getByDisplayValue } = render(
-      <DocTitle title="Start" onSave={onSave} />,
+      <DocTitle docId="doc-123" title="Start" onSave={onSave} />,
     );
 
     const input = getByDisplayValue('Start');
@@ -113,12 +125,12 @@ describe('DocTitle', () => {
   it('syncs value when title prop changes (e.g. switching docs)', () => {
     const onSave = vi.fn();
     const { getByDisplayValue, rerender } = render(
-      <DocTitle title="Doc A" onSave={onSave} />,
+      <DocTitle docId="doc-123" title="Doc A" onSave={onSave} />,
     );
 
     expect(getByDisplayValue('Doc A')).toBeTruthy();
 
-    rerender(<DocTitle title="Doc B" onSave={onSave} />);
+    rerender(<DocTitle docId="doc-456" title="Doc B" onSave={onSave} />);
 
     expect(getByDisplayValue('Doc B')).toBeTruthy();
   });
