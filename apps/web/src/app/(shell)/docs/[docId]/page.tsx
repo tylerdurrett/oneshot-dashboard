@@ -4,6 +4,7 @@ import type { Block } from '@blocknote/core';
 import { Button, Spinner } from '@repo/ui';
 import { useDocument, useSaveDocument } from '../_hooks/use-doc-query';
 import { DocEditor } from '../_components/editor';
+import { DocTitle } from '../_components/doc-title';
 import { DocsLayout } from '../_components/docs-layout';
 
 /**
@@ -22,6 +23,13 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
   const handleSave = useCallback(
     (content: Block[]) => {
       saveMutation.mutate({ content: content as unknown[] });
+    },
+    [saveMutation.mutate],
+  );
+
+  const handleSaveTitle = useCallback(
+    (title: string) => {
+      saveMutation.mutate({ title });
     },
     [saveMutation.mutate],
   );
@@ -61,13 +69,16 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <DocsLayout>
-        {/* key forces editor remount when switching docs so BlockNote
-            reinitializes with the new document's content */}
-        <DocEditor
-          key={docId}
-          initialContent={doc.content as Block[]}
-          onSave={handleSave}
-        />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <DocTitle key={`title-${docId}`} title={doc.title} onSave={handleSaveTitle} />
+          {/* key forces editor remount when switching docs so BlockNote
+              reinitializes with the new document's content */}
+          <DocEditor
+            key={docId}
+            initialContent={doc.content as Block[]}
+            onSave={handleSave}
+          />
+        </div>
       </DocsLayout>
     </div>
   );

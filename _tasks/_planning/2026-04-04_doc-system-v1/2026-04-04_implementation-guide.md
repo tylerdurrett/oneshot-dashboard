@@ -180,9 +180,11 @@ apps/web/src/
 
 ### 3.3 Inline title editing
 
-- [ ] Create `apps/web/src/app/(shell)/docs/_components/doc-title.tsx` — an editable title component. Renders as a large text input (no border, transparent background) above the editor. Debounced save on change (same 1500ms pattern as editor). Blurs on Enter.
-- [ ] Wire into the doc page: pass current title + save callback. Save calls `PATCH /docs/:id` with `{ title }`.
-- [ ] Update editor component: it no longer needs to know about the title — title is a sibling component, not part of BlockNote.
+- [x] Create `apps/web/src/app/(shell)/docs/_components/doc-title.tsx` — an editable title component. Renders as a large text input (no border, transparent background) above the editor. Debounced save on change (same 1500ms pattern as editor). Blurs on Enter.
+- [x] Wire into the doc page: pass current title + save callback. Save calls `PATCH /docs/:id` with `{ title }`.
+- [x] Update editor component: it no longer needs to know about the title — title is a sibling component, not part of BlockNote.
+
+> **Notes (3.3):** `DocTitle` component uses the same debounce pattern as `DocEditor` (1500ms, ref-based callback, flush-on-unmount). Styled as a transparent `<input>` with `text-2xl font-bold` to look like a heading. Left padding matches BlockNote editor's content indent (`px-[54px]`). Wired into `DocViewPage` as a sibling above `DocEditor` — editor unchanged. `key={`title-${docId}`}` forces remount on doc switch. 7 tests in `doc-title.test.tsx` cover debounce, flush-on-unmount, Enter blur, rapid-change reset, and prop sync. All 335 web tests pass, type-check clean.
 
 **Acceptance Criteria:**
 - Title displays above the editor, looks like a heading (not a form field).
