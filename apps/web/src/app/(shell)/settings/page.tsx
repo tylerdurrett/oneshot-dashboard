@@ -7,7 +7,7 @@ import { ConfirmationDialog } from '@repo/ui/components/confirmation-dialog';
 import { Switch } from '@repo/ui/components/switch';
 
 import { BucketSettingsDialog } from '@/app/(shell)/timers/_components/bucket-settings-dialog';
-import { BUCKET_COLORS, type TimeBucket } from '@/app/(shell)/timers/_lib/timer-types';
+import { BUCKET_COLORS, generateBucketId, type TimeBucket } from '@/app/(shell)/timers/_lib/timer-types';
 import type { BucketResponse, CreateBucketInput, UpdateBucketInput } from '@/app/(shell)/timers/_lib/timer-api';
 import {
   useBuckets,
@@ -102,6 +102,7 @@ export default function SettingsPage() {
   const deleteMutation = useDeleteBucket();
 
   const [editingBucket, setEditingBucket] = useState<TimeBucket | null>(null);
+  const [pendingBucket, setPendingBucket] = useState<TimeBucket | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Context menu state for delete action (right-click / long-press)
@@ -245,16 +246,41 @@ export default function SettingsPage() {
     deleteMutation.mutate(id);
   };
 
-  const handleAddBucket = async () => {
-    const input: CreateBucketInput = {
+  // Defers the API call until Save to prevent a premature POST with defaults
+  // and a client/server ID mismatch that broke the Save button.
+  const handleAddBucket = () => {
+    const template: TimeBucket = {
+      id: generateBucketId(),
       name: 'New Bucket',
       totalMinutes: 60,
+      elapsedSeconds: 0,
       colorIndex: nextAvailableColorIndex(buckets ?? []),
       daysOfWeek: ALL_DAYS,
+      weeklySchedule: null,
+      startedAt: null,
+      goalReachedAt: null,
+      dismissedAt: null,
+      deactivatedAt: null,
     };
-    const newBucket = await createMutation.mutateAsync(input);
-    setEditingBucket(bucketResponseToTimeBucket(newBucket));
+    setPendingBucket(template);
     setDialogOpen(true);
+  };
+
+  const handleCreateBucket = (_id: string, updates: Partial<TimeBucket>) => {
+    if (!pendingBucket) return;
+    const { name, totalMinutes, colorIndex, daysOfWeek, weeklySchedule } = {
+      ...pendingBucket,
+      ...updates,
+    };
+    const input: CreateBucketInput = {
+      name,
+      totalMinutes,
+      colorIndex,
+      daysOfWeek,
+      ...(weeklySchedule && { weeklySchedule }),
+    };
+    createMutation.mutate(input);
+    setPendingBucket(null);
   };
 
   if (isLoading) {
@@ -283,10 +309,13 @@ export default function SettingsPage() {
           <p className="text-muted-foreground text-center text-lg">No buckets yet</p>
         </div>
         <BucketSettingsDialog
-          bucket={editingBucket}
+          bucket={pendingBucket ?? editingBucket}
           open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          onSave={handleSave}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setPendingBucket(null);
+          }}
+          onSave={pendingBucket ? handleCreateBucket : handleSave}
         />
       </div>
     );
@@ -370,10 +399,13 @@ export default function SettingsPage() {
       </div>
 
       <BucketSettingsDialog
-        bucket={editingBucket}
+        bucket={pendingBucket ?? editingBucket}
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSave={handleSave}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) setPendingBucket(null);
+        }}
+        onSave={pendingBucket ? handleCreateBucket : handleSave}
       />
 
       {contextMenu && createPortal(

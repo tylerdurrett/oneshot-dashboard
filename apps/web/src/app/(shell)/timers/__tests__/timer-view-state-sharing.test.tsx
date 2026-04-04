@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import type { UseTimerStateReturn } from '../_hooks/use-timer-state';
@@ -64,6 +64,18 @@ describe('timer views state sharing', () => {
 
     expect(screen.getByText('No buckets yet')).toBeTruthy();
     expect(mockUseTimerState).not.toHaveBeenCalled();
+  });
+
+  it('clicking "Create your first bucket" opens dialog without calling addBucket', () => {
+    const state = makeTimerState();
+    render(<TimerGridWithState timerState={state} />);
+
+    const btn = screen.getAllByRole('button', { name: /create your first bucket/i })[0]!;
+    fireEvent.click(btn);
+
+    // addBucket must NOT be called — the API call should be deferred until
+    // the user saves the dialog, preventing a premature POST with defaults.
+    expect(state.addBucket).not.toHaveBeenCalled();
   });
 
   it('AllTimerGridWithState uses the provided timer state instead of creating a new hook instance', () => {

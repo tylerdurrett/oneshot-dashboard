@@ -10,13 +10,13 @@ import type { BucketResponse } from '@/app/(shell)/timers/_lib/timer-api';
 // ---------------------------------------------------------------------------
 
 const mockUseBuckets = vi.fn();
-const mockCreateMutateAsync = vi.fn();
+const mockCreateMutate = vi.fn();
 const mockUpdateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
 
 vi.mock('@/app/(shell)/timers/_hooks/use-timer-queries', () => ({
   useBuckets: () => mockUseBuckets(),
-  useCreateBucket: () => ({ mutateAsync: mockCreateMutateAsync }),
+  useCreateBucket: () => ({ mutate: mockCreateMutate }),
   useUpdateBucket: () => ({ mutate: mockUpdateMutate }),
   useDeleteBucket: () => ({ mutate: mockDeleteMutate }),
 }));
@@ -238,9 +238,7 @@ describe('SettingsPage', () => {
     expect(screen.getByRole('button', { name: 'Add bucket' })).toBeDefined();
   });
 
-  it('creates a bucket and opens dialog when clicking add button', async () => {
-    const newBucket = makeBucket({ id: 'new-1', name: 'New Bucket' });
-    mockCreateMutateAsync.mockResolvedValue(newBucket);
+  it('opens dialog with template without calling API when clicking add button', () => {
     mockUseBuckets.mockReturnValue({
       data: [makeBucket({ id: 'b1', name: 'Work' })],
       isLoading: false,
@@ -249,15 +247,11 @@ describe('SettingsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add bucket' }));
 
-    expect(mockCreateMutateAsync).toHaveBeenCalledWith({
-      name: 'New Bucket',
-      totalMinutes: 60,
-      colorIndex: 1, // colorIndex 0 is used by 'Work'
-      daysOfWeek: [0, 1, 2, 3, 4, 5, 6],
-    });
+    // API call should be deferred until Save — not fired on Add.
+    expect(mockCreateMutate).not.toHaveBeenCalled();
 
-    // Wait for the async mutation to resolve and dialog to open
-    await screen.findByTestId('settings-dialog');
+    // Dialog should open with the template bucket name.
+    expect(screen.getByTestId('settings-dialog')).toBeDefined();
     expect(screen.getByTestId('settings-dialog').textContent).toBe('New Bucket');
   });
 

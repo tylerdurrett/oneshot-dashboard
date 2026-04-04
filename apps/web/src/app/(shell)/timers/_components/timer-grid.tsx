@@ -74,6 +74,7 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
   } = timerState;
 
   const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+  const [pendingBucket, setPendingBucket] = useState<TimeBucket | null>(null);
 
   const handleDeleteBucket = useCallback(
     (id: string) => {
@@ -86,6 +87,8 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
   const allBucketsRef = useRef(allBuckets);
   allBucketsRef.current = allBuckets;
 
+  // Defers the API call until Save to prevent a premature POST with defaults
+  // and a client/server ID mismatch that broke the Save button.
   const handleAddBucket = useCallback(() => {
     const newBucket: TimeBucket = {
       id: generateBucketId(),
@@ -100,9 +103,17 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
       dismissedAt: null,
       deactivatedAt: null,
     };
-    addBucket(newBucket);
-    setSelectedBucketId(newBucket.id);
-  }, [addBucket]);
+    setPendingBucket(newBucket);
+  }, []);
+
+  const handleCreateBucket = useCallback(
+    (_id: string, updates: Partial<TimeBucket>) => {
+      if (!pendingBucket) return;
+      addBucket({ ...pendingBucket, ...updates });
+      setPendingBucket(null);
+    },
+    [pendingBucket, addBucket],
+  );
 
   useEffect(() => {
     const handler = () => handleAddBucket();
@@ -197,14 +208,17 @@ function TimerGridContent({ timerState }: { timerState: UseTimerStateReturn }) {
         })}
       </AnimatePresence>
 
-      {selectedBucketId && (
+      {(selectedBucketId || pendingBucket) && (
         <BucketSettingsDialog
-          bucket={selectedBucket}
+          bucket={pendingBucket ?? selectedBucket}
           open
           onOpenChange={(open) => {
-            if (!open) setSelectedBucketId(null);
+            if (!open) {
+              setSelectedBucketId(null);
+              setPendingBucket(null);
+            }
           }}
-          onSave={updateBucket}
+          onSave={pendingBucket ? handleCreateBucket : updateBucket}
         />
       )}
     </div>
