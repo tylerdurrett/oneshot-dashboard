@@ -9,9 +9,9 @@ Evolve the existing single-doc BlockNote editor into a multi-doc system with a t
 
 ## End-User Capabilities
 
-1. Create multiple docs with titles. Switch between them.
-2. Tap "Journal" to open a pinned doc instantly — no file picker.
-3. Browse docs in a library view. Organize them into folders.
+1. Create multiple docs with titles. Switch between them via a sidebar list (desktop) or title dropdown (mobile).
+2. Pin any doc to keep it at the top of the list for quick access.
+3. Organize docs into folders. Browse and filter by AI-assigned tags.
 4. After going idle or leaving a doc, the system automatically assigns tags across multiple taxonomies (topic, mood, type) — only processing what changed.
 5. Filter and search docs by AI-assigned tags.
 
@@ -19,7 +19,17 @@ Evolve the existing single-doc BlockNote editor into a multi-doc system with a t
 
 ### Multi-Doc
 
-The existing `documents` table evolves to support multiple docs with titles. Each doc is a BlockNote editor with JSONB content, same as today. The journal is a pinned doc (`isJournal: true`) with a fast-path nav entry point. Additional docs are accessed through a library view.
+The existing `documents` table evolves to support multiple docs with titles. Each doc is a BlockNote editor with JSONB content, same as today.
+
+**Navigation & doc switching:**
+
+- **Desktop:** An inner left nav panel lists all docs, split into two sections: pinned docs (sorted by `pinnedAt` desc) and recent docs (sorted by `updatedAt` desc). Clicking a doc opens it in the editor.
+- **Mobile:** The current doc's title is a tappable dropdown trigger (popover pattern, same as the thread selector). Tapping it opens a popover listing docs in the same pinned/recent layout. A "+" icon button next to the title creates a new doc.
+- **`/docs` route** opens the most recently edited doc automatically — there is no separate library landing page. The doc list *is* the nav.
+
+**Pinning:** Any doc can be pinned. Pinning sets a `pinnedAt` timestamp; unpinning nulls it. Pinned docs appear in a visually separate section at the top of the list. No limit on pinned docs.
+
+**Titles:** Inline editable above the BlockNote editor content (Notion-style). New docs default to "Notes [date]" (e.g., "Notes Apr 4, 2026").
 
 ### Workspace Column (Schema Only)
 
@@ -90,7 +100,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 ## Data Model
 
 **Existing (evolve):**
-- `documents` — add: `title` (text), `workspaceId` (FK), `folderId` (FK, nullable), `isJournal` (boolean, default false), `pipelineEnabled` (boolean, default true), `processedAt` (timestamp, nullable)
+- `documents` — add: `title` (text), `workspaceId` (FK), `folderId` (FK, nullable), `pinnedAt` (timestamp, nullable), `pipelineEnabled` (boolean, default true), `processedAt` (timestamp, nullable)
 
 **New tables:**
 
@@ -112,12 +122,16 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 ### Phase 1: Multi-Doc
 - Create `workspaces` table (minimal), seed default workspace on first run.
-- Add `title`, `workspaceId`, `isJournal`, `pipelineEnabled`, `processedAt` to `documents`.
-- Migrate existing default doc: give it a title, assign to default workspace, mark as journal.
-- Build doc CRUD APIs (create, list, read, update, delete).
-- Build doc list UI in the docs area. Journal remains the pinned fast-path entry.
+- Add `title`, `workspaceId`, `folderId` (nullable, unused until Phase 4), `pinnedAt`, `pipelineEnabled`, `processedAt` to `documents`.
+- Migrate existing default doc: give it a title ("Notes [date]"), assign to default workspace.
+- Build doc CRUD APIs (create, list, read, update title, update content, delete, pin/unpin).
+- Build doc list as inner left nav (desktop) — pinned section + recent section, sorted by `pinnedAt` / `updatedAt` desc.
+- Build mobile doc switcher — title-as-dropdown-trigger popover (same pattern as thread selector), "+" button for new doc.
+- Inline title editing above BlockNote editor. New docs default to "Notes [date]".
+- Context menu on doc list items (right-click desktop, long-press mobile) for delete, pin/unpin.
+- `/docs` opens the most recently edited doc. `/docs/:id` opens a specific doc.
 
-**Testable:** Create multiple docs, give them titles, switch between them. Journal still works as before.
+**Testable:** Create multiple docs, give them titles, switch between them. Pin a doc, see it move to the top. Delete a doc. Existing doc still works.
 
 ### Phase 2: Taxonomy/Terms + On-Idle Processing
 - Create `taxonomies`, `terms`, `fragments`, `document_block_states`, `document_terms`, `fragment_terms` tables.
@@ -153,7 +167,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 4. **workspaceId on everything, but no workspace features.** The column is there. A default workspace is seeded. That's it. Workspace management comes later.
 5. **Taxonomy/terms, not flat tags.** Proper system with named taxonomies, hierarchy support, AI-managed flag. Worth the small upfront cost to avoid retrofitting.
 6. **Folders separate from taxonomies.** Different cardinality, different management model. Keep them separate.
-7. **Journal is a pinned doc.** Same table, same editor, same pipeline. Navigation gives it special treatment.
+7. **Pinned docs, not a dedicated journal.** Any doc can be pinned via `pinnedAt` timestamp. Pinned docs sort by pin date in a separate section at the top of the list. No special-cased journal concept.
 8. **Fragments linked to source blocks.** Enables incremental processing — when a block changes, the system knows exactly which fragments to replace.
 
 ## Risks and Considerations
@@ -180,7 +194,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 - Idle timeout duration (30 min? 60 min?)
 - How to display tags in the doc editor UI — inline chips? sidebar panel? both?
 - Should processing trigger on every idle or only when `document_block_states` shows changes?
-- How to handle the journal doc's special status in the doc list — always pinned at top? separate section?
+- Manual pin ordering — defer to later, currently sorted by `pinnedAt` desc.
 - Term consolidation — when and how to merge near-duplicate terms?
 - How much context should the agent receive by default vs pull on-demand via tools?
 
