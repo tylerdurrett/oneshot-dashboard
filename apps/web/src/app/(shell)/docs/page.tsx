@@ -1,13 +1,13 @@
 import { useCallback } from 'react';
 import type { Block } from '@blocknote/core';
 import { Spinner } from '@repo/ui';
-import { useDefaultDocument, useSaveDocument } from './_hooks/use-doc-query';
+import { useDefaultDocument, useSaveDefaultDocument } from './_hooks/use-doc-query';
 import { DocEditor } from './_components/editor';
 import { DocsLayout } from './_components/docs-layout';
 
 export default function DocsPage() {
   const { data: doc, isLoading, error } = useDefaultDocument();
-  const saveMutation = useSaveDocument();
+  const saveMutation = useSaveDefaultDocument();
 
   const handleSave = useCallback(
     (content: Block[]) => {

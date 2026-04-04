@@ -137,7 +137,7 @@ apps/web/src/
 
 ### 3.1 API client and query hooks
 
-- [ ] Update `apps/web/src/app/(shell)/docs/_lib/docs-api.ts`:
+- [x] Update `apps/web/src/app/(shell)/docs/_lib/docs-api.ts`:
   - `fetchDocuments()` → `GET /docs` — returns doc list.
   - `fetchRecentDocument()` → `GET /docs/recent` — returns most recent doc.
   - `fetchDocument(id)` → `GET /docs/:id` — returns single doc.
@@ -146,7 +146,7 @@ apps/web/src/
   - `deleteDocument(id)` → `DELETE /docs/:id`.
   - `pinDocument(id)` → `POST /docs/:id/pin`.
   - `unpinDocument(id)` → `DELETE /docs/:id/pin`.
-- [ ] Update `apps/web/src/app/(shell)/docs/_hooks/use-doc-query.ts`:
+- [x] Update `apps/web/src/app/(shell)/docs/_hooks/use-doc-query.ts`:
   - New query keys: `docKeys.list`, `docKeys.detail(id)`, `docKeys.recent`.
   - `useDocuments()` → list query.
   - `useDocument(id)` → single doc query.
@@ -154,6 +154,8 @@ apps/web/src/
   - `useCreateDocument()` → mutation, invalidates list, returns new doc.
   - `useDeleteDocument()` → mutation, invalidates list.
   - `usePinDocument()` / `useUnpinDocument()` → mutations, invalidate list.
+
+> **Notes (3.1):** `DocumentResponse` interface expanded with all new fields (title, workspaceId, folderId, pinnedAt, pipelineEnabled, processedAt). Legacy `useSaveDocument()` renamed to `useSaveDefaultDocument()` to avoid collision with new `useSaveDocument(id)` — `page.tsx` import updated accordingly. `fetchRecentDocument` and `docKeys.recent` defined here for use by section 3.2's redirect page. Pin/unpin mutations update both detail cache (`setQueryData`) and list cache (`invalidateQueries`). Delete mutation uses `removeQueries` to clear stale detail cache. `DocumentResponse` type re-exported from hooks file for consumer convenience. Type-check clean.
 
 **Acceptance Criteria:**
 - All API functions hit correct endpoints.
