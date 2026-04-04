@@ -463,16 +463,19 @@ export function AppShell({
       {/* Mobile bottom nav */}
       <nav
         aria-label="Bottom navigation"
-        className="app-shell-mobile-nav relative flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb select-none"
+        className="app-shell-mobile-nav flex md:hidden shrink-0 bg-sidebar border-t border-sidebar-border safe-area-pb select-none"
       >
-        {/* Sliding indicator — driven by a MotionValue so it tracks the
-             finger without triggering React re-renders during drag. */}
-        {fractionalIndex != null && areaNavItems.length > 0 && (
-          <NavIndicator fractionalIndex={fractionalIndex} pageCount={areaNavItems.length} />
-        )}
-        {areaNavItems.map((item) =>
-          renderNavItem(item, true, isItemActive(item, pathname)),
-        )}
+        {/* Nav items wrapper — indicator is scoped here so its percentage
+             width/position are relative to just the nav items, not the
+             AreaSwitcher button which sits outside this container. */}
+        <div className="relative flex flex-1">
+          {fractionalIndex != null && areaNavItems.length > 0 && (
+            <NavIndicator fractionalIndex={fractionalIndex} pageCount={areaNavItems.length} />
+          )}
+          {areaNavItems.map((item) =>
+            renderNavItem(item, true, isItemActive(item, pathname)),
+          )}
+        </div>
         <AreaSwitcher currentArea={area} />
       </nav>
     </div>
