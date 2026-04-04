@@ -90,14 +90,16 @@ apps/web/src/
 
 ### 2.1 Document service layer
 
-- [ ] Add `listDocuments(workspaceId, db)` → returns all docs for workspace, ordered: pinned first (by `pinnedAt` desc), then unpinned (by `updatedAt` desc).
-- [ ] Add `getDocumentById(id, db)` → returns single doc or null.
-- [ ] Add `getMostRecentDocument(workspaceId, db)` → returns the most recently edited doc (by `updatedAt` desc), or auto-creates one if none exist.
-- [ ] Add `createDocument(workspaceId, title?, db)` → creates doc with default title `"Notes [date]"`, returns it.
-- [ ] Add `updateDocumentTitle(id, title, db)` → updates title + `updatedAt`, returns doc.
-- [ ] Add `deleteDocument(id, db)` → deletes doc. Returns boolean success.
-- [ ] Add `pinDocument(id, db)` → sets `pinnedAt` to now. `unpinDocument(id, db)` → sets `pinnedAt` to null.
-- [ ] Write tests for all new service functions in `apps/server/src/__tests__/document.test.ts`.
+- [x] Add `listDocuments(workspaceId, db)` → returns all docs for workspace, ordered: pinned first (by `pinnedAt` desc), then unpinned (by `updatedAt` desc).
+- [x] Add `getDocumentById(id, db)` → returns single doc or null.
+- [x] Add `getMostRecentDocument(workspaceId, db)` → returns the most recently edited doc (by `updatedAt` desc), or auto-creates one if none exist.
+- [x] Add `createDocument(workspaceId, title?, db)` → creates doc with default title `"Notes [date]"`, returns it.
+- [x] Add `updateDocumentTitle(id, title, db)` → updates title + `updatedAt`, returns doc.
+- [x] Add `deleteDocument(id, db)` → deletes doc. Returns boolean success.
+- [x] Add `pinDocument(id, db)` → sets `pinnedAt` to now. `unpinDocument(id, db)` → sets `pinnedAt` to null.
+- [x] Write tests for all new service functions in `apps/server/src/__tests__/document.test.ts`.
+
+> **Notes (2.1):** All 7 service functions added to `document.ts` with full test coverage (16 new tests, 20 total document tests pass). `listDocuments` uses a SQL CASE expression for pinned-first ordering. `deleteDocument` returns boolean via `.returning({ id })` check (single round-trip). `getMostRecentDocument` delegates to `createDocument` for the auto-create path. Pin/unpin kept as separate functions for API clarity. Type-check clean.
 
 **Acceptance Criteria:**
 - `listDocuments` returns pinned docs first (sorted by pinnedAt desc), then unpinned (sorted by updatedAt desc).
