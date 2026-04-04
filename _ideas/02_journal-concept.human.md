@@ -370,3 +370,110 @@ Typical case: you added a few paragraphs at the bottom = one contiguous section,
 
 So to answer your question directly
 You don't need to worry about changeset boundaries being too granular. The diff is just an index — "look here, here, and here." The LLM always gets full blocks with surrounding context. Even a one-word change gets the full paragraph plus neighbors, which is enough to understand intent.
+---
+Feature: Journal Intelligence Pipeline
+Date: 2026-04-03
+Status: Scoped
+
+Overview
+Build an AI-powered intelligence layer on top of the app's document system. The user writes freely in BlockNote docs — one continuous journal doc with a fast-path "home base" entry point, plus additional standalone docs as needed. Behind the scenes, the system detects idle periods, diffs what changed, and uses an LLM to extract semantic fragments, tags, and knowledge — building a searchable, structured knowledge base without any manual organization.
+
+End-User Capabilities
+Tap "Journal" and immediately start writing — no file picker, no decisions. The journal doc (or current week's doc) opens directly.
+Create, browse, and organize additional docs in a library view with a folder hierarchy.
+See auto-inserted day and week headings in journal docs as temporal landmarks.
+After going idle or leaving, the system automatically processes what you wrote — across any doc.
+Search and browse by topics, themes, or knowledge areas (goals, concerns, beliefs) that the AI identified — without ever having created a tag or folder yourself.
+The chat agent can access doc content, fragments, and knowledge base entries for context-aware conversation.
+Architecture
+Multi-Doc System
+The foundation is a general-purpose document system. Every doc lives in the same table and goes through the same editor, save pipeline, and (optionally) intelligence pipeline. The journal is not a separate feature — it's a pinned doc with a privileged nav entry point and "just start writing" UX. The distinction between "journal" and "docs" is in the navigation layer, not the data layer.
+
+The intelligence pipeline (snapshots, diffs, fragment extraction) is per-document and runs on any doc where it's enabled. Default: on. Quick scratch docs can opt out.
+
+Folder Taxonomy
+Docs are organized via a dedicated folders table with a proper hierarchical structure (parent references). This supports performant subtree operations — moving a folder reparents it and all descendants without rewriting tags. Docs belong to a folder via foreign key. A doc can optionally exist outside any folder (unfiled).
+
+The folder hierarchy is one organizational axis. AI-generated tags are another, independent axis. Folders are user-managed structure; tags are AI-managed structure. Both coexist.
+
+Auto-Headings
+When the user opens a journal doc and begins typing:
+
+If no blocks exist for today, insert an H2 block with the current date.
+If the previous entry was from a different week, also insert an H1 week heading.
+These are real BlockNote blocks in the content array — editable, deletable, not overlays.
+Snapshot & Diff Pipeline
+Trigger: Idle detection (configurable, likely 30-60 min) or navigating away from the doc. Detected on the frontend, which pings the server to start processing. Server-side fallback polls updatedAt as a safety net for cases where the frontend can't fire (tab killed, phone sleep).
+
+Process:
+
+Capture a snapshot of the current doc content.
+Diff against the last-processed snapshot using a structural JSON diff (microdiff or similar) to identify which blocks were added, modified, or deleted.
+Store the changeset — the set of changed block references and the snapshot reference.
+A "session" is not a segment of text. It's a changeset — the delta between two processing runs.
+
+Fragment Extraction (LLM)
+For each changeset, an LLM call extracts semantic fragments — distinct ideas, thoughts, or topics contained in the changes.
+
+Input to the LLM:
+
+The full content of each changed block, plus 2-3 surrounding blocks for context (not raw diff tokens).
+Adjacent changed blocks merge into a single context window to avoid redundancy.
+For deleted blocks, the previous snapshot's content is included so the LLM understands what was removed.
+The existing tag list, with instructions to reuse when appropriate and create new ones sparingly.
+Output from the LLM:
+
+A list of fragments, each with: a brief title, the relevant text, and suggested tags.
+Model choice: Haiku. Volume is low (a few changesets per day), latency is irrelevant (background processing), and cost is negligible.
+
+Tags
+Tags emerge organically from the AI's extraction. The system starts with zero tags. Over time, a taxonomy grows that reflects what you actually write about. Tags are global across all docs — mentioning "health" in your journal and in a standalone doc produces fragments that share the same tag.
+
+Tags have a taxonomy field for categorization (topic, area, mood, etc.). Periodic LLM-driven consolidation merges near-duplicates and cleans up the taxonomy.
+
+Knowledge Base
+Certain fragments map to durable knowledge areas — goals, concerns, beliefs, feelings. When the LLM identifies a fragment as one of these, it upserts a knowledge base entry. If a previously stated goal is deleted from a doc, the knowledge base reflects that removal. Knowledge is global — your goals are your goals regardless of which doc they came from.
+
+Data Model
+Existing (evolve):
+
+documents — add: title, folderId (FK, nullable), pipelineEnabled (boolean, default true)
+New tables:
+
+folders — id, name, parentId (FK self-referencing, nullable), sortOrder, createdAt, updatedAt
+journal_snapshots — id, documentId, content (JSONB), capturedAt, processedAt
+journal_changesets — id, documentId, snapshotBeforeId, snapshotAfterId, diff (JSONB), summary, createdAt, processedAt
+journal_fragments — id, changesetId, title, content, sourceBlockIds, createdAt
+journal_tags — id, name, taxonomy
+journal_fragment_tags — fragmentId, tagId
+journal_knowledge — id, area, content, sourceFragmentId, createdAt, updatedAt
+Key Decisions
+One doc system, two entry points. Journal is a pinned doc with fast-path UX. The library is the full-power view. Same editor, same pipeline, same data.
+Folders are proper hierarchy. Dedicated table with parent references, not tag naming conventions. Supports performant reparenting and subtree moves.
+Tags and folders are independent axes. Folders are user-managed organization. Tags are AI-managed emergent structure. Both apply to all docs.
+Diff identifies, LLM reads. Structural diff finds which blocks changed. The LLM receives full block content with surrounding context.
+Fragments, not changesets, are the tagged unit. A single writing session might contain 3 distinct topics. The AI splits them into separate searchable fragments.
+Tags emerge, not defined. No manual taxonomy management. The AI builds and maintains the tag system.
+LLM over embeddings for extraction. Embeddings can't distinguish a goal from an observation about the same topic. LLM extraction costs almost nothing at personal journal volume.
+Pipeline is per-doc and opt-in/out. Runs on all docs by default. Can be disabled for scratch docs.
+Global tags and knowledge. Cross-doc searchability by default. A thought is a thought regardless of where you wrote it.
+Agent Access (Planned)
+The doc system will expose full CRUD APIs — list, read, create, write. The chat agent will be able to read any doc's content, query fragments and tags, and access the knowledge base. Agent writing to docs (creating docs, appending entries) is a natural extension of the same API surface. This is out of scope for the initial build but the API design should not preclude it.
+
+Risks and Considerations
+Extraction quality — bad fragments/tags erode trust. Prompt engineering is critical and will need iteration. Store raw LLM responses for debugging.
+Snapshot storage growth — full JSONB snapshots of growing docs add up. May need a retention policy (keep last N full snapshots, discard older ones once changesets are processed).
+Block ID stability — fragments reference source blocks. Must use BlockNote's block IDs, not array indices, since positions shift as content is added.
+Idle detection edge cases — phone sleep, tab killed, laptop closed. Server-side updatedAt polling is the safety net.
+Folder operations at scale — reparenting a deep subtree is a single UPDATE on parentId, but UI tree rendering and sort order maintenance need attention.
+Non-Goals (This Iteration)
+Views (tag browser, knowledge dashboard, timeline) — these consume the data this pipeline produces but are scoped separately.
+Embedding-based search — useful for "find similar" queries later, not needed for extraction.
+Agent write access — accounted for in API design, built separately.
+Weekly doc rotation — the journal may start as one doc; auto-rotating to a fresh doc weekly is a UX decision to make after using it.
+Open Questions
+Exact idle timeout duration (30 min? 60 min? configurable by user?)
+Which knowledge areas to extract initially (goals, concerns, beliefs — others?)
+Should the user be able to see/correct extracted fragments and tags, or is it fully hands-off?
+Tag consolidation frequency and trigger (weekly? when tag count exceeds threshold?)
+Journal as a single forever-doc or weekly rotation? May depend on how it feels in practice.
