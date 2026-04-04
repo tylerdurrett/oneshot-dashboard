@@ -47,12 +47,12 @@ apps/web/src/app/(shell)/docs/
 
 ### 1.1 Add auto-title columns to documents
 
-- [ ] Add `isTitleManual` column to `documents` in `packages/db/src/schema.ts`: `boolean('is_title_manual').notNull().default(false)`. Place after `processedAt`, before `createdAt`.
-- [ ] Add `titleGeneratedFromBlockIds` column: `text('title_generated_from_block_ids').array()`. Nullable — null means no auto-title has been generated yet.
-- [ ] Run `pnpm --filter @repo/db db:generate` to generate the migration SQL.
-- [ ] Review the generated SQL. Verify the `when` timestamp in `drizzle/meta/_journal.json` is after all previous entries.
-- [ ] Run `pnpm --filter @repo/db db:migrate` to apply.
-- [ ] Verify via tsx script: query `documents` table and confirm new columns exist with correct defaults.
+- [x] Add `isTitleManual` column to `documents` in `packages/db/src/schema.ts`: `boolean('is_title_manual').notNull().default(false)`. Place after `processedAt`, before `createdAt`.
+- [x] Add `titleGeneratedFromBlockIds` column: `text('title_generated_from_block_ids').array()`. Nullable — null means no auto-title has been generated yet.
+- [x] Run `pnpm --filter @repo/db db:generate` to generate the migration SQL.
+- [x] Review the generated SQL. Verify the `when` timestamp in `drizzle/meta/_journal.json` is after all previous entries.
+- [x] Run `pnpm --filter @repo/db db:migrate` to apply.
+- [x] Verify via docker psql: queried `documents` table and confirmed new columns exist with correct defaults. *(Used docker exec instead of tsx script — same verification.)*
 
 **Acceptance Criteria:**
 - `documents` table has `is_title_manual` (boolean, default false) and `title_generated_from_block_ids` (text[], nullable) columns.

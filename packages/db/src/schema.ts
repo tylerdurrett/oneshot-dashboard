@@ -70,6 +70,8 @@ export const documents = pgTable('documents', {
   pinnedAt: timestamp('pinned_at', { withTimezone: true, mode: 'string' }),
   pipelineEnabled: boolean('pipeline_enabled').notNull().default(true),
   processedAt: timestamp('processed_at', { withTimezone: true, mode: 'string' }),
+  isTitleManual: boolean('is_title_manual').notNull().default(false),
+  titleGeneratedFromBlockIds: text('title_generated_from_block_ids').array(),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
   updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' }).notNull().$defaultFn(() => new Date().toISOString()),
 });
