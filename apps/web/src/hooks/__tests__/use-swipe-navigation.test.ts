@@ -118,7 +118,8 @@ describe('useSwipeNavigation', () => {
     const { result } = renderHook(() => useSwipeNavigation());
     expect(result.current.activeIndex).toBe(0);
     expect(result.current.currentArea.id).toBe('docs');
-    expect(result.current.pages).toHaveLength(1);
+    // Docs area has 2 pages: /docs and /docs/chat (when chat is enabled)
+    expect(result.current.pages).toHaveLength(2);
   });
 
   // --- Area persistence ---

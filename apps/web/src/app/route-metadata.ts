@@ -4,3 +4,4 @@ export const CHAT_TITLE = 'Chat';
 export const TIMERS_TITLE = 'To Do';
 export const ALL_TIMERS_TITLE = 'Done';
 export const DOCS_TITLE = 'Docs';
+export const DOCS_CHAT_TITLE = 'Docs Chat';

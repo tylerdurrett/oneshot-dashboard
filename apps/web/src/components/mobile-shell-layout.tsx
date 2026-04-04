@@ -14,8 +14,9 @@ import { AllTimerGridWithState } from '@/app/(shell)/timers/_components/all-time
 import { TotalTimeIndicator } from '@/app/(shell)/timers/_components/total-time-indicator';
 import SettingsPage from '@/app/(shell)/settings/page';
 import { MobileChatView, extractThreadId } from '@/app/(shell)/chat/mobile-chat-view';
-import { TIMERS_TITLE, ALL_TIMERS_TITLE, CHAT_TITLE, DOCS_TITLE } from '@/app/route-metadata';
+import { TIMERS_TITLE, ALL_TIMERS_TITLE, CHAT_TITLE, DOCS_TITLE, DOCS_CHAT_TITLE } from '@/app/route-metadata';
 import DocsPage from '@/app/(shell)/docs/page';
+import { DocsChatPage } from '@/app/(shell)/docs/_components/docs-chat-page';
 
 import { AppShell } from './app-shell';
 
@@ -29,6 +30,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/chat': CHAT_TITLE,
   '/settings': 'All Buckets',
   '/docs': DOCS_TITLE,
+  '/docs/chat': DOCS_CHAT_TITLE,
 };
 
 // ---------------------------------------------------------------------------
@@ -116,6 +118,8 @@ export function MobileShellLayout() {
             return <SettingsPage key={page.href} />;
           case '/docs':
             return <DocsPage key={page.href} />;
+          case '/docs/chat':
+            return <DocsChatPage key={page.href} />;
           default:
             return <div key={page.href} />;
         }

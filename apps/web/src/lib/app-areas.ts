@@ -1,7 +1,8 @@
-import { Timer, FileText } from 'lucide-react';
+import { Timer, FileText, MessageSquare } from 'lucide-react';
 
 import { NAV_ITEMS, isItemActive, type NavItem } from '@/lib/nav-items';
 import { AREA_STORAGE_KEY } from '@/lib/area-storage';
+import { features } from '@/lib/features';
 
 // ---------------------------------------------------------------------------
 // App area — a grouping layer above nav items. Each area owns a subset of
@@ -27,7 +28,14 @@ const DOCS_NAV_ITEM: NavItem = {
   href: '/docs',
   label: 'Docs',
   icon: FileText,
-  matchType: 'prefix',
+  matchType: 'exact',
+};
+
+const DOCS_CHAT_NAV_ITEM: NavItem = {
+  href: '/docs/chat',
+  label: 'Chat',
+  icon: MessageSquare,
+  matchType: 'exact',
 };
 
 export const APP_AREAS: AppArea[] = [
@@ -41,7 +49,7 @@ export const APP_AREAS: AppArea[] = [
     id: 'docs',
     label: 'Docs',
     icon: FileText,
-    navItems: [DOCS_NAV_ITEM],
+    navItems: [DOCS_NAV_ITEM, ...(features.chat ? [DOCS_CHAT_NAV_ITEM] : [])],
   },
 ];
 

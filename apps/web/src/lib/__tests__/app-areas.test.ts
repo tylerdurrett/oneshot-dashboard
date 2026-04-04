@@ -31,8 +31,13 @@ describe('getAreaForPath', () => {
     expect(getAreaForPath('/docs').id).toBe('docs');
   });
 
-  it('returns Docs area for /docs/some-page', () => {
-    expect(getAreaForPath('/docs/some-page').id).toBe('docs');
+  it('returns Docs area for /docs/chat', () => {
+    expect(getAreaForPath('/docs/chat').id).toBe('docs');
+  });
+
+  it('falls back to Timers area for unknown /docs sub-path', () => {
+    // /docs uses exact match, so arbitrary sub-paths don't match
+    expect(getAreaForPath('/docs/some-page').id).toBe('timers');
   });
 
   it('falls back to first area (Timers) for unknown paths', () => {
@@ -54,9 +59,10 @@ describe('APP_AREAS', () => {
     expect(timers?.navItems).toHaveLength(4);
   });
 
-  it('Docs area has 1 navItem', () => {
+  it('Docs area has 2 navItems when chat is enabled', () => {
     const docs = APP_AREAS.find((a) => a.id === 'docs');
-    expect(docs?.navItems).toHaveLength(1);
+    expect(docs?.navItems).toHaveLength(2);
     expect(docs?.navItems[0]?.href).toBe('/docs');
+    expect(docs?.navItems[1]?.href).toBe('/docs/chat');
   });
 });

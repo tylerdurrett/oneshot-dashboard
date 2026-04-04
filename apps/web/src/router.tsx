@@ -16,6 +16,7 @@ import ChatPrototype from '@/app/prototype/chat/page';
 import VideoPage from '@/app/video/page';
 import SettingsPage from '@/app/(shell)/settings/page';
 import DocsPage from '@/app/(shell)/docs/page';
+import { DocsChatPage } from '@/app/(shell)/docs/_components/docs-chat-page';
 import NoFeaturesPage from '@/app/no-features/page';
 import { features, getHomeRedirectPath } from '@/lib/features';
 
@@ -81,6 +82,9 @@ const shellChildren = [
     : []),
   { path: 'settings', element: <SettingsPage /> },
   { path: 'docs', element: <DocsPage /> },
+  ...(features.chat
+    ? [{ path: 'docs/chat', element: <DocsChatPage /> }]
+    : []),
 ];
 
 const prototypeChildren = [
