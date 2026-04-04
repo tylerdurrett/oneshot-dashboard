@@ -524,3 +524,64 @@ Term consolidation frequency and trigger
 Journal as a single forever-doc or periodic fresh starts?
 Workspace switcher UX — nav rail icon? dropdown? separate screen on mobile?
 Should initial taxonomies (Topic, Mood, Type) be seeded per workspace, or should the AI create them organically on first extraction?
+---
+The dependency graph
+
+Auto-headings ─────────────────────────── (no deps, works today)
+
+Multi-doc + doc CRUD ──┬── Folders
+                       │
+Workspaces ────────────┘   (workspace FK goes on docs, folders, etc.)
+
+Snapshot/diff pipeline ─── Fragment extraction ─── Knowledge base
+                                    │
+                           Taxonomy/terms system
+                           
+Agent integration ─── (reads from all of the above)
+Two independent tracks
+The interesting thing is there are two tracks that can run in parallel:
+
+Track A: Doc system — multi-doc, folders, workspaces. This is about where things live and how you organize them. Testable via UI — you can see and use it.
+
+Track B: Intelligence pipeline — snapshots, diffs, taxonomy, fragment extraction, knowledge base. This is about what the system learns from your writing. Testable via inspecting the database and eventually through search/browse views.
+
+Auto-headings stands alone and is useful immediately.
+
+Possible sequence
+1. Auto-headings
+Works on the existing single doc today. Zero schema changes. You open the journal, start typing, a date heading appears. Immediately tangible. Good confidence builder.
+
+2. Multi-doc + workspaces (schema layer)
+Evolve the documents table — add title, workspaceId, folderId. Create the workspaces table, seed a default "Personal" workspace. Build doc CRUD APIs and a basic doc list UI. You don't need the workspace switcher yet — everything lives in the default workspace — but the column is there from day one so you never retrofit.
+
+Testable: you can create multiple docs, give them titles, switch between them. The journal is still a pinned entry point to one specific doc.
+
+3. Snapshot/diff pipeline
+Add journal_snapshots and journal_changesets tables. Build the idle detection on the frontend. When triggered, capture a snapshot, diff against previous, store the changeset. No LLM yet — just the plumbing.
+
+Testable: write in the journal, go idle, check the database — snapshots and changesets should appear with correct diffs. You can verify the diff captures exactly what you changed, including surrounding context assembly.
+
+4. Taxonomy/terms + fragment extraction
+Add taxonomies, terms, and the join tables. Seed initial taxonomies (Topic, Mood, Type). Build the LLM extraction call — feed it a changeset with context blocks, get back fragments with term assignments. Store everything.
+
+Testable: write something, wait for processing, query the fragments table. "Did the AI correctly split my three topics into three fragments? Did it assign reasonable terms?" This is where you iterate on the prompt.
+
+5. Folders
+Add the folders table. Build folder CRUD and the tree UI in the doc library. Reparenting, drag-and-drop, the works.
+
+Testable: create folders, move docs around, verify the hierarchy. This is somewhat independent — could swap with step 4 if you want the organizational UI before the intelligence layer.
+
+6. Knowledge base
+Add journal_knowledge. Extend the extraction prompt to identify durable knowledge (goals, beliefs, concerns) and upsert entries. Build a view for browsing knowledge.
+
+Testable: write "My goal is to ship the journal feature by end of April." Wait for processing. Check that a knowledge entry appears under "goals."
+
+7. Agent integration
+Give the chat agent query access to docs, fragments, terms, and knowledge within the current workspace. This is mostly API surface — the data is already there from previous steps.
+
+The question for you
+Does this sequence feel right? The main choice points:
+
+Folders (step 5) can slide earlier if you want the doc organization UX sooner, or later if intelligence is more exciting.
+Workspace switcher UI is deferred throughout — the data model is ready from step 2, but you only build the switching experience when you actually need a second workspace.
+Steps 3 and 4 are where you'll spend the most iteration time (diff correctness, prompt tuning). Worth getting to those relatively early.
