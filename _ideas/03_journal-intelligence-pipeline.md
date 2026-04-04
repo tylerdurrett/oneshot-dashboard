@@ -1,4 +1,4 @@
-# Feature: Journal Intelligence Pipeline
+# Feature IDEA (REJECTED, IGNORE THIS DOC): Journal Intelligence Pipeline
 
 **Date:** 2026-04-04
 **Status:** Scoped
