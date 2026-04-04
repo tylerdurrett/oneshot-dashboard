@@ -50,7 +50,7 @@ After a user creates a new doc and starts writing, the system automatically gene
 
 **Manual override:** If the user edits the title at any point, auto-titling stops for that doc. The system tracks this via an `isTitleManual` flag. If the user clears the title back to empty, auto-titling re-engages (future refinement, not required for initial build).
 
-**Model:** Gemini Flash 2.5 via Vercel AI SDK. `GEMINI_API_KEY` in `.env.local`. Cheap and fast — appropriate for a single-sentence title generation.
+**Model:** Gemini Flash 2.5 via Vercel AI SDK. `GOOGLE_GEMINI_API_KEY` in `.env.local`. Cheap and fast — appropriate for a single-sentence title generation.
 
 ### Workspace Column (Schema Only)
 
@@ -156,7 +156,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 ### Phase 2: Auto-Title
 - Add `isTitleManual` (boolean, default false) and `titleGeneratedFromBlockIds` (text[], nullable) columns to `documents`.
-- Add `GEMINI_API_KEY` to `.env.local`, document in `.env`.
+- Add `GOOGLE_GEMINI_API_KEY` to `.env.local`, document in `.env`.
 - Install Vercel AI SDK (`ai`) and the Google Generative AI provider (`@ai-sdk/google`).
 - Build server-side title generation endpoint: accepts doc content, returns a generated title.
 - Craft the title generation prompt — concise, descriptive titles from doc content.
