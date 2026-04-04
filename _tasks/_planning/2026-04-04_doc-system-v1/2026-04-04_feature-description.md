@@ -10,10 +10,11 @@ Evolve the existing single-doc BlockNote editor into a multi-doc system with a t
 ## End-User Capabilities
 
 1. Create multiple docs with titles. Switch between them via a sidebar list (desktop) or title dropdown (mobile).
-2. Pin any doc to keep it at the top of the list for quick access.
-3. Organize docs into folders. Browse and filter by AI-assigned tags.
-4. After going idle or leaving a doc, the system automatically assigns tags across multiple taxonomies (topic, mood, type) — only processing what changed.
-5. Filter and search docs by AI-assigned tags.
+2. After writing in a new doc, the system automatically generates a descriptive title. Titles update if the content changes significantly. Manually editing a title disables auto-titling for that doc.
+3. Pin any doc to keep it at the top of the list for quick access.
+4. Organize docs into folders. Browse and filter by AI-assigned tags.
+5. After going idle or leaving a doc, the system automatically assigns tags across multiple taxonomies (topic, mood, type) — only processing what changed.
+6. Filter and search docs by AI-assigned tags.
 
 ## Architecture
 
@@ -30,6 +31,26 @@ The existing `documents` table evolves to support multiple docs with titles. Eac
 **Pinning:** Any doc can be pinned. Pinning sets a `pinnedAt` timestamp; unpinning nulls it. Pinned docs appear in a visually separate section at the top of the list. No limit on pinned docs.
 
 **Titles:** Inline editable above the BlockNote editor content (Notion-style). New docs default to "Notes [date]" (e.g., "Notes Apr 4, 2026").
+
+### Auto-Title
+
+After a user creates a new doc and starts writing, the system automatically generates a title using a small LLM (Gemini Flash 2.5). Uses the Vercel AI SDK as an abstraction layer so the model can be swapped later.
+
+**Trigger — debounced typing pause (not idle):**
+- The doc still has its default "Notes [date]" title (user hasn't manually renamed it)
+- Content exceeds ~50 words or 3+ blocks (minimum content threshold)
+- User hasn't typed for 10–15 seconds
+- Fire once, update the title via the same title-update API
+
+**Re-title on significant change:**
+- On each subsequent debounce trigger, compare the current block IDs against `titleGeneratedFromBlockIds` (the block IDs present when the title was last generated)
+- If fewer than half the original blocks are still present, OR the doc now has 2x+ the blocks → re-generate the title
+- Same guard rails: only if the user hasn't manually edited the title, and content still meets the minimum threshold
+- The ~50% change threshold is a starting point — tune from real usage
+
+**Manual override:** If the user edits the title at any point, auto-titling stops for that doc. The system tracks this via an `isTitleManual` flag. If the user clears the title back to empty, auto-titling re-engages (future refinement, not required for initial build).
+
+**Model:** Gemini Flash 2.5 via Vercel AI SDK. `GEMINI_API_KEY` in `.env.local`. Cheap and fast — appropriate for a single-sentence title generation.
 
 ### Workspace Column (Schema Only)
 
@@ -100,7 +121,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 ## Data Model
 
 **Existing (evolve):**
-- `documents` — add: `title` (text), `workspaceId` (FK), `folderId` (FK, nullable), `pinnedAt` (timestamp, nullable), `pipelineEnabled` (boolean, default true), `processedAt` (timestamp, nullable)
+- `documents` — add: `title` (text), `workspaceId` (FK), `folderId` (FK, nullable), `pinnedAt` (timestamp, nullable), `pipelineEnabled` (boolean, default true), `processedAt` (timestamp, nullable), `isTitleManual` (boolean, default false), `titleGeneratedFromBlockIds` (text[], nullable)
 
 **New tables:**
 
@@ -122,7 +143,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 ### Phase 1: Multi-Doc
 - Create `workspaces` table (minimal), seed default workspace on first run.
-- Add `title`, `workspaceId`, `folderId` (nullable, unused until Phase 4), `pinnedAt`, `pipelineEnabled`, `processedAt` to `documents`.
+- Add `title`, `workspaceId`, `folderId` (nullable, unused until Phase 5), `pinnedAt`, `pipelineEnabled`, `processedAt` to `documents`.
 - Migrate existing default doc: give it a title ("Notes [date]"), assign to default workspace.
 - Build doc CRUD APIs (create, list, read, update title, update content, delete, pin/unpin).
 - Build doc list as inner left nav (desktop) — pinned section + recent section, sorted by `pinnedAt` / `updatedAt` desc.
@@ -133,7 +154,20 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Create multiple docs, give them titles, switch between them. Pin a doc, see it move to the top. Delete a doc. Existing doc still works.
 
-### Phase 2: Taxonomy/Terms + On-Idle Processing
+### Phase 2: Auto-Title
+- Add `isTitleManual` (boolean, default false) and `titleGeneratedFromBlockIds` (text[], nullable) columns to `documents`.
+- Add `GEMINI_API_KEY` to `.env.local`, document in `.env`.
+- Install Vercel AI SDK (`ai`) and the Google Generative AI provider (`@ai-sdk/google`).
+- Build server-side title generation endpoint: accepts doc content, returns a generated title.
+- Craft the title generation prompt — concise, descriptive titles from doc content.
+- Build frontend debounce logic: 10–15 second typing pause + content threshold (50 words or 3+ blocks) + doc still has default title.
+- On successful title generation, update the doc title and store current block IDs in `titleGeneratedFromBlockIds`.
+- Set `isTitleManual = true` when the user manually edits the title. Auto-title skips docs where this is true.
+- Build re-title logic: on subsequent debounce triggers, compare current block IDs to `titleGeneratedFromBlockIds`. Re-generate if <50% of original blocks remain or doc has 2x+ blocks.
+
+**Testable:** Create a new doc, type a few paragraphs, stop typing. Title should update from "Notes [date]" to something content-derived within ~15 seconds. Manually rename it — auto-title should stop. Create another doc, write a paragraph, get a title, then write significantly more — title should update again.
+
+### Phase 3: Taxonomy/Terms + On-Idle Processing
 - Create `taxonomies`, `terms`, `fragments`, `document_block_states`, `document_terms`, `fragment_terms` tables.
 - Seed initial taxonomies (Topic, Mood, Type) in the default workspace.
 - Build the on-idle processing trigger (frontend idle detection + server endpoint).
@@ -144,7 +178,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Write in a doc, go idle, check the database. Fragments and terms should appear for the new/changed blocks. Edit one block, go idle again — only that block's fragments should change. Everything else stays stable.
 
-### Phase 3: Tag Filtering + Search
+### Phase 4: Tag Filtering + Search
 - Build UI to display assigned terms on docs (tag chips, sidebar, etc.).
 - Build doc list filtering by terms — click a topic to see matching docs.
 - Build text search across docs.
@@ -152,7 +186,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Filter docs by "career" topic, see the right docs. Search for a phrase, find the doc containing it.
 
-### Phase 4: Folders
+### Phase 5: Folders
 - Create `folders` table. Add `folderId` to documents.
 - Build folder CRUD APIs.
 - Build folder tree UI in doc library — create, rename, reparent, drag-and-drop.
@@ -169,11 +203,16 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 6. **Folders separate from taxonomies.** Different cardinality, different management model. Keep them separate.
 7. **Pinned docs, not a dedicated journal.** Any doc can be pinned via `pinnedAt` timestamp. Pinned docs sort by pin date in a separate section at the top of the list. No special-cased journal concept.
 8. **Fragments linked to source blocks.** Enables incremental processing — when a block changes, the system knows exactly which fragments to replace.
+9. **Auto-title via small LLM, not the taxonomy agent.** Title generation is a lightweight, fast operation — Gemini Flash 2.5 via Vercel AI SDK. Separate from the heavier on-idle taxonomy processing. Debounce-triggered (10–15s pause), not idle-triggered (30–60 min).
+10. **Re-title on significant content change, not every edit.** Track which blocks existed when the title was generated. Only re-title when >50% of blocks changed or doc doubled in size. Avoids unnecessary API calls and title churn.
+11. **Vercel AI SDK as abstraction layer.** Model-agnostic interface so the title generation model can be swapped without changing application code.
 
 ## Risks and Considerations
 
 - **Extraction quality** — bad tags erode trust. Start simple (just topic assignment), iterate on the prompt. Store raw agent responses for debugging.
-- **Block ID stability** — the system depends on BlockNote block IDs being stable across saves. If BlockNote regenerates IDs (e.g., on paste or certain operations), the hash comparison breaks and triggers unnecessary reprocessing. Needs validation during Phase 2.
+- **Block ID stability** — the system depends on BlockNote block IDs being stable across saves. If BlockNote regenerates IDs (e.g., on paste or certain operations), the hash comparison breaks and triggers unnecessary reprocessing. Affects both auto-title (Phase 2) and taxonomy processing (Phase 3). Needs validation during Phase 2.
+- **Auto-title quality** — a bad auto-title is worse than the default "Notes [date]". The prompt needs to produce concise, useful titles without being generic. Start simple and iterate on the prompt based on real usage.
+- **Auto-title cost** — Gemini Flash is cheap, but the debounce trigger fires more frequently than idle. Monitor usage. The content threshold and re-title guards keep it bounded.
 - **Agent cost at scale** — a Claude Code agent invocation is heavier than a Haiku API call. At personal journal volume this is fine, but worth monitoring if usage patterns change.
 - **Folder + tag interaction** — users may expect folders and tags to work together in filtering (show me docs in "Work" folder tagged "urgent"). Make sure the query layer supports this.
 
