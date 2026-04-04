@@ -114,10 +114,259 @@ Agent integration depth — The chat agent can read journal content, but can it 
 DECISION:
 We're using BlockNote for the journal editor. It's built on Tiptap/ProseMirror and gives us a Notion-style block editor out of the box — slash commands, drag-and-drop blocks, formatting toolbar, dark theme support. The free tier (MPL-2.0) covers everything we need. Content is stored as JSON blocks in SQLite, which is lossless and easy to query. Markdown export is available (lossy, but fine for feeding the agent/knowledgebase since we never need to import it back). Bundle size is ~357KB gzipped — heavier than alternatives but acceptable for a personal PWA. Other candidates considered: Tiptap (too much UI to build yourself), MDXEditor (single maintainer, no slash commands, mobile bugs), Lexical (a framework, not an editor — way too much custom work).
 ---
-OKAY - before we go and implement a ton of stuff, I want to focus purely on simple doc editing to make sure that works.
-
-Let's just create the absolute simplest of pages that is a full-screen doc editor.
-Use BlockNote.
-Save it to a default doc in the db.
-All else will come afterward.
+OKAY - we implemented a very simple BlockNotes editor, just one doc filling the page to test it out.
+---
+Let's talk about how we can separate out sessions automatically.
+Maybe it's as simple as me needing to manually do something to indicate new session.
+Like if we detect "=======" then what follows is a new session
+I'm not sure.
+Originally I imagined it would be automatic based on time, and that could still be the way.
+But I have to be careful, too, because I actually want it to FEEL like a big doc, not like a string of separate sessions.
+I'm okay with session divisions, but what happens if I tap up a few times on the keyboard (into a previous session) and edit - does that become part of today's session?
+Not sure yet.
+But the goal of sessions comes back to the way I use Notion.
+I create a big doc and add a Day heading and go to town. New doc each week.
+I want to automate some of that, but I also want the AI to be able to look at my changes for a session and:
+- Add tags in various taxonomies
+- Chunk and vectorize (doesn't require individual sessions)
+- Update knowledge/beliefs in knowledgebase
+Help me think through this.
+Maybe it gets dynamically "sessionified" as needed.
+For example, let's say I go idle for an hour and that kicks in a processing workflow behind the scenes. Instead of trying to treat a particular segment of text as a session, what if it looks at a diff of what changed - total. Then that diff is what we consider the session changes.
 Let's discuss.
+---
+Your instinct about the diff-based approach is the right one. Here's why, and how I'd think about it:
+
+The "One Big Doc" model is correct
+You keep coming back to wanting it to feel like one continuous document — and that's exactly what you should build. Right now you already have a single documents table with one default doc and a JSONB content column. That's actually close to the right foundation.
+
+Don't try to make sessions a first-class editing concept. The moment you split the editor into visible session boundaries, you've recreated the Notion problem — "where does this thought go?" Instead:
+
+Sessions are a background processing concept, not a UI concept
+Here's the model I'd suggest:
+
+What you see: One infinite doc. You open it, your cursor is at the bottom, you type. You can scroll up. Day headings and week headings are injected automatically based on timestamps (more on this below). It feels like one long document.
+
+What happens behind the scenes:
+
+Every save already captures a snapshot (your current debounced auto-save at 1500ms does this).
+When you go idle (say 30-60 min, configurable), a background job wakes up.
+It diffs the current doc content against the last-processed snapshot.
+That diff — "here's what changed since we last looked" — is the "session." It's not a segment of the doc, it's a changeset.
+The changeset gets processed: summarized, tagged, knowledge extracted.
+The snapshot is marked as processed.
+This means:
+
+If you edit old text 3 paragraphs up, that's captured in the diff. No confusion about "which session owns that paragraph."
+If you write for 5 minutes, leave for 2 hours, come back and write more — that's two sessions (two processing runs), but you never saw a boundary.
+The doc itself has no session markers. Sessions exist only in a journal_snapshots or journal_changesets table.
+Auto-headings: simpler than you think
+Day/week headings don't need to be "sessions." They're just blocks the system inserts into the doc content.
+
+When you open the journal and start typing:
+
+Check if the first block from today already exists. If not, insert an H2 with today's date before your cursor position.
+Same logic for week headings (H1 on Monday or first entry of the week).
+These are real blocks in the BlockNote content array — you can edit or delete them if you want.
+This keeps the "one doc" feel while giving you temporal landmarks to scroll through.
+
+Proposed data model evolution
+Your current documents table stays as-is for the doc content. Add:
+
+
+journal_snapshots
+  id, documentId, content (JSONB), capturedAt, processedAt
+
+journal_changesets  
+  id, documentId, snapshotBeforeId, snapshotAfterId,
+  diff (JSONB), summary, createdAt, processedAt
+
+journal_tags
+  id, name, taxonomy
+
+journal_changeset_tags
+  changesetId, tagId
+
+journal_knowledge
+  id, area, content, sourceChangesetId, createdAt, updatedAt
+The key shift from the earlier sketch: sessions → changesets. The atomic unit isn't "a stretch of text" — it's "what you changed between two processing runs."
+
+What to figure out next
+Idle detection — Frontend detects no edits for N minutes, pings the server to trigger processing. Or the server polls updatedAt on the document. The frontend approach is simpler and more accurate.
+
+Day/week heading injection — Small feature, high impact. Could be the first thing to build since it transforms the "one doc" experience immediately.
+
+Snapshot + diff pipeline — The background processing system. This is the core infrastructure for everything else (tags, summaries, knowledge).
+
+What "knowledge areas" to extract — You mentioned goals, concerns, feelings, beliefs. This is a product design question more than a technical one. Start with 2-3 areas and expand.
+---
+
+For your case: BlockNote JSON blocks
+Your doc content is stored as a JSONB array of blocks, not raw text. So you have two layers to think about:
+
+1. Structural diff (JSON/tree level)
+json-diff-ts or microdiff — these compare two JSON objects/arrays and produce a changeset of additions, removals, and modifications. Microdiff is tiny (~1KB) and fast.
+
+This tells you: "block 14 was added, block 7's text content changed, block 3 was deleted." That's probably what you want for the processing pipeline — you care about which blocks changed, not character-level edits within a paragraph.
+
+
+import diff from "microdiff"
+
+const changes = diff(snapshotBefore, snapshotAfter)
+// [{ type: "CHANGE", path: [7, "content", 0, "text"], oldValue: "...", value: "..." },
+//  { type: "CREATE", path: [14], value: { type: "paragraph", ... } }]
+2. Text diff (within a block's content)
+If you also want to know what changed inside a paragraph (for summarization — "user added a sentence about X"), the classic algorithm is Myers diff — the same one git diff uses. It finds the minimum edit distance between two strings.
+
+Libraries:
+
+diff (aka jsdiff) — the standard. diffWords() or diffSentences() are more useful than diffChars() for your use case. Battle-tested, ~15KB.
+fast-diff — character-level only but very fast. Used internally by Quill/ProseMirror for operational transforms.
+What I'd recommend for your pipeline
+Two-pass approach:
+
+Microdiff on the full block array — identifies which blocks were added/removed/changed. This is your "what happened" overview. Cheap, fast.
+jsdiff's diffWords() on changed blocks' text content only — gives you the actual text changes for feeding to the AI summarizer. Only run this on blocks that microdiff flagged as changed.
+This is performant because you're never diffing the entire document text — you're diffing a JSON array (fast), then selectively diffing only the individual paragraphs that changed (small strings).
+
+The algorithms under the hood
+Myers (1986) — O(ND) where N is input length and D is edit distance. Fast when changes are small relative to document size (your typical case — you wrote a few paragraphs, not rewrote everything). This is what diff and git use.
+Patience diff — a variant that produces more human-readable diffs by anchoring on unique lines. git diff --patience uses this. Less relevant for your block-level approach.
+JSON-specific — tree diffing is technically O(n^3) for arbitrary trees, but BlockNote's flat block array makes it O(n) with a simple linear scan (which is what microdiff does).
+Storage consideration
+Store the diff as JSONB in your journal_changesets table, not the full snapshot. A microdiff output is tiny compared to the full doc. You only need to store full snapshots at processing boundaries — not every auto-save.
+---
+Originally I had conceived of a system that could, for example, automatically tag a section of text because that would have been considered an "entry" aka "session". However, now we're talking about changesets really being what constitute a session.
+Now I want to think about - what am I tagging, if anything? 
+I want structured/searchable journaling to ermerge from a mostly sequential and/or unstructured journing process through the AI layer. 
+People build huge obsidian databases with hierarchies of pages with tags. I don't want to manually create the hierarchies or tags, but I do want some amount of structure to emerge. 
+Let's discuss.
+---
+This is a really interesting design tension. Let me think through it with you.
+
+What you're actually producing
+You write in a single continuous doc. The system periodically snapshots and diffs. So the raw material for the AI layer is changesets — "here's what Tyler added/changed between 2pm and 5pm on Tuesday."
+
+A changeset isn't a topical unit though. In one sitting you might jot down a grocery reminder, reflect on a career goal, and brainstorm a feature idea. Tagging the changeset as a whole would be like tagging a page of a physical notebook — too coarse.
+
+The unit that matters: extracted fragments
+What if the AI processing step doesn't just summarize the changeset, but breaks it into semantic fragments?
+
+A changeset comes in: "Tyler wrote 4 new paragraphs and edited 1 existing one." The AI reads the changed content and produces:
+
+Fragment 1: "Considering switching to a standing desk" → tagged health, workspace
+Fragment 2: "Feature idea: timer buckets should support recurring schedules" → tagged product-ideas, timers
+Fragment 3: "Feeling stuck on the journal design" → tagged reflection, journal
+Each fragment is a row in a table, linked back to the changeset (and therefore to a time range and the actual blocks in the doc). You never created these fragments or chose these tags — the AI extracted them.
+
+Tags emerge from content, not from you
+The tag taxonomy doesn't need to be predefined. The AI can:
+
+Look at existing tags in the system
+Reuse them when they fit
+Create new ones when nothing fits
+Periodically consolidate (merge "product-idea" and "product-ideas", notice "health" and "fitness" overlap)
+You'd start with zero tags. After a month of journaling, you'd have an organically grown taxonomy that reflects what you actually think about — not what you planned to think about.
+
+What this gives you
+Search: "What have I written about career goals?" → query fragments tagged career + goals
+Patterns over time: "You've mentioned sleep quality 12 times in the last 3 weeks, mostly negatively"
+Knowledge base updates: Fragments tagged belief or goal feed into the knowledge areas you mentioned
+Agent context: The chat agent can pull relevant fragments when you're discussing a topic, not just raw doc text
+The question back to you
+Does this match your intuition? The key idea is:
+
+You interact with one big doc. Zero structure required.
+The system extracts fragments, tags them, and builds structure behind the scenes.
+Views (search, knowledge areas, tag clouds, timelines) are windows into the emergent structure — you consume it, you don't maintain it.
+Or do you feel like you'd want some manual control — like pinning a tag, correcting a bad extraction, starring an important fragment?
+
+I think this is exactly what I'm looking for.
+My next question is - how do we extract semantic fragments?
+Two options, and they're not mutually exclusive:
+
+Option 1: LLM extraction (the obvious one)
+Feed the changeset diff to Claude with a prompt like:
+
+Here's what the user wrote/changed. Extract distinct semantic fragments. For each, provide: a brief title, the relevant text, and suggested tags. Here are the existing tags in the system: [list]. Reuse when appropriate, create new ones sparingly.
+
+This is flexible, handles nuance well ("feeling stuck on journal design" is both a reflection and about the journal feature), and can match existing tags intelligently. It's also the only option that can extract meaning — like detecting that something is a goal vs an observation vs a complaint.
+
+Cost/latency: A changeset from a typical writing session is maybe 500-2000 tokens of input. Claude Haiku could handle this for fractions of a cent per run. Since it's background processing (you've already left or gone idle), latency doesn't matter. You could batch multiple changesets too.
+
+Option 2: Embedding-based clustering (cheaper, dumber)
+Split changed text into chunks (by paragraph or block), embed each one, and cluster against existing fragments by vector similarity. If a new paragraph is close to existing "health" fragments, tag it "health."
+
+This is cheaper at scale but can't do the nuanced work — it won't identify that something is a goal vs a concern about the same topic. It also can't create meaningful new tags, only match existing ones.
+
+My recommendation
+LLM extraction is the right choice here. The reasons:
+
+Volume is low. You're writing a personal journal, not processing a firehose. Maybe 2-5 changesets per day. At Haiku prices that's essentially free.
+Quality matters more than cost. Bad tags are worse than no tags — if the structure that emerges doesn't feel right, you'll stop trusting it.
+You need judgment, not just similarity. "I should really start running again" and "I ran 3 miles today" are both about running but one is a goal and the other is a log entry. Only an LLM catches that distinction.
+Tag consolidation also needs an LLM. Periodically reviewing the tag taxonomy and merging/cleaning — that's a judgment call.
+Embeddings could be useful later for search ("find things similar to this fragment") but not for the extraction step itself.
+
+The practical shape
+The processing pipeline for a changeset would be:
+
+Diff → identify changed/added blocks
+Extract → LLM call: "here are the changes, here are existing tags, produce fragments"
+Store → fragments table with text, tags, source changeset ID, timestamp
+Optionally update knowledge areas → if a fragment looks like a goal/belief/concern, upsert the knowledge table
+One LLM call per changeset. Simple, auditable, and you can always re-run extraction if you improve the prompt later.
+
+---
+
+I'm with you on the LLM usage. When we give the LLM something to work with (e.g. the changeset) we would probably need to feed it a bit more context, too, so it's not just seeing a small segment (like a couple of words changing) - it needs the context of those word changes. So do we have to worry about segment and/or changeset boundaries? Knowing of course one or two words changing could alter and potentially reverse the entire meaning/intent of a block of text.
+
+---
+
+Exactly right — a diff that says "changed 'should' to 'shouldn't'" is meaningless without context. And it could flip the entire meaning.
+
+The key insight: the diff identifies what changed, but the LLM reads the full blocks
+Think of it as two stages:
+
+Microdiff tells you which blocks were touched (added, modified, deleted)
+You send the LLM the full content of those blocks, not the raw diff
+So if you edited one word in a paragraph, the LLM doesn't see "should" → "shouldn't". It sees the entire paragraph as it now reads. That's the context it needs.
+
+But a single block isn't always enough context either
+"I'm going to do that differently this time" — do what differently? The paragraph above probably explains it. So you need surrounding blocks too.
+
+A simple rule: for each touched block, include N blocks before and after as context (maybe 2-3). Like how git diff shows context lines around changes. The LLM prompt would look something like:
+
+Here are the sections of the user's journal that changed during this session. Each section shows the changed block with surrounding context.
+
+Section 1 (block 47 modified):
+[block 45 - context]
+[block 46 - context]
+
+[block 47 - changed]
+[block 48 - context]
+[block 49 - context]
+
+Section 2 (blocks 82-84 added):
+[block 80 - context]
+[block 81 - context]
+[blocks 82-84 - new]
+[block 85 - context]
+
+This way the LLM has enough to understand meaning, but you're not sending the entire 6-month journal every time.
+
+Adjacent changes should merge
+If blocks 47, 48, and 50 all changed, don't send three separate sections with overlapping context. Merge them into one section covering blocks 45-52. Simple logic: if two changed blocks are within N positions of each other, combine them into one context window.
+
+What about deletions?
+If a block was deleted, the LLM needs to know what was there. So for deletions, you'd include the block content from the previous snapshot. The prompt could flag it: "The user deleted this block: [content]. Surrounding blocks that remain: [context]."
+
+This matters for knowledge base accuracy — if you wrote "My goal is to run a marathon" last week and today you deleted it, the system should update the knowledge base to reflect that it's no longer a goal.
+
+Cost check
+Worst case: you changed 10 blocks scattered across the doc, each with 3 blocks of context on each side = ~70 blocks. At maybe 50-100 tokens per block, that's 3,500-7,000 tokens of input. Still well within Haiku's sweet spot and basically free.
+
+Typical case: you added a few paragraphs at the bottom = one contiguous section, maybe 10-15 blocks including context. Trivial.
+
+So to answer your question directly
+You don't need to worry about changeset boundaries being too granular. The diff is just an index — "look here, here, and here." The LLM always gets full blocks with surrounding context. Even a one-word change gets the full paragraph plus neighbors, which is enough to understand intent.
