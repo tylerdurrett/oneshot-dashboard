@@ -19,6 +19,7 @@ import {
 import type { Database } from './services/thread.js';
 import { seedDefaultBuckets } from './services/timer-bucket.js';
 import { TimerScheduler } from './services/timer-scheduler.js';
+import { ensureDefaultWorkspace } from './services/workspace.js';
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -193,6 +194,16 @@ if (!process.env.VITEST) {
     } catch (err) {
       server.log.warn(`Failed to seed default timer buckets: ${err}`);
     }
+  }
+
+  // Seed default workspace and backfill orphaned docs (idempotent)
+  try {
+    const { seeded } = await ensureDefaultWorkspace();
+    if (seeded) {
+      server.log.info('Seeded default workspace');
+    }
+  } catch (err) {
+    server.log.warn(`Failed to seed default workspace: ${err}`);
   }
 
   // Bind to 0.0.0.0 so the server is reachable over Tailscale / LAN

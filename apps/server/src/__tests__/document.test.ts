@@ -10,7 +10,8 @@ describe('document service', () => {
   let testDb: Database;
 
   beforeEach(async () => {
-    testDb = await createCleanTestDb('documents');
+    // Truncate workspaces too — getDefaultDocument now queries the workspaces table
+    testDb = await createCleanTestDb('documents, workspaces');
   });
 
   describe('getDefaultDocument', () => {

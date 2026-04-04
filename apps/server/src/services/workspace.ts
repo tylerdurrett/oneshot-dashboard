@@ -1,0 +1,81 @@
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { db as defaultDb, workspaces, documents } from '@repo/db';
+import type { Database } from './thread.js';
+
+/** Format a date as a default document title: "Notes 2026-04-04" */
+export function titleFromDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `Notes ${d.toISOString().slice(0, 10)}`;
+}
+
+/** Get the default workspace ID (if one has been seeded). */
+export async function getDefaultWorkspaceId(
+  database: Database = defaultDb,
+): Promise<string | undefined> {
+  const [ws] = await database
+    .select({ id: workspaces.id })
+    .from(workspaces)
+    .where(eq(workspaces.isDefault, true))
+    .limit(1);
+  return ws?.id;
+}
+
+/**
+ * Ensure a default workspace exists and backfill orphaned documents.
+ * Called once on server startup — idempotent, safe to call multiple times.
+ */
+export async function ensureDefaultWorkspace(
+  database: Database = defaultDb,
+): Promise<{ workspaceId: string; seeded: boolean }> {
+  const existingId = await getDefaultWorkspaceId(database);
+
+  if (existingId) {
+    return { workspaceId: existingId, seeded: false };
+  }
+
+  const now = new Date().toISOString();
+  const [inserted] = await database
+    .insert(workspaces)
+    .values({
+      name: 'Default',
+      isDefault: true,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+
+  if (!inserted) throw new Error('Failed to create default workspace');
+
+  // Backfill orphaned docs created before workspaces existed
+  await backfillOrphanedDocs(inserted.id, database);
+  return { workspaceId: inserted.id, seeded: true };
+}
+
+/** Bulk-assign orphaned docs to a workspace and title untitled ones. */
+async function backfillOrphanedDocs(
+  workspaceId: string,
+  database: Database,
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  // Assign all orphaned docs to the workspace
+  await database
+    .update(documents)
+    .set({ workspaceId, updatedAt: now })
+    .where(isNull(documents.workspaceId));
+
+  // Title any untitled docs with a date-based name
+  // Uses raw SQL for to_char since we need the per-row created_at value
+  await database
+    .update(documents)
+    .set({
+      title: sql`'Notes ' || to_char(${documents.createdAt}, 'YYYY-MM-DD')`,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(documents.workspaceId, workspaceId),
+        or(eq(documents.title, ''), isNull(documents.title)),
+      ),
+    );
+}

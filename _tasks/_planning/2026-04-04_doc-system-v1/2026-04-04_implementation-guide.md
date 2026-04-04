@@ -69,11 +69,13 @@ apps/web/src/
 
 ### 1.2 Workspace seeding and data migration
 
-- [ ] Create `apps/server/src/services/workspace.ts` with `ensureDefaultWorkspace(db)` — idempotent function that creates a default workspace if none exists (checks `isDefault = true`).
-- [ ] Call `ensureDefaultWorkspace()` during server startup in `apps/server/src/index.ts`, before route registration. Follow the `seedDefaultBuckets()` pattern.
-- [ ] Update `getDefaultDocument()` in `apps/server/src/services/document.ts` to assign the default workspace ID when auto-creating a new document, and set a default title of `"Notes [date]"`.
-- [ ] Write a one-time data migration in `ensureDefaultWorkspace`: after seeding the workspace, update any documents with null `workspaceId` to point to the default workspace. Give untitled docs a title based on their `createdAt` date.
-- [ ] Write tests in `apps/server/src/__tests__/workspace.test.ts`: seed creates workspace, second call is idempotent, existing docs get assigned.
+- [x] Create `apps/server/src/services/workspace.ts` with `ensureDefaultWorkspace(db)` — idempotent function that creates a default workspace if none exists (checks `isDefault = true`).
+- [x] Call `ensureDefaultWorkspace()` during server startup in `apps/server/src/index.ts`, before route registration. Follow the `seedDefaultBuckets()` pattern.
+- [x] Update `getDefaultDocument()` in `apps/server/src/services/document.ts` to assign the default workspace ID when auto-creating a new document, and set a default title of `"Notes [date]"`.
+- [x] Write a one-time data migration in `ensureDefaultWorkspace`: after seeding the workspace, update any documents with null `workspaceId` to point to the default workspace. Give untitled docs a title based on their `createdAt` date.
+- [x] Write tests in `apps/server/src/__tests__/workspace.test.ts`: seed creates workspace, second call is idempotent, existing docs get assigned.
+
+> **Notes (1.2):** `workspace.ts` exports three functions: `titleFromDate` (shared title format), `getDefaultWorkspaceId` (workspace lookup), and `ensureDefaultWorkspace` (idempotent seeding). The backfill uses 2 bulk UPDATEs (not per-doc loop) and only runs on the `seeded: true` path since new docs always get a workspace assigned. `document.ts` imports `titleFromDate` and `getDefaultWorkspaceId` from workspace.ts to avoid duplication. Added `fileParallelism: false` to server vitest config to prevent test files from racing on the shared Postgres DB. Document test `beforeEach` now truncates `documents, workspaces` since `getDefaultDocument` queries workspaces. All 9 tests pass (5 workspace + 4 document), type-check clean.
 
 **Acceptance Criteria:**
 - Server startup creates a default workspace if none exists.
