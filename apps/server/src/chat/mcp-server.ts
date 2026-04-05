@@ -1,14 +1,11 @@
 /**
  * MCP Server — Exposes One Shot operations (timers, docs) as Claude tools.
  *
- * Runs as a stdio MCP server inside the Docker sandbox. Calls the host's
- * REST API over HTTP via host.docker.internal.
- *
- * Bundled into a single .mjs file by esbuild (scripts/build-mcp-server.mjs).
+ * Registers tools on an McpServer instance and exports it for use by the
+ * Fastify route plugin (routes/mcp.ts), which serves it over Streamable HTTP.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { api, resolveOrError, resolveDocOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
 
@@ -343,8 +340,7 @@ server.tool(
 );
 
 // ---------------------------------------------------------------------------
-// Start
+// Export
 // ---------------------------------------------------------------------------
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+export { server as mcpServer };

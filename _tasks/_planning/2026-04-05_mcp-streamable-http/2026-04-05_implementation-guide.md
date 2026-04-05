@@ -61,15 +61,17 @@ workspace/
 
 ### 1.2 Refactor `mcp-server.ts` to export the server instance
 
-- [ ] Remove the `StdioServerTransport` import and the `server.connect(transport)` call at the bottom of the file
-- [ ] Export the `McpServer` instance (e.g., `export { server as mcpServer }`)
-- [ ] Keep all 14 tool registrations and their `api()` calls unchanged for now
-- [ ] Update the file-level JSDoc to reflect the new architecture
+- [x] Remove the `StdioServerTransport` import and the `server.connect(transport)` call at the bottom of the file
+- [x] Export the `McpServer` instance (e.g., `export { server as mcpServer }`)
+- [x] Keep all 14 tool registrations and their `api()` calls unchanged for now
+- [x] Update the file-level JSDoc to reflect the new architecture
 
 **Acceptance Criteria:**
 - `mcp-server.ts` no longer connects to stdio on import
 - The exported `mcpServer` has all 14 tools registered
 - Importing `mcp-server.ts` does not produce side effects (no transport connection)
+
+**Notes:** No divergences from plan. All 33 MCP tests pass. TypeScript compiles cleanly.
 
 ### 1.3 Register the MCP route in the Fastify server
 
