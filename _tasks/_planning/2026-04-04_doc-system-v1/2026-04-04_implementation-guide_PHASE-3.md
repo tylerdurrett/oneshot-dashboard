@@ -236,32 +236,34 @@ apps/web/src/
 
 ### 4.1 Update ensure-sandbox.mjs
 
-- [ ] Update `MCP_BUNDLE_DEST` constant from `/home/agent/timer-mcp-server.mjs` to `/home/agent/oneshot-mcp-server.mjs`
-- [ ] Update `injectMcpBundle()` to read from `apps/server/dist/oneshot-mcp-server.mjs`
-- [ ] Update `injectMcpConfig()`: change the MCP server name from `oneshot-timers` to `oneshot` and update the args to point to the new bundle path
-- [ ] Update log messages to reflect the new name
-- [ ] Verify the old bundle path (`timer-mcp-server.mjs`) is no longer referenced anywhere
+- [x] Update `MCP_BUNDLE_DEST` constant from `/home/agent/timer-mcp-server.mjs` to `/home/agent/oneshot-mcp-server.mjs`
+- [x] Update `injectMcpBundle()` to read from `apps/server/dist/oneshot-mcp-server.mjs`
+- [x] Update `injectMcpConfig()`: change the MCP server name from `oneshot-timers` to `oneshot` and update the args to point to the new bundle path
+- [x] Update log messages to reflect the new name
+- [x] Verify the old bundle path (`timer-mcp-server.mjs`) is no longer referenced anywhere
+  - **Note:** All ensure-sandbox.mjs updates were completed as part of section 3.1 (MCP server rename). Verified: only references to old names exist in planning docs, not code.
 
 **Acceptance Criteria:**
-- `ensure-sandbox.mjs` injects the renamed bundle
-- `.mcp.json` written to workspace uses the new bundle path and server name
-- No references to old `timer-mcp-server` remain in the injection pipeline
+- `ensure-sandbox.mjs` injects the renamed bundle ✅
+- `.mcp.json` written to workspace uses the new bundle path and server name ✅
+- No references to old `timer-mcp-server` remain in the injection pipeline ✅
 
 ### 4.2 Update soul.md
 
-- [ ] Add a "Docs" section to `apps/server/src/chat/soul.md` documenting the three new tools
-- [ ] Include guidance on when to use each tool:
+- [x] Add a "Docs" section to `apps/server/src/chat/soul.md` documenting the three new tools
+- [x] Include guidance on when to use each tool:
   - `get_current_doc`: "When the user mentions 'this doc', 'my doc', or seems to be referring to what they're currently writing"
   - `list_docs`: "When the user asks what docs they have, or you need to find a doc by topic"
   - `read_doc`: "When you need to read a specific doc's content — by name or ID"
-- [ ] Update the opening description from "personal time management dashboard" to include doc capabilities
-- [ ] Keep the existing timer tool documentation unchanged
-- [ ] Add guidance: "If the user is on the docs page and asks a question that could relate to their doc content, call get_current_doc first to check before asking for clarification."
+- [x] Update the opening description from "personal time management dashboard" to include doc capabilities
+- [x] Keep the existing timer tool documentation unchanged
+- [x] Add guidance: "If the user is on the docs page and asks a question that could relate to their doc content, call get_current_doc first to check before asking for clarification."
+  - **Note:** Tightened the wording per code review to reduce token cost: "When the user seems to reference what they're currently writing, call `get_current_doc` first before asking for clarification." Also added "pinned status" to `list_docs` description to match the actual tool definition. Organized tools under `### Timers` and `### Docs` subheadings for clarity.
 
 **Acceptance Criteria:**
-- Soul file documents all three doc tools with clear usage guidance
-- Timer tool documentation is unchanged
-- Agent has enough context to use doc tools proactively
+- Soul file documents all three doc tools with clear usage guidance ✅
+- Timer tool documentation is unchanged ✅
+- Agent has enough context to use doc tools proactively ✅
 
 ## Phase 5: Smoke Test
 
