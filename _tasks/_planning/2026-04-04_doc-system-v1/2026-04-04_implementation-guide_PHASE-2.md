@@ -149,14 +149,15 @@ apps/web/src/app/(shell)/docs/
 
 ### 2.3 Generate-title endpoint and PATCH update
 
-- [ ] Add `POST /docs/:id/generate-title` route in `apps/server/src/routes/docs.ts`. Register it before `/docs/:id` (static before parameterized). Calls `generateDocumentTitle(id, db)`. Returns `{ document }` on success, 404 if doc not found. Catches AI SDK errors and returns 502 with `{ error: 'Title generation failed' }`.
-- [ ] Update `updateDocumentTitle` in `apps/server/src/services/document.ts`: add `isTitleManual: true` to the `.set()` call. This function is only called from the user-facing `PATCH /docs/:id` route, so every user title edit correctly marks the doc as manually titled.
-- [ ] Add the `generateDocumentTitle` import to the route file.
-- [ ] Write route tests in `apps/server/src/__tests__/auto-title.test.ts`:
+- [x] Add `POST /docs/:id/generate-title` route in `apps/server/src/routes/docs.ts`. Register it before `/docs/:id` (static before parameterized). Calls `generateDocumentTitle(id, db)`. Returns `{ document }` on success, 404 if doc not found. Catches AI SDK errors and returns 502 with `{ error: 'Title generation failed' }`.
+- [x] Update `updateDocumentTitle` in `apps/server/src/services/document.ts`: add `isTitleManual: true` to the `.set()` call. *(JSDoc tightened per code review — documents the contract rather than asserting caller assumptions.)*
+- [x] Add the `generateDocumentTitle` import to the route file.
+- [x] Write route tests in `apps/server/src/__tests__/auto-title.test.ts` (4 tests):
   - `POST /docs/:id/generate-title` returns 200 with updated doc (mocked AI).
   - `POST /docs/:id/generate-title` returns 404 for non-existent doc.
   - `PATCH /docs/:id` with `{ title }` sets `isTitleManual = true` on the doc.
   - `POST /docs/:id/generate-title` returns doc unchanged when `isTitleManual = true`.
+- [x] *(Code review)* Hoisted `buildContentBlocks` to file scope to deduplicate across test describe blocks.
 
 **Acceptance Criteria:**
 - `POST /docs/:id/generate-title` generates a title and returns the updated doc.

@@ -11,6 +11,7 @@ import {
   deleteDocument,
   pinDocument,
   unpinDocument,
+  generateDocumentTitle,
 } from '../services/document.js';
 import { getDefaultWorkspaceId } from '../services/workspace.js';
 
@@ -72,6 +73,23 @@ export async function docsRoutes(
     const doc = await getMostRecentDocument(wsId, db);
     return { document: doc };
   });
+
+  // Register /docs/:id/generate-title BEFORE /docs/:id (static segment before parameterized).
+  /** POST /docs/:id/generate-title — auto-generate a title via AI. */
+  server.post<{ Params: { id: string } }>(
+    '/docs/:id/generate-title',
+    async (request, reply) => {
+      try {
+        const result = await generateDocumentTitle(request.params.id, db);
+        if (!result) {
+          return reply.status(404).send({ error: 'Document not found' });
+        }
+        return { document: result };
+      } catch {
+        return reply.status(502).send({ error: 'Title generation failed' });
+      }
+    },
+  );
 
   /** GET /docs/:id — single document by ID. */
   server.get<{ Params: { id: string } }>(

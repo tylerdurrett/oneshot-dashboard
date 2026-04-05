@@ -114,7 +114,8 @@ export async function createDocument(
   return inserted;
 }
 
-/** Update a document's title and bump updatedAt. */
+/** Update a document's title, bump updatedAt, and mark isTitleManual = true.
+ *  Use only for user-initiated title edits — auto-generated titles bypass this function. */
 export async function updateDocumentTitle(
   id: string,
   title: string,
@@ -123,7 +124,7 @@ export async function updateDocumentTitle(
   const now = new Date().toISOString();
   const [updated] = await database
     .update(documents)
-    .set({ title, updatedAt: now })
+    .set({ title, isTitleManual: true, updatedAt: now })
     .where(eq(documents.id, id))
     .returning();
   return updated;
