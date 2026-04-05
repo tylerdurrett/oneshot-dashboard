@@ -19,7 +19,7 @@ import {
 import type { Database } from './services/thread.js';
 import { seedDefaultBuckets } from './services/timer-bucket.js';
 import { TimerScheduler } from './services/timer-scheduler.js';
-import { ensureDefaultWorkspace } from './services/workspace.js';
+import { ensureDefaultWorkspace, backfillManualTitles } from './services/workspace.js';
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -204,6 +204,16 @@ if (!process.env.VITEST) {
     }
   } catch (err) {
     server.log.warn(`Failed to seed default workspace: ${err}`);
+  }
+
+  // Backfill isTitleManual for docs manually titled before the column existed (idempotent)
+  try {
+    const backfilled = await backfillManualTitles();
+    if (backfilled > 0) {
+      server.log.info(`Backfilled ${backfilled} manual doc titles`);
+    }
+  } catch (err) {
+    server.log.warn(`Failed to backfill manual titles: ${err}`);
   }
 
   // Bind to 0.0.0.0 so the server is reachable over Tailscale / LAN

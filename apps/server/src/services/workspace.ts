@@ -1,4 +1,4 @@
-import { and, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql, not } from 'drizzle-orm';
 import { db as defaultDb, workspaces, documents } from '@repo/db';
 import type { Database } from './thread.js';
 
@@ -49,6 +49,31 @@ export async function ensureDefaultWorkspace(
   // Backfill orphaned docs created before workspaces existed
   await backfillOrphanedDocs(inserted.id, database);
   return { workspaceId: inserted.id, seeded: true };
+}
+
+/**
+ * Backfill `isTitleManual = true` for docs that were manually titled before the column existed.
+ * Targets docs where `isTitleManual` is false AND the title doesn't match the default
+ * "Notes YYYY-MM-DD" pattern. Idempotent — returns 0 on subsequent runs.
+ */
+export async function backfillManualTitles(
+  database: Database = defaultDb,
+): Promise<number> {
+  const now = new Date().toISOString();
+  const result = await database
+    .update(documents)
+    .set({ isTitleManual: true, updatedAt: now })
+    .where(
+      and(
+        eq(documents.isTitleManual, false),
+        sql`${documents.title} !~ '^Notes \\d{4}-\\d{2}-\\d{2}$'`,
+        // Exclude untitled docs — they were never manually titled
+        not(eq(documents.title, '')),
+      ),
+    )
+    .returning({ id: documents.id });
+
+  return result.length;
 }
 
 /** Bulk-assign orphaned docs to a workspace and title untitled ones. */

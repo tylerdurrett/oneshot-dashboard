@@ -61,9 +61,9 @@ apps/web/src/app/(shell)/docs/
 
 ### 1.2 Backfill existing manually-titled docs
 
-- [ ] Add `backfillManualTitles(database)` in `apps/server/src/services/workspace.ts` — sets `isTitleManual = true` for docs where `isTitleManual = false` AND title doesn't match the default `Notes YYYY-MM-DD` pattern. Uses a Postgres regex: `title !~ '^Notes \d{4}-\d{2}-\d{2}$'`. Returns the count of updated rows.
-- [ ] Call `backfillManualTitles()` in server startup (`apps/server/src/index.ts`), after `ensureDefaultWorkspace()`. Idempotent — safe to run on every startup. Log when rows are updated.
-- [ ] Add tests in `apps/server/src/__tests__/workspace.test.ts`: docs with custom titles get `isTitleManual = true`, docs with "Notes YYYY-MM-DD" titles stay `false`, second run changes nothing.
+- [x] Add `backfillManualTitles(database)` in `apps/server/src/services/workspace.ts` — sets `isTitleManual = true` for docs where `isTitleManual = false` AND title doesn't match the default `Notes YYYY-MM-DD` pattern. Uses a Postgres regex: `title !~ '^Notes \d{4}-\d{2}-\d{2}$'`. Also excludes empty-title docs (never manually titled). Returns the count of updated rows.
+- [x] Call `backfillManualTitles()` in server startup (`apps/server/src/index.ts`), after `ensureDefaultWorkspace()`. Idempotent — safe to run on every startup. Log when rows are updated.
+- [x] Add tests in `apps/server/src/__tests__/workspace.test.ts`: docs with custom titles get `isTitleManual = true`, docs with "Notes YYYY-MM-DD" titles stay `false`, untitled (empty) docs stay `false`, second run changes nothing.
 
 **Acceptance Criteria:**
 - Existing docs with manually-set titles (non-default pattern) have `isTitleManual = true`.
