@@ -291,8 +291,6 @@ function injectSandboxAssets() {
   } else {
     console.log('  ⚠ Could not inject soul file');
   }
-
-  injectMcpConfig();
 }
 
 /**
@@ -327,7 +325,11 @@ function injectMcpConfig() {
 // ── Main ────────────────────────────────────────────────
 
 async function main() {
-  // Skip entirely if Docker sandbox plugin isn't available
+  // Always write .mcp.json — it's a host file write that doesn't need Docker.
+  // Must be present before the sandbox starts so the chat agent sees MCP tools.
+  injectMcpConfig();
+
+  // Skip Docker-dependent setup if the sandbox plugin isn't available
   if (!isSandboxPluginAvailable()) {
     console.log('');
     console.log('  ⚠ Docker sandbox plugin not found — skipping sandbox check.');
