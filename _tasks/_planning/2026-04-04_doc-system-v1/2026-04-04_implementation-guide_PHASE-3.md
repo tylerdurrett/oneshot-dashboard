@@ -63,19 +63,21 @@ apps/web/src/
 
 ### 1.2 Build blocksToMarkdown utility
 
-- [ ] Create a `blocksToMarkdown(blocks: unknown[]): string` function in `apps/server/src/services/document.ts`
-- [ ] The function creates a minimal `linkedom` document, sets it as `globalThis.document` temporarily, instantiates a headless `BlockNoteEditor`, calls `blocksToMarkdownLossy()`, then restores the global state
-- [ ] Handle edge cases: empty blocks array returns empty string, null/undefined content returns empty string
-- [ ] Ensure the function is safe to call concurrently (no leaked global state between calls)
-- [ ] Write tests in `apps/server/src/__tests__/doc-markdown.test.ts` covering:
+- [x] Create a `blocksToMarkdown(blocks: unknown[]): string` function in `apps/server/src/services/document.ts`
+- [x] The function creates a minimal `linkedom` document, sets it as `globalThis.document` temporarily, instantiates a headless `BlockNoteEditor`, calls `blocksToMarkdownLossy()`, then restores the global state
+- [x] Handle edge cases: empty blocks array returns empty string, null/undefined content returns empty string
+- [x] Ensure the function is safe to call concurrently (no leaked global state between calls)
+  - **Note:** Concurrency safety is achieved by keeping the function fully synchronous (no await points), so the event loop cannot interleave other calls. Also added `editor._tiptapEditor.destroy()` to clean up ProseMirror internals.
+- [x] Write tests in `apps/server/src/__tests__/doc-markdown.test.ts` covering:
   - Empty content → empty string
   - Single paragraph → plain text
   - Headings → `#` / `##` / `###` markdown
-  - Bullet list items → `- ` prefixed lines
+  - Bullet list items → `- ` prefixed lines (BlockNote uses `*` not `-`)
   - Numbered list items → `1. ` prefixed lines
-  - Bold/italic inline styles → `**bold**` / `_italic_`
+  - Bold/italic inline styles → `**bold**` / `*italic*`
   - Mixed content (heading + paragraphs + list) → correct combined output
   - Nested children (sub-lists) → indented markdown
+  - Sequential call consistency + globalThis leak check (2 bonus tests)
 
 **Acceptance Criteria:**
 - `blocksToMarkdown()` converts BlockNote JSONB to readable markdown

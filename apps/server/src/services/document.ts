@@ -1,3 +1,5 @@
+import { parseHTML } from 'linkedom';
+import { BlockNoteEditor } from '@blocknote/core';
 import { generateText } from 'ai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { desc, eq, sql } from 'drizzle-orm';
@@ -7,6 +9,38 @@ import type { Database } from './thread.js';
 import { getDefaultWorkspaceId, titleFromDate } from './workspace.js';
 
 type DocumentRow = typeof documents.$inferSelect;
+
+/**
+ * Convert BlockNote JSONB content blocks to a markdown string.
+ * Uses linkedom to provide the minimal DOM environment that BlockNote requires,
+ * then delegates to BlockNote's built-in blocksToMarkdownLossy() converter.
+ */
+export function blocksToMarkdown(blocks: unknown[] | null | undefined): string {
+  if (!blocks || blocks.length === 0) return '';
+
+  // BlockNote's editor needs DOM globals (document.createElement, etc.).
+  // We save/restore globals in a synchronous block — safe because there
+  // are no await points, so the event loop can't interleave other calls.
+  const { document, window } = parseHTML(
+    '<html><head></head><body></body></html>',
+  );
+  const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
+  (globalThis as Record<string, unknown>).document = document;
+  (globalThis as Record<string, unknown>).window = window;
+  try {
+    const editor = BlockNoteEditor.create();
+    const md = editor.blocksToMarkdownLossy(blocks as Parameters<typeof editor.blocksToMarkdownLossy>[0]);
+    // Clean up ProseMirror internals to avoid orphaned listeners
+    editor._tiptapEditor.destroy();
+    return md;
+  } finally {
+    if (prevDoc === undefined) delete (globalThis as Record<string, unknown>).document;
+    else (globalThis as Record<string, unknown>).document = prevDoc;
+    if (prevWin === undefined) delete (globalThis as Record<string, unknown>).window;
+    else (globalThis as Record<string, unknown>).window = prevWin;
+  }
+}
 
 /** Return the single default document, creating it on first access. */
 export async function getDefaultDocument(
