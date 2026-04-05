@@ -326,7 +326,7 @@ describe('Bucket CRUD routes', () => {
     it('returns 404 for nonexistent bucket', async () => {
       const response = await server.inject({
         method: 'PATCH',
-        url: '/timers/buckets/nonexistent',
+        url: '/timers/buckets/00000000-0000-0000-0000-000000000000',
         payload: { name: 'Nope' },
       });
 
@@ -377,7 +377,7 @@ describe('Bucket CRUD routes', () => {
     it('returns 404 for nonexistent bucket', async () => {
       const response = await server.inject({
         method: 'DELETE',
-        url: '/timers/buckets/nonexistent',
+        url: '/timers/buckets/00000000-0000-0000-0000-000000000000',
       });
 
       expect(response.statusCode).toBe(404);
@@ -406,7 +406,7 @@ describe('Bucket CRUD routes', () => {
 
       await schedulerServer.inject({
         method: 'DELETE',
-        url: '/timers/buckets/nonexistent',
+        url: '/timers/buckets/00000000-0000-0000-0000-000000000000',
       });
 
       expect(mockScheduler.cancelGoalJob).not.toHaveBeenCalled();
@@ -521,7 +521,7 @@ describe('Timer control routes', () => {
     it('returns 404 for nonexistent bucket', async () => {
       const res = await server.inject({
         method: 'POST',
-        url: '/timers/buckets/nonexistent/start',
+        url: '/timers/buckets/00000000-0000-0000-0000-000000000000/start',
       });
 
       expect(res.statusCode).toBe(404);
@@ -778,7 +778,7 @@ describe('Timer control routes', () => {
     it('returns 404 for nonexistent bucket', async () => {
       const res = await server.inject({
         method: 'POST',
-        url: '/timers/buckets/nonexistent/set-time',
+        url: '/timers/buckets/00000000-0000-0000-0000-000000000000/set-time',
         payload: { elapsedSeconds: 100 },
       });
 

@@ -176,7 +176,7 @@ describe('bucket CRUD', () => {
     });
 
     it('returns undefined for nonexistent ID', async () => {
-      const found = await getBucket('nonexistent-id', testDb);
+      const found = await getBucket('00000000-0000-0000-0000-000000000000', testDb);
       expect(found).toBeUndefined();
     });
   });
@@ -254,12 +254,12 @@ describe('bucket CRUD', () => {
 
       // Small delay to ensure timestamp differs
       const updated = await updateBucket(created.id, { name: 'Updated' }, testDb);
-      // ISO string comparison — later timestamps sort after earlier ones
-      expect(updated!.updatedAt >= created.updatedAt).toBe(true);
+      // Compare as Date objects — JS toISOString() and Postgres timestamp formats differ
+      expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThanOrEqual(new Date(created.updatedAt).getTime());
     });
 
     it('returns undefined for nonexistent ID', async () => {
-      const result = await updateBucket('nonexistent-id', { name: 'X' }, testDb);
+      const result = await updateBucket('00000000-0000-0000-0000-000000000000', { name: 'X' }, testDb);
       expect(result).toBeUndefined();
     });
 
@@ -297,7 +297,7 @@ describe('bucket CRUD', () => {
     });
 
     it('returns false for nonexistent ID', async () => {
-      const result = await deleteBucket('nonexistent-id', testDb);
+      const result = await deleteBucket('00000000-0000-0000-0000-000000000000', testDb);
       expect(result).toBe(false);
     });
 

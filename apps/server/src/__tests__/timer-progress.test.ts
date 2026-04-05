@@ -511,7 +511,7 @@ describe('setElapsedTime', () => {
   it('throws for nonexistent bucket', async () => {
     const now = new Date(2026, 2, 24, 10, 0, 0);
     await expect(
-      setElapsedTime('nonexistent-id', 1000, testDb, now),
+      setElapsedTime('00000000-0000-0000-0000-000000000000', 1000, testDb, now),
     ).rejects.toThrow('Bucket not found');
   });
 });
@@ -798,7 +798,7 @@ describe('setDailyGoal', () => {
   it('throws for nonexistent bucket', async () => {
     const now = new Date(2026, 2, 24, 10, 0, 0);
     await expect(
-      setDailyGoal('nonexistent-id', 30, testDb, now),
+      setDailyGoal('00000000-0000-0000-0000-000000000000', 30, testDb, now),
     ).rejects.toThrow('Bucket not found');
   });
 

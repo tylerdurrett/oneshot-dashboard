@@ -1,9 +1,29 @@
+import { setTimeout as realDelay } from 'node:timers/promises';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { timerDailyProgress } from '@repo/db';
 import type { Database } from '../services/thread.js';
 import { startTimer } from '../services/timer-progress.js';
 import { TimerScheduler } from '../services/timer-scheduler.js';
 import { createTimerTestDb, seedBucket } from './timer-test-helpers.js';
+
+// Fake only the timer/Date APIs the scheduler uses. Leave setImmediate real
+// so the postgres driver can process socket I/O responses.
+const FAKE_OPTS = {
+  toFake: ['setTimeout', 'clearTimeout', 'Date'] as const,
+};
+
+/**
+ * After advancing fake timers, give async setTimeout callbacks (which make
+ * DB calls via real I/O) time to settle. Uses the real timer from node:timers
+ * which is unaffected by vi.useFakeTimers.
+ */
+const flush = () => realDelay(100);
+
+/** Advance fake timers by `ms` then flush async I/O from callbacks. */
+async function advance(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms);
+  await flush();
+}
 
 // ---------------------------------------------------------------------------
 // init() — startup recovery
@@ -16,8 +36,8 @@ describe('TimerScheduler — init()', () => {
   let scheduler: TimerScheduler;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
     testDb = await createTimerTestDb();
+    vi.useFakeTimers(FAKE_OPTS);
     goalReachedBuckets = [];
     resetCount = 0;
     scheduler = new TimerScheduler({
@@ -28,7 +48,7 @@ describe('TimerScheduler — init()', () => {
   });
 
   afterEach(() => {
-    scheduler.destroy();
+    scheduler?.destroy();
     vi.useRealTimers();
   });
 
@@ -78,7 +98,7 @@ describe('TimerScheduler — init()', () => {
     expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance time by 5 minutes (300s) — goal should be reached
-    await vi.advanceTimersByTimeAsync(300_000);
+    await advance(300_000);
 
     expect(goalReachedBuckets).toHaveLength(1);
     expect(goalReachedBuckets[0]).toBe(bucket.id);
@@ -165,8 +185,8 @@ describe('TimerScheduler — scheduleGoalReached', () => {
   let scheduler: TimerScheduler;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
     testDb = await createTimerTestDb();
+    vi.useFakeTimers(FAKE_OPTS);
     goalReachedBuckets = [];
     scheduler = new TimerScheduler({
       database: testDb,
@@ -176,7 +196,7 @@ describe('TimerScheduler — scheduleGoalReached', () => {
   });
 
   afterEach(() => {
-    scheduler.destroy();
+    scheduler?.destroy();
     vi.useRealTimers();
   });
 
@@ -196,11 +216,11 @@ describe('TimerScheduler — scheduleGoalReached', () => {
     expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance 4 minutes — still not fired
-    await vi.advanceTimersByTimeAsync(240_000);
+    await advance(240_000);
     expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance 1 more minute — should fire
-    await vi.advanceTimersByTimeAsync(60_000);
+    await advance(60_000);
     expect(goalReachedBuckets).toHaveLength(1);
     expect(goalReachedBuckets[0]).toBe(bucket.id);
 
@@ -223,11 +243,11 @@ describe('TimerScheduler — scheduleGoalReached', () => {
     scheduler.scheduleGoalReached(bucket.id, now.getTime() + 600_000, now);
 
     // Advance past the first scheduled time — should NOT fire
-    await vi.advanceTimersByTimeAsync(300_000);
+    await advance(300_000);
     expect(goalReachedBuckets).toHaveLength(0);
 
     // Advance to the new scheduled time — should fire
-    await vi.advanceTimersByTimeAsync(300_000);
+    await advance(300_000);
     expect(goalReachedBuckets).toHaveLength(1);
   });
 
@@ -241,7 +261,7 @@ describe('TimerScheduler — scheduleGoalReached', () => {
     scheduler.scheduleGoalReached(bucket.id, now.getTime() - 1000, now);
 
     // Should fire on next tick (setTimeout(fn, 0))
-    await vi.advanceTimersByTimeAsync(0);
+    await advance(0);
     expect(goalReachedBuckets).toHaveLength(1);
   });
 });
@@ -252,8 +272,8 @@ describe('TimerScheduler — cancelGoalJob', () => {
   let scheduler: TimerScheduler;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
     testDb = await createTimerTestDb();
+    vi.useFakeTimers(FAKE_OPTS);
     goalReachedBuckets = [];
     scheduler = new TimerScheduler({
       database: testDb,
@@ -263,7 +283,7 @@ describe('TimerScheduler — cancelGoalJob', () => {
   });
 
   afterEach(() => {
-    scheduler.destroy();
+    scheduler?.destroy();
     vi.useRealTimers();
   });
 
@@ -277,7 +297,7 @@ describe('TimerScheduler — cancelGoalJob', () => {
     scheduler.cancelGoalJob(bucket.id);
 
     // Advance past the scheduled time — callback should not fire
-    await vi.advanceTimersByTimeAsync(600_000);
+    await advance(600_000);
     expect(goalReachedBuckets).toHaveLength(0);
   });
 
@@ -297,8 +317,8 @@ describe('TimerScheduler — scheduleNextReset', () => {
   let scheduler: TimerScheduler;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
     testDb = await createTimerTestDb();
+    vi.useFakeTimers(FAKE_OPTS);
     resetCount = 0;
     scheduler = new TimerScheduler({
       database: testDb,
@@ -308,7 +328,7 @@ describe('TimerScheduler — scheduleNextReset', () => {
   });
 
   afterEach(() => {
-    scheduler.destroy();
+    scheduler?.destroy();
     vi.useRealTimers();
   });
 
@@ -322,11 +342,11 @@ describe('TimerScheduler — scheduleNextReset', () => {
     expect(resetCount).toBe(0);
 
     // Advance 4 hours — not yet
-    await vi.advanceTimersByTimeAsync(4 * 60 * 60 * 1000);
+    await advance(4 * 60 * 60 * 1000);
     expect(resetCount).toBe(0);
 
     // Advance 1 more hour — should fire
-    await vi.advanceTimersByTimeAsync(1 * 60 * 60 * 1000);
+    await advance(1 * 60 * 60 * 1000);
     expect(resetCount).toBe(1);
   });
 
@@ -337,10 +357,10 @@ describe('TimerScheduler — scheduleNextReset', () => {
     scheduler.scheduleNextReset(now);
 
     // Should fire in 17 hours (10 AM → 3 AM next day = 17 hours)
-    await vi.advanceTimersByTimeAsync(16 * 60 * 60 * 1000);
+    await advance(16 * 60 * 60 * 1000);
     expect(resetCount).toBe(0);
 
-    await vi.advanceTimersByTimeAsync(1 * 60 * 60 * 1000);
+    await advance(1 * 60 * 60 * 1000);
     expect(resetCount).toBe(1);
   });
 
@@ -355,7 +375,7 @@ describe('TimerScheduler — scheduleNextReset', () => {
     scheduler.scheduleNextReset(startTime);
 
     // Advance to 3 AM — the reset fires
-    await vi.advanceTimersByTimeAsync(5 * 60 * 60 * 1000);
+    await advance(5 * 60 * 60 * 1000);
     expect(resetCount).toBe(1);
 
     // Timer should be stopped with elapsed accumulated
@@ -370,11 +390,11 @@ describe('TimerScheduler — scheduleNextReset', () => {
     scheduler.scheduleNextReset(now);
 
     // Advance to first 3AM (5 hours)
-    await vi.advanceTimersByTimeAsync(5 * 60 * 60 * 1000);
+    await advance(5 * 60 * 60 * 1000);
     expect(resetCount).toBe(1);
 
     // Advance 24 more hours to the next 3AM
-    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+    await advance(24 * 60 * 60 * 1000);
     expect(resetCount).toBe(2);
   });
 });
@@ -390,8 +410,8 @@ describe('TimerScheduler — destroy', () => {
   let scheduler: TimerScheduler;
 
   beforeEach(async () => {
-    vi.useFakeTimers();
     testDb = await createTimerTestDb();
+    vi.useFakeTimers(FAKE_OPTS);
     goalReachedBuckets = [];
     resetCount = 0;
     scheduler = new TimerScheduler({
@@ -419,7 +439,7 @@ describe('TimerScheduler — destroy', () => {
     scheduler.destroy();
 
     // Advance well past both scheduled times
-    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+    await advance(24 * 60 * 60 * 1000);
 
     // Neither callback should have fired
     expect(goalReachedBuckets).toHaveLength(0);

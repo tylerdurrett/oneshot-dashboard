@@ -133,8 +133,8 @@ describe('thread service', () => {
       await addMessage(thread.id, 'user', 'New message', testDb);
 
       const updated = await getThread(thread.id, testDb);
-      // ISO string comparison — later timestamps sort after earlier ones
-      expect(updated!.updatedAt > originalUpdatedAt).toBe(true);
+      // Compare as Date objects — JS toISOString() and Postgres timestamp formats differ
+      expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(new Date(originalUpdatedAt).getTime());
     });
   });
 
@@ -157,7 +157,7 @@ describe('thread service', () => {
       await updateThreadSessionId(thread.id, 'session-xyz', testDb);
 
       const updated = await getThread(thread.id, testDb);
-      expect(updated!.updatedAt > original).toBe(true);
+      expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(new Date(original).getTime());
     });
   });
 
@@ -210,7 +210,7 @@ describe('thread service', () => {
       await updateThreadTitle(thread.id, 'Updated title', testDb);
 
       const updated = await getThread(thread.id, testDb);
-      expect(updated!.updatedAt > original).toBe(true);
+      expect(new Date(updated!.updatedAt).getTime()).toBeGreaterThan(new Date(original).getTime());
     });
   });
 });
