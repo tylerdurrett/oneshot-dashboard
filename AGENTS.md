@@ -58,6 +58,7 @@ After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts th
 - To type-check without a full build, use `pnpm --filter @repo/web tsc --noEmit`.
 - When doing UI work, visually test your code using the chrome devtools skill
 - Do as much as possible to verify your work yourself without asking the user
+- **Mocked tests are not enough.** After building a feature, restart the server and smoke-test the real endpoint (curl, browser). Mocks hide integration bugs — prove it works end-to-end.
 - Use best-practice software architecture patterns
 - Create minimal code, and be pragmatic with your choices. We do not want to overengineer. Our focus is on creating exactly the functionality we need, nothing more
 - Security is always important: always flag security issues

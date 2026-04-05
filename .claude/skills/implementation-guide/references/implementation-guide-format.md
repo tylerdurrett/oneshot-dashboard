@@ -52,6 +52,23 @@ contains numbered sub-sections.
 - If database migrations are needed, batch related schema changes and
   place them in early phases.
 
+## Smoke Test Section
+
+Every implementation guide must end its final phase with a **Smoke Test**
+sub-section. This is a manual, end-to-end verification against the
+running server — not mocked unit tests.
+
+    ### N.X Smoke test
+
+    - [ ] Restart the server
+    - [ ] Exercise the feature through its real interface (curl, browser, etc.)
+    - [ ] Confirm the expected result — not just "no errors" but the actual output
+
+Mocked tests prove code logic; the smoke test proves the feature
+actually works when everything is wired together. This catches
+integration bugs (wrong env var names, module evaluation order,
+missing config) that mocks hide by design.
+
 ## End Sections
 
 ### Dependency Graph
@@ -88,3 +105,4 @@ Table summarizing important architectural choices and their rationale.
 - Rationale is included for phase sequencing decisions
 - Tasks are one story point or smaller
 - Dependency graph reflects actual sequencing constraints
+- Final phase includes a smoke test against the running server

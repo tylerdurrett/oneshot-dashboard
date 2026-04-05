@@ -21,7 +21,7 @@ vi.mock('ai', () => ({
 }));
 
 vi.mock('@ai-sdk/google', () => ({
-  google: vi.fn(() => 'mocked-model'),
+  createGoogleGenerativeAI: vi.fn(() => vi.fn(() => 'mocked-model')),
 }));
 
 // Mock config so we can toggle the API key per test

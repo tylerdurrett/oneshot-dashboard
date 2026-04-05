@@ -80,8 +80,12 @@ export const config = {
 
   // -- AI --
 
-  /** Google Gemini API key for auto-title generation. Empty string = disabled. */
-  googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? '',
+  /** Google Gemini API key for auto-title generation. Empty string = disabled.
+   *  Read lazily via getter — dotenv loads .env.local AFTER ESM imports evaluate,
+   *  so a plain property would always read undefined from process.env. */
+  get googleGeminiApiKey(): string {
+    return process.env.GOOGLE_GEMINI_API_KEY ?? '';
+  },
 };
 
 /** Check whether an origin is allowed for CORS (any host on the web app port). */

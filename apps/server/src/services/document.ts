@@ -1,5 +1,5 @@
 import { generateText } from 'ai';
-import { google } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db as defaultDb, documents } from '@repo/db';
 import { config } from '../config.js';
@@ -274,7 +274,9 @@ export async function generateDocumentTitle(
 
   try {
     const { text: generatedTitle } = await generateText({
-      model: google('gemini-2.5-flash'),
+      // Pass API key explicitly — the SDK default env var name
+      // (GOOGLE_GENERATIVE_AI_API_KEY) differs from our config convention.
+      model: createGoogleGenerativeAI({ apiKey: config.googleGeminiApiKey })('gemini-2.5-flash'),
       prompt: `Generate a short, descriptive title for this document (max 60 characters).
 Rules: no quotes, no generic titles like "Untitled" or "My Document",
 no explanation — just the title on a single line.
