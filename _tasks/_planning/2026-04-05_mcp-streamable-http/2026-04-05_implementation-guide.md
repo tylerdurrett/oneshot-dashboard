@@ -223,17 +223,19 @@ workspace/
 
 ### 3.6 Smoke test
 
-- [ ] Restart the server (`pnpm service:uninstall && pnpm stop && pnpm service:install`)
-- [ ] Send an MCP `initialize` request to `http://localhost:4902/mcp` via curl and confirm it returns server info
-- [ ] Send a `tools/list` request and confirm all 14 tools are listed
-- [ ] Send a `tools/call` request for `get_timer_status` and confirm it returns timer data (or a reasonable empty state)
-- [ ] Verify `pnpm prego` completes without errors
+- [x] Restart the server (`pnpm service:uninstall && pnpm stop && pnpm service:install`)
+- [x] Send an MCP `initialize` request to `http://localhost:4902/mcp` via curl and confirm it returns server info
+- [x] Send a `tools/list` request and confirm all 14 tools are listed
+- [x] Send a `tools/call` request for `get_timer_status` and confirm it returns timer data (or a reasonable empty state)
+- [x] Verify `pnpm prego` completes without errors
 - [ ] If Docker sandbox is available: start a chat session and verify the agent can use MCP tools
 
 **Acceptance Criteria:**
 - MCP endpoint responds to all three request types
 - Timer and doc tools return real data from the database
 - No references to the old stdio pipeline remain anywhere in the codebase
+
+**Notes:** All smoke tests pass. MCP initialize returns `serverInfo.name === "oneshot"` with `capabilities.tools`. `tools/list` returns all 14 tools by name. `tools/call` for `get_timer_status` returns real timer data from the database (7 buckets with actual user data). `pnpm prego` completes without errors (no reference to deleted `build:mcp` script). Fixed stale references in `docs/project-structure.md`: removed `build-mcp-server.mjs` from the scripts tree, updated `mcp-server.ts` description from "bundled into a single file that runs inside the Docker sandbox" to "served over Streamable HTTP from the Fastify server at `/mcp`", and removed "HTTP client" from `mcp-helpers.ts` description. Grep confirmed no stale references to the old stdio pipeline remain in active code or docs (only in historical `_tasks/_planning/` files). Docker sandbox test skipped — sandbox is not available on this machine (`docker sandbox start` not supported). Manual test steps: start sandbox, open chat, ask the agent to check timer status or list docs, verify it uses MCP tools successfully.
 
 ---
 

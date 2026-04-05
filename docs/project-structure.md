@@ -24,7 +24,6 @@ your-project/
 │   ├── new-video.mjs         ← Scaffold new Remotion compositions
 │   ├── get-port.mjs          ← Read dev server port from config
 │   ├── get-studio-port.mjs   ← Read Remotion Studio port from config
-│   ├── build-mcp-server.mjs   ← Bundle chat agent's MCP tools for the sandbox
 │   ├── stop-dev-processes.mjs ← Stop local dev + studio processes (pnpm stop)
 │   ├── service-dispatch.sh   ← Routes service commands to macOS (launchd) or Linux (systemd)
 │   ├── install-launchd.sh    ← macOS persistent service (called via service-dispatch)
@@ -44,8 +43,8 @@ your-project/
 This is where the chat agent's knowledge and tools live. The agent runs inside a Docker sandbox — see [Sandbox](sandbox.md) for how that works.
 
 - **`soul.md`** — The agent's identity and instructions. It knows about the timer system and how to help you manage your time. Edit this file to change how the agent behaves or what it knows. Gets injected as the agent's CLAUDE.md at sandbox startup.
-- **`mcp-server.ts`** — Gives the agent the ability to read and control your timers, read your docs, and more. Gets bundled into a single file that runs inside the Docker sandbox.
-- **`mcp-helpers.ts`** — Shared utilities for the MCP tools (HTTP client, name resolution, result formatters).
+- **`mcp-server.ts`** — Gives the agent the ability to read and control your timers, read your docs, and more. Served over Streamable HTTP from the Fastify server at `/mcp`.
+- **`mcp-helpers.ts`** — Shared utilities for the MCP tools (name resolution, result formatters).
 
 ### `apps/web/` — Your App
 
