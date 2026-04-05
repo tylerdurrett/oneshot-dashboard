@@ -50,6 +50,10 @@ The app runs via `pnpm service:install` (persistent service — launchd on macOS
 
 After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts the server. If the server is crashing after a migration, verify it applied: `psql postgresql://oneshot:oneshot@localhost:5432/oneshot -c "\d TABLE_NAME"`.
 
+## Testing
+
+Run tests per-package: `pnpm --filter @repo/server test`. Postgres must be running. Server tests hit a real `oneshot_test` DB — no mocks. If mixing `vi.useFakeTimers()` with DB calls, only fake `['setTimeout', 'clearTimeout', 'Date']` and set up the DB connection **before** installing fakes. See `docs/testing.md`.
+
 ## Remember
 
 - Never edit files ending in .human.md. Those were created by a person and should stay that way.
