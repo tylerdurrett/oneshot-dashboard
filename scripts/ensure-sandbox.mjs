@@ -93,16 +93,58 @@ function getSandboxState() {
   }
 }
 
+/**
+ * Resume a stopped sandbox.
+ * There is no `docker sandbox start` command — `docker sandbox run <name>`
+ * resumes an existing sandbox the same way it creates a new one.
+ * Uses async spawn + polling (same as createSandbox) because the command
+ * blocks until the agent exits.
+ */
 function startSandbox() {
   console.log(`  Starting sandbox "${SANDBOX_NAME}"...`);
-  try {
-    run(`docker sandbox start ${SANDBOX_NAME}`, { timeout: 30_000 });
-    console.log('  ✓ Sandbox started');
-    return true;
-  } catch (err) {
-    console.log(`  ✗ Failed to start sandbox: ${err.message}`);
-    return false;
-  }
+  return new Promise((resolve) => {
+    const child = spawn('docker', ['sandbox', 'run', SANDBOX_NAME], {
+      stdio: 'pipe',
+      detached: true,
+    });
+
+    let settled = false;
+    const finish = (success) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(poller);
+      clearTimeout(deadline);
+      child.unref();
+      resolve(success);
+    };
+
+    child.on('error', () => finish(false));
+    child.on('exit', (code) => {
+      if (code === 0 || code === null) {
+        console.log('  ✓ Sandbox started');
+        finish(true);
+      } else {
+        const stderr = child.stderr?.read()?.toString() ?? '';
+        console.log(`  ✗ Failed to start sandbox: ${stderr.slice(0, 200)}`);
+        finish(false);
+      }
+    });
+
+    const poller = setInterval(() => {
+      try {
+        execFileSync('docker', ['sandbox', 'exec', SANDBOX_NAME, 'echo', 'ready'], { stdio: 'pipe', timeout: 5_000 });
+        console.log('  ✓ Sandbox started');
+        finish(true);
+      } catch {
+        // Not ready yet
+      }
+    }, 3_000);
+
+    const deadline = setTimeout(() => {
+      console.log('  ✗ Sandbox start timed out');
+      finish(false);
+    }, 30_000);
+  });
 }
 
 /**
@@ -365,7 +407,7 @@ async function main() {
   fs.mkdirSync(SANDBOX_WORKSPACE, { recursive: true });
 
   if (state.exists && state.status === 'stopped') {
-    if (!startSandbox()) {
+    if (!(await startSandbox())) {
       console.log('  ⚠ Could not start sandbox. Chat features will be unavailable.');
       console.log('');
       return;
