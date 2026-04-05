@@ -143,7 +143,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 ### Phase 1: Multi-Doc
 - Create `workspaces` table (minimal), seed default workspace on first run.
-- Add `title`, `workspaceId`, `folderId` (nullable, unused until Phase 5), `pinnedAt`, `pipelineEnabled`, `processedAt` to `documents`.
+- Add `title`, `workspaceId`, `folderId` (nullable, unused until Phase 6), `pinnedAt`, `pipelineEnabled`, `processedAt` to `documents`.
 - Migrate existing default doc: give it a title ("Notes [date]"), assign to default workspace.
 - Build doc CRUD APIs (create, list, read, update title, update content, delete, pin/unpin).
 - Build doc list as inner left nav (desktop) — pinned section + recent section, sorted by `pinnedAt` / `updatedAt` desc.
@@ -167,7 +167,36 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Create a new doc, type a few paragraphs, stop typing. Title should update from "Notes [date]" to something content-derived within ~15 seconds. Manually rename it — auto-title should stop. Create another doc, write a paragraph, get a title, then write significantly more — title should update again.
 
-### Phase 3: Taxonomy/Terms + On-Idle Processing
+### Phase 3: Doc-Aware Chat Agent (Read Tools)
+
+Give the existing chat agent the ability to see and read docs. The chat agent already runs as Claude Code in a Docker sandbox with MCP tools for timers. This phase adds doc-related MCP tools using the same pattern — thin MCP tool wrappers that call back to the host API.
+
+**MCP Tools:**
+- `get_current_doc` — returns the doc the user is currently viewing (ID, title, full content as markdown). Requires the frontend to report the active doc ID to the server on every doc switch.
+- `list_docs` — returns all docs (ID, title, content snippet, updatedAt). Lets the agent discover what's available.
+- `read_doc` — reads a specific doc by ID or title (fuzzy match, same pattern as timer bucket name resolution). Returns full content as markdown.
+
+**Markdown as interchange format:** The agent reads doc content as markdown, not raw BlockNote JSON. BlockNote has built-in markdown conversion. This is natural for an LLM and keeps the tool interface clean.
+
+**Active doc tracking:** The frontend reports the currently viewed doc ID to the server via a lightweight API call whenever the user navigates to a different doc. The server holds this in memory (single-user app, no DB needed). The `get_current_doc` MCP tool queries this.
+
+**MCP server consolidation:** Rather than a separate MCP server for docs, extend the existing timer MCP server into a general-purpose `oneshot-mcp-server`. Both timer and doc tools are thin wrappers around host API calls — no reason for separate processes. Rename the bundle and update the sandbox injection accordingly.
+
+**Implementation:**
+- Add server-side doc read endpoints (`GET /docs/active`, `GET /docs`, `GET /docs/:id`) if not already present.
+- Add `PUT /docs/active` endpoint for frontend to report the currently viewed doc.
+- Add `get_current_doc`, `list_docs`, `read_doc` tools to the MCP server.
+- Add markdown conversion on the server (BlockNote JSON → markdown) for tool responses.
+- Rename the MCP server bundle from `timer-mcp-server` to `oneshot-mcp-server`.
+- Update `ensure-sandbox.mjs` to inject the renamed bundle and updated `.mcp.json`.
+- Update `soul.md` with doc tool documentation so the agent knows how and when to use them.
+- Frontend reports active doc ID on doc navigation (docs page mount + doc switch).
+
+**Testable:** Open a doc, ask the chat agent "what doc am I looking at?" — it should name the current doc. Ask "summarize this doc" — it should read and summarize the content. Ask "what other docs do I have?" — it should list them. Ask "read my doc called [title]" — it should find it by fuzzy title match and return the content.
+
+**Future (Phase 3b, not scoped yet):** Write tools (`write_doc`, `create_doc`) with an inline diff review + accept/reject flow. The agent proposes changes, the doc editor enters a review mode showing the diff directly in the editor, and the user accepts or rejects from the doc itself. The MCP tool long-polls until the user decides, so the agent naturally awaits the answer and can react to acceptance or rejection. Design details deferred until read tools are proven out.
+
+### Phase 4: Taxonomy/Terms + On-Idle Processing
 - Create `taxonomies`, `terms`, `fragments`, `document_block_states`, `document_terms`, `fragment_terms` tables.
 - Seed initial taxonomies (Topic, Mood, Type) in the default workspace.
 - Build the on-idle processing trigger (frontend idle detection + server endpoint).
@@ -178,7 +207,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Write in a doc, go idle, check the database. Fragments and terms should appear for the new/changed blocks. Edit one block, go idle again — only that block's fragments should change. Everything else stays stable.
 
-### Phase 4: Tag Filtering + Search
+### Phase 5: Tag Filtering + Search
 - Build UI to display assigned terms on docs (tag chips, sidebar, etc.).
 - Build doc list filtering by terms — click a topic to see matching docs.
 - Build text search across docs.
@@ -186,7 +215,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 
 **Testable:** Filter docs by "career" topic, see the right docs. Search for a phrase, find the doc containing it.
 
-### Phase 5: Folders
+### Phase 6: Folders
 - Create `folders` table. Add `folderId` to documents.
 - Build folder CRUD APIs.
 - Build folder tree UI in doc library — create, rename, reparent, drag-and-drop.
@@ -206,11 +235,13 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 9. **Auto-title via small LLM, not the taxonomy agent.** Title generation is a lightweight, fast operation — Gemini Flash 2.5 via Vercel AI SDK. Separate from the heavier on-idle taxonomy processing. Debounce-triggered (10–15s pause), not idle-triggered (30–60 min).
 10. **Re-title on significant content change, not every edit.** Track which blocks existed when the title was generated. Only re-title when >50% of blocks changed or doc doubled in size. Avoids unnecessary API calls and title churn.
 11. **Vercel AI SDK as abstraction layer.** Model-agnostic interface so the title generation model can be swapped without changing application code.
+12. **Doc tools via MCP, same as timers.** The chat agent gains doc awareness through MCP tools that call the host API — same architecture as the timer tools. Markdown is the interchange format (not raw BlockNote JSON). One consolidated MCP server for all tools rather than separate servers per feature.
+13. **Read tools first, write tools later.** Read access (get current doc, list, read by title) ships before write access. Write tools require an inline diff review UX with accept/reject — more complex, deferred until read tools prove out the pattern.
 
 ## Risks and Considerations
 
 - **Extraction quality** — bad tags erode trust. Start simple (just topic assignment), iterate on the prompt. Store raw agent responses for debugging.
-- **Block ID stability** — the system depends on BlockNote block IDs being stable across saves. If BlockNote regenerates IDs (e.g., on paste or certain operations), the hash comparison breaks and triggers unnecessary reprocessing. Affects both auto-title (Phase 2) and taxonomy processing (Phase 3). Needs validation during Phase 2.
+- **Block ID stability** — the system depends on BlockNote block IDs being stable across saves. If BlockNote regenerates IDs (e.g., on paste or certain operations), the hash comparison breaks and triggers unnecessary reprocessing. Affects both auto-title (Phase 2) and taxonomy processing (Phase 4). Needs validation during Phase 2.
 - **Auto-title quality** — a bad auto-title is worse than the default "Notes [date]". The prompt needs to produce concise, useful titles without being generic. Start simple and iterate on the prompt based on real usage.
 - **Auto-title cost** — Gemini Flash is cheap, but the debounce trigger fires more frequently than idle. Monitor usage. The content threshold and re-title guards keep it bounded.
 - **Agent cost at scale** — a Claude Code agent invocation is heavier than a Haiku API call. At personal journal volume this is fine, but worth monitoring if usage patterns change.
@@ -222,7 +253,7 @@ The chat agent already exists. In this phase, it gains read access to doc conten
 - Full snapshot/changeset pipeline — block hashing handles incremental tagging; session-level summarization deferred.
 - Notes-as-atoms / feed UX — significant complexity, deferred until real usage shows it's needed.
 - Knowledge base extraction (goals, beliefs, concerns) — build after basic tagging proves useful.
-- Agent write access to docs — read access only for now.
+- Agent write access to docs — read access in Phase 3, write tools deferred to Phase 3b.
 - Cross-workspace agent tools.
 - Multi-user / shared workspaces.
 - Embedding-based search.
