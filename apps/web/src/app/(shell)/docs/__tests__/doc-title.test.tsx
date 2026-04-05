@@ -71,6 +71,7 @@ describe('DocTitle', () => {
     expect(mockSaveDocument).toHaveBeenCalledTimes(1);
     expect(mockSaveDocument).toHaveBeenCalledWith('doc-456', {
       title: 'Changed',
+      isTitleManual: true,
     });
 
     // Flush the microtask from saveDocument's .then() so the cache invalidation runs

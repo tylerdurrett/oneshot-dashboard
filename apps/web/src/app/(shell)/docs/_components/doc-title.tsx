@@ -49,7 +49,7 @@ export function DocTitle({ docId, title, onSave }: DocTitleProps) {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
-        saveDocument(docIdRef.current, { title: valueRef.current }).then(() => {
+        saveDocument(docIdRef.current, { title: valueRef.current, isTitleManual: true }).then(() => {
           queryClient.invalidateQueries({
             queryKey: docKeys.detail(docIdRef.current),
           });

@@ -4,6 +4,7 @@ import type { Block } from '@blocknote/core';
 import { Button, Spinner } from '@repo/ui';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useDocument, useSaveDocument } from '../_hooks/use-doc-query';
+import { useAutoTitle } from '../_hooks/use-auto-title';
 import { DocEditor } from '../_components/editor';
 import { DocTitle } from '../_components/doc-title';
 import { DocsLayout } from '../_components/docs-layout';
@@ -22,6 +23,7 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
 
   const { data: doc, isLoading, isError, error } = useDocument(docId);
   const saveMutation = useSaveDocument(docId);
+  const { notifyContentChange } = useAutoTitle({ docId, doc, enabled: !!doc });
 
   const handleSave = useCallback(
     (content: Block[]) => {
@@ -32,7 +34,7 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
 
   const handleSaveTitle = useCallback(
     (title: string) => {
-      saveMutation.mutate({ title });
+      saveMutation.mutate({ title, isTitleManual: true });
     },
     [saveMutation.mutate],
   );
@@ -86,6 +88,7 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
             docId={docId}
             initialContent={doc.content as Block[]}
             onSave={handleSave}
+            onContentChange={notifyContentChange}
           />
         </div>
       </DocsLayout>

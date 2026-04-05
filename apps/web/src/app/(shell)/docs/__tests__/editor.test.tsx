@@ -134,4 +134,35 @@ describe('DocEditor', () => {
 
     expect(preventDefaultSpy).not.toHaveBeenCalled();
   });
+
+  it('calls onContentChange on every change event', () => {
+    const onSave = vi.fn();
+    const onContentChange = vi.fn();
+    const { getByTestId } = render(
+      <DocEditor
+        docId="doc-123"
+        initialContent={[]}
+        onSave={onSave}
+        onContentChange={onContentChange}
+      />,
+    );
+
+    act(() => {
+      getByTestId('editor').click();
+    });
+
+    // onContentChange fires immediately (not debounced)
+    expect(onContentChange).toHaveBeenCalledTimes(1);
+    expect(onContentChange).toHaveBeenCalledWith(mockDocument);
+
+    // onSave has not fired yet (still debouncing)
+    expect(onSave).not.toHaveBeenCalled();
+
+    act(() => {
+      getByTestId('editor').click();
+    });
+
+    // Fires again on second change
+    expect(onContentChange).toHaveBeenCalledTimes(2);
+  });
 });

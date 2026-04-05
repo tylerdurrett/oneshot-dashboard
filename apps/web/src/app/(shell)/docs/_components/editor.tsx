@@ -14,11 +14,12 @@ interface DocEditorProps {
   docId: string;
   initialContent: Block[];
   onSave: (content: Block[]) => void;
+  onContentChange?: (blocks: Block[]) => void;
 }
 
 const DEBOUNCE_MS = 1500;
 
-export function DocEditor({ docId, initialContent, onSave }: DocEditorProps) {
+export function DocEditor({ docId, initialContent, onSave, onContentChange }: DocEditorProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Capture docId at mount so the unmount cleanup always targets the correct doc
   const docIdRef = useRef(docId);
@@ -72,7 +73,12 @@ export function DocEditor({ docId, initialContent, onSave }: DocEditorProps) {
     return () => window.removeEventListener('beforeunload', handler);
   }, []);
 
+  const onContentChangeRef = useRef(onContentChange);
+  useEffect(() => { onContentChangeRef.current = onContentChange; }, [onContentChange]);
+
   const handleChange = useCallback(() => {
+    onContentChangeRef.current?.(editor.document);
+
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       onSaveRef.current(editor.document);
