@@ -63,6 +63,7 @@ Run tests per-package: `pnpm --filter @repo/server test`. Postgres must be runni
 - To type-check without a full build, use `pnpm --filter @repo/web tsc --noEmit`.
 - When doing UI work, visually test your code using the chrome devtools skill
 - Always verify for YOURSELF. Do not make assumptions about the codebase or libraries.
+- **If something fails during your work, investigate the failure — don't work around it.** A smoke test you can't run is a bug to fix, not a step to skip.
 - Use best-practice software architecture patterns
 - Create minimal code, and be pragmatic with your choices. We do not want to overengineer. Our focus is on creating exactly the functionality we need, nothing more
 - Security is always important: always flag security issues

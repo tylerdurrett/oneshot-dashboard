@@ -72,8 +72,10 @@ missing config) that mocks hide by design.
 Rules for smoke test checkboxes:
 - A checkbox is only checked after you actually execute the step and
   observe the result. "Covered by automated tests" is not valid.
-- If you cannot run a step (no Docker, no browser, etc.), leave it
-  unchecked and add a note explaining why.
+- If you cannot run a step, investigate why before moving on — the
+  inability to run the smoke test is itself a bug to fix, not a
+  limitation to accept. Leave the checkbox unchecked and document
+  the blocker and what you did to investigate it.
 
 ## End Sections
 

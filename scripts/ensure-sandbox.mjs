@@ -16,6 +16,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ensureHostTokenFresh } from './lib/host-token.mjs';
 import { readHostCredentials } from './lib/read-host-credentials.mjs';
+import { buildStartArgs, buildCreateArgs, parseSandboxList } from './lib/sandbox-commands.mjs';
 import { buildSandboxExecArgs } from './lib/sandbox-exec.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,14 +81,7 @@ function isSandboxPluginAvailable() {
 function getSandboxState() {
   try {
     const output = run('docker sandbox list');
-    for (const line of output.split('\n')) {
-      // Columns: NAME  AGENT  STATUS  WORKSPACE
-      const cols = line.trim().split(/\s{2,}/);
-      if (cols[0] === SANDBOX_NAME) {
-        return { exists: true, status: cols[2]?.toLowerCase() ?? 'unknown' };
-      }
-    }
-    return { exists: false, status: null };
+    return parseSandboxList(output, SANDBOX_NAME);
   } catch {
     return { exists: false, status: null };
   }
@@ -103,7 +97,7 @@ function getSandboxState() {
 function startSandbox() {
   console.log(`  Starting sandbox "${SANDBOX_NAME}"...`);
   return new Promise((resolve) => {
-    const child = spawn('docker', ['sandbox', 'run', SANDBOX_NAME], {
+    const child = spawn('docker', buildStartArgs(SANDBOX_NAME), {
       stdio: 'pipe',
       detached: true,
     });
@@ -159,7 +153,7 @@ function startSandbox() {
 function createSandbox() {
   console.log(`  Creating sandbox "${SANDBOX_NAME}"...`);
   return new Promise((resolve) => {
-    const child = spawn('docker', ['sandbox', 'run', '--name', SANDBOX_NAME, 'claude', SANDBOX_WORKSPACE], {
+    const child = spawn('docker', buildCreateArgs(SANDBOX_NAME, SANDBOX_WORKSPACE), {
       stdio: 'pipe',
       detached: true,
     });
@@ -408,16 +402,21 @@ async function main() {
 
   if (state.exists && state.status === 'stopped') {
     if (!(await startSandbox())) {
-      console.log('  ⚠ Could not start sandbox. Chat features will be unavailable.');
-      console.log('');
-      return;
+      console.error('');
+      console.error(`  ERROR: Sandbox "${SANDBOX_NAME}" exists (stopped) but could not be resumed.`);
+      console.error(`    Try: docker sandbox rm ${SANDBOX_NAME} && pnpm prego`);
+      console.error(`    Or:  docker sandbox ls   (check current state)`);
+      console.error('');
+      process.exit(1);
     }
   } else if (!state.exists) {
     if (!(await createSandbox())) {
-      console.log('');
-      console.log('  ⚠ Could not create sandbox. Run `pnpm sandbox` for interactive setup.');
-      console.log('');
-      return;
+      console.error('');
+      console.error(`  ERROR: Could not create sandbox "${SANDBOX_NAME}".`);
+      console.error('    Check that Docker Desktop is running and the sandbox plugin is installed.');
+      console.error('    Try: docker sandbox ls   (verify plugin works)');
+      console.error('');
+      process.exit(1);
     }
   }
 
@@ -427,11 +426,12 @@ async function main() {
     if (tryCredentialInjection() && checkAuth()) {
       console.log('  ✓ Sandbox authenticated via host credentials');
     } else {
-      console.log('');
-      console.log('  ⚠ Sandbox created but not authenticated.');
-      console.log('  Run `pnpm sandbox` to complete login.');
-      console.log('');
-      return;
+      console.error('');
+      console.error(`  ERROR: Sandbox "${SANDBOX_NAME}" is running but not authenticated.`);
+      console.error('    Credential injection from host failed.');
+      console.error('    Fix: Run `pnpm sandbox` for interactive login.');
+      console.error('');
+      process.exit(1);
     }
   }
 
