@@ -122,3 +122,21 @@ export async function unpinDocument(id: string): Promise<DocumentResponse> {
   const data: { document: DocumentResponse } = await res.json();
   return data.document;
 }
+
+// ---------------------------------------------------------------------------
+// Active doc tracking
+// ---------------------------------------------------------------------------
+
+/** Fire-and-forget — tells the server which doc the user is viewing. */
+export async function reportActiveDoc(
+  docId: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const res = await fetch(`${getServerHttpUrl()}/docs/active`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ docId }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`Failed to report active doc: ${res.status}`);
+}

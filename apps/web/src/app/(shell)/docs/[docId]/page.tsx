@@ -5,6 +5,7 @@ import { Button, Spinner } from '@repo/ui';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useDocument, useSaveDocument } from '../_hooks/use-doc-query';
 import { useAutoTitle } from '../_hooks/use-auto-title';
+import { useActiveDocReporter } from '../_hooks/use-active-doc-reporter';
 import { DocEditor } from '../_components/editor';
 import { DocTitle } from '../_components/doc-title';
 import { DocsLayout } from '../_components/docs-layout';
@@ -24,6 +25,7 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
   const { data: doc, isLoading, isError, error } = useDocument(docId);
   const saveMutation = useSaveDocument(docId);
   const { notifyContentChange } = useAutoTitle({ docId, doc, enabled: !!doc });
+  useActiveDocReporter(docId);
 
   const handleSave = useCallback(
     (content: Block[]) => {

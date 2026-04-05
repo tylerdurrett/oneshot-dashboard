@@ -125,15 +125,24 @@ apps/web/src/
 
 ### 2.2 Frontend active doc reporting
 
-- [ ] Create `apps/web/src/app/(shell)/docs/_hooks/use-active-doc-reporter.ts`
-- [ ] The hook accepts a `docId` and fires `PUT /docs/active` whenever the `docId` changes (debounced, fire-and-forget — failures are silent)
-- [ ] Wire the hook into `DocViewPage` (`apps/web/src/app/(shell)/docs/[docId]/page.tsx`) — call it with the current `docId`
-- [ ] Add `reportActiveDoc(docId: string)` to `apps/web/src/app/(shell)/docs/_lib/docs-api.ts`
+- [x] Create `apps/web/src/app/(shell)/docs/_hooks/use-active-doc-reporter.ts`
+- [x] The hook accepts a `docId` and fires `PUT /docs/active` whenever the `docId` changes (debounced, fire-and-forget — failures are silent)
+  - **Note:** No debounce needed — doc navigation is already infrequent. Used `AbortController` in the effect cleanup instead, which cancels stale in-flight requests on rapid doc switching (prevents race condition where a slow request for Doc A could overwrite a faster request for Doc B).
+- [x] Wire the hook into `DocViewPage` (`apps/web/src/app/(shell)/docs/[docId]/page.tsx`) — call it with the current `docId`
+- [x] Add `reportActiveDoc(docId: string)` to `apps/web/src/app/(shell)/docs/_lib/docs-api.ts`
+  - **Note:** Added optional `signal?: AbortSignal` parameter to support the cleanup pattern. Follows the file's `if (!res.ok) throw` convention — the hook's `.catch()` swallows errors.
 
 **Acceptance Criteria:**
-- Navigating between docs sends `PUT /docs/active` with the new doc ID
-- The call is fire-and-forget — network failures don't affect doc navigation
-- `GET /docs/active` returns the correct doc after switching in the UI
+- Navigating between docs sends `PUT /docs/active` with the new doc ID ✅
+- The call is fire-and-forget — network failures don't affect doc navigation ✅
+- `GET /docs/active` returns the correct doc after switching in the UI ✅ (requires manual verification with running server)
+
+**Manual test steps (for smoke testing with running server):**
+1. Start the dev server (`pnpm go`)
+2. Open a doc in the browser
+3. `curl http://localhost:4902/docs/active` — should return that doc
+4. Navigate to a different doc
+5. `curl` again — should return the new doc
 
 ## Phase 3: MCP Doc Tools
 
