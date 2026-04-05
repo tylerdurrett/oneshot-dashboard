@@ -216,16 +216,17 @@ apps/web/src/
 
 ### 3.5 Add read_doc tool
 
-- [ ] Add `read_doc` tool to `mcp-server.ts`
-- [ ] Parameters: `{ doc: string }` — accepts doc title (fuzzy) or UUID
-- [ ] Uses `resolveDocOrError()` to find the doc, then calls `GET /docs/:id/markdown`
-- [ ] Returns: doc title + full markdown content
-- [ ] Write a test
+- [x] Add `read_doc` tool to `mcp-server.ts`
+- [x] Parameters: `{ doc: string }` — accepts doc title (fuzzy) or UUID
+- [x] Uses `resolveDocOrError()` to find the doc, then calls `GET /docs/:id?format=markdown`
+- [x] Returns: doc title + full markdown content
+- [x] Write a test
+  - **Note:** Used `GET /docs/:id?format=markdown` instead of `GET /docs/:id/markdown` — the former returns both the document object (with title) and markdown in one request, while the latter only returns `{ markdown }`. Added 3 tests: successful read with title + markdown, resolution failure, and 404 from markdown endpoint. All 33 tests pass (30 existing + 3 new).
 
 **Acceptance Criteria:**
-- Finds docs by exact title, substring match, or UUID
-- Returns full markdown content
-- Descriptive error when doc can't be resolved
+- Finds docs by exact title, substring match, or UUID ✅
+- Returns full markdown content ✅
+- Descriptive error when doc can't be resolved ✅
 
 ## Phase 4: Sandbox & Soul Updates
 

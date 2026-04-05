@@ -10,7 +10,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { api, resolveOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
+import { api, resolveOrError, resolveDocOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
 // MCP Server
@@ -317,6 +317,27 @@ server.tool(
       return { content: [{ type: 'text' as const, text: sections.join('\n\n') }] };
     } catch (e) {
       return errorResult(`Failed to list docs. ${(e as Error).message}`);
+    }
+  },
+);
+
+// -- read_doc ---------------------------------------------------------------
+
+server.tool(
+  'read_doc',
+  "Read a doc's full content as markdown. Accepts doc title (fuzzy match) or UUID.",
+  { doc: z.string().describe('Doc title or UUID') },
+  async ({ doc }) => {
+    try {
+      const resolved = await resolveDocOrError(doc);
+      if (resolved.error) return resolved.error;
+      const res = await api('GET', `/docs/${resolved.id}?format=markdown`);
+      if (!res.ok) return apiError(res);
+      const data = res.data as { document: { title: string }; markdown: string };
+      const title = data.document?.title ?? 'Untitled';
+      return { content: [{ type: 'text' as const, text: `# ${title}\n\n${data.markdown}` }] };
+    } catch (e) {
+      return errorResult(`Failed to read doc. ${(e as Error).message}`);
     }
   },
 );

@@ -402,6 +402,55 @@ describe('list_docs logic', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// read_doc tool logic
+// ---------------------------------------------------------------------------
+
+describe('read_doc logic', () => {
+  /** Mirrors the tool handler in mcp-server.ts */
+  async function readDoc(doc: string) {
+    const resolved = await resolveDoc(doc);
+    if ('error' in resolved) {
+      return { content: [{ type: 'text' as const, text: resolved.error }], isError: true as const };
+    }
+    const res = await api('GET', `/docs/${resolved.id}?format=markdown`);
+    if (!res.ok) {
+      return { content: [{ type: 'text' as const, text: `API error (${res.status}): ${JSON.stringify(res.data)}` }], isError: true as const };
+    }
+    const data = res.data as { document: { title: string }; markdown: string };
+    const title = data.document?.title ?? 'Untitled';
+    return { content: [{ type: 'text' as const, text: `# ${title}\n\n${data.markdown}` }] };
+  }
+
+  it('returns title and markdown content for a resolved doc', async () => {
+    // First call: resolveDoc fetches doc list
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    // Second call: GET /docs/:id?format=markdown
+    mockHttpResponse(200, {
+      document: { id: 'doc-aaa', title: 'Meeting Notes' },
+      markdown: '## Agenda\n\n- Discuss roadmap\n- Review PRs',
+    });
+
+    const result = await readDoc('Meeting Notes');
+    expect(result.content[0]!.text).toBe('# Meeting Notes\n\n## Agenda\n\n- Discuss roadmap\n- Review PRs');
+    expect(result).not.toHaveProperty('isError');
+  });
+
+  it('returns error when doc cannot be resolved', async () => {
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    const result = await readDoc('Nonexistent Doc');
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toContain('No doc matches');
+  });
+
+  it('returns error when markdown endpoint returns 404', async () => {
+    mockHttpResponse(404, { error: 'Document not found' });
+    const result = await readDoc('12345678-1234-1234-1234-123456789abc');
+    expect(result.isError).toBe(true);
+    expect(result.content[0]!.text).toContain('404');
+  });
+});
+
 describe('MCP server bundle', () => {
   it('responds to MCP initialize request', () => {
     const initRequest = JSON.stringify({
