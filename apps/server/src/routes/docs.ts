@@ -34,6 +34,11 @@ export function setActiveDocForTest(id: string | null): void {
   activeDocId = id;
 }
 
+/** Return the currently active doc ID (set by PUT /docs/active). */
+export function getActiveDocId(): string | null {
+  return activeDocId;
+}
+
 export async function docsRoutes(
   server: FastifyInstance,
   opts: DocsRoutesOptions,

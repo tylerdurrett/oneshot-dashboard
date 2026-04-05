@@ -5,6 +5,8 @@
 
 import http from 'node:http';
 import { listBuckets } from '../services/timer-bucket.js';
+import { listDocuments } from '../services/document.js';
+import { getDefaultWorkspaceId } from '../services/workspace.js';
 import type { Database } from '../services/thread.js';
 
 // ---------------------------------------------------------------------------
@@ -130,13 +132,25 @@ interface Doc {
   title: string;
 }
 
-export async function resolveDoc(nameOrId: string): Promise<{ id: string } | { error: string }> {
+export async function resolveDoc(nameOrId: string, db?: Database): Promise<{ id: string } | { error: string }> {
   if (UUID_RE.test(nameOrId)) return { id: nameOrId };
 
-  const res = await api('GET', '/docs');
-  if (!res.ok) return { error: `Failed to fetch docs: ${JSON.stringify(res.data)}` };
-
-  const docs = (res.data as { documents: Doc[] }).documents ?? [];
+  // HTTP fallback kept until Phase 3.4 removes api() entirely.
+  let docs: Doc[];
+  if (db) {
+    try {
+      const wsId = await getDefaultWorkspaceId(db);
+      if (!wsId) return { error: 'No default workspace found' };
+      const rows = await listDocuments(wsId, db);
+      docs = rows.map((r) => ({ id: r.id, title: r.title }));
+    } catch (e) {
+      return { error: `Failed to fetch docs: ${(e as Error).message}` };
+    }
+  } else {
+    const res = await api('GET', '/docs');
+    if (!res.ok) return { error: `Failed to fetch docs: ${JSON.stringify(res.data)}` };
+    docs = (res.data as { documents: Doc[] }).documents ?? [];
+  }
   const needle = nameOrId.toLowerCase();
 
   // Exact case-insensitive match first
@@ -155,10 +169,10 @@ export async function resolveDoc(nameOrId: string): Promise<{ id: string } | { e
 }
 
 /** Resolve a doc name/ID or return an MCP error result. */
-export async function resolveDocOrError(nameOrId: string): Promise<
+export async function resolveDocOrError(nameOrId: string, db?: Database): Promise<
   { id: string; error?: undefined } | { id?: undefined; error: { content: Array<{ type: 'text'; text: string }>; isError: true } }
 > {
-  const result = await resolveDoc(nameOrId);
+  const result = await resolveDoc(nameOrId, db);
   if ('error' in result) {
     return { error: { content: [{ type: 'text' as const, text: result.error }], isError: true } };
   }

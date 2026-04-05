@@ -174,15 +174,17 @@ workspace/
 
 ### 3.3 Migrate doc tool handlers to direct service calls
 
-- [ ] Replace `api('GET', '/docs/active')` in `get_current_doc` with direct service call
-- [ ] Replace `api('GET', '/docs')` in `list_docs` with `listDocuments(db)`
-- [ ] Replace `api('GET', '/docs/:id?format=markdown')` in `read_doc` with direct service call using `getDocumentById` + `blocksToMarkdown`
-- [ ] Update `resolveDoc()` in `mcp-helpers.ts` to accept a database parameter and query directly
+- [x] Replace `api('GET', '/docs/active')` in `get_current_doc` with direct service call
+- [x] Replace `api('GET', '/docs')` in `list_docs` with `listDocuments(db)`
+- [x] Replace `api('GET', '/docs/:id?format=markdown')` in `read_doc` with direct service call using `getDocumentById` + `blocksToMarkdown`
+- [x] Update `resolveDoc()` in `mcp-helpers.ts` to accept a database parameter and query directly
 
 **Acceptance Criteria:**
 - All 3 doc tools work via direct service calls
 - No `api()` calls remain in doc tool handlers
 - Doc tools return the same response format as before
+
+**Notes:** `get_current_doc` uses `getActiveDocId()` exported from `routes/docs.ts` to access the in-memory active doc state, then calls `getDocumentById()` + `blocksToMarkdown()` directly. Also clears stale `activeDocId` via `resetActiveDoc()` when the active doc was deleted (matching the route handler's behavior). `list_docs` calls `getDefaultWorkspaceId(db)` + `listDocuments(wsId, db)` directly. `read_doc` uses `resolveDocOrError(doc, db)` then `getDocumentById()` + `blocksToMarkdown()`. `resolveDoc()` and `resolveDocOrError()` accept an optional `db?: Database` parameter — when provided, queries via `getDefaultWorkspaceId(db)` + `listDocuments(wsId, db)` directly; the HTTP fallback is preserved for the transition window until Phase 3.4 removes `api()` entirely. All 34 MCP tests and 43 doc tests pass. TypeScript compiles cleanly.
 
 ### 3.4 Remove the `api()` helper and HTTP proxy logic
 

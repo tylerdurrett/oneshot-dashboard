@@ -11,7 +11,14 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { api, resolveOrError, resolveDocOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
+import { resolveOrError, resolveDocOrError, textResult, errorResult, extractPlainText } from './mcp-helpers.js';
+import {
+  listDocuments,
+  getDocumentById,
+  blocksToMarkdown,
+} from '../services/document.js';
+import { getDefaultWorkspaceId } from '../services/workspace.js';
+import { getActiveDocId, resetActiveDoc } from '../routes/docs.js';
 import type { Database } from '../services/thread.js';
 import {
   listBuckets,
@@ -277,14 +284,23 @@ server.tool(
   {},
   async () => {
     try {
-      const res = await api('GET', '/docs/active');
-      if (!res.ok) {
+      const activeId = getActiveDocId();
+      if (!activeId) {
         return textResult(
           'No doc is currently open. Use list_docs to see available docs.',
         );
       }
-      const { title, markdown } = res.data as { title: string; markdown: string };
-      return { content: [{ type: 'text' as const, text: `# ${title}\n\n${markdown}` }] };
+      const doc = await getDocumentById(activeId, db);
+      if (!doc) {
+        // Doc was deleted since it was set as active — clear stale reference
+        // (mirrors the same guard in GET /docs/active route handler)
+        resetActiveDoc();
+        return textResult(
+          'No doc is currently open. Use list_docs to see available docs.',
+        );
+      }
+      const markdown = blocksToMarkdown(doc.content as unknown[]);
+      return { content: [{ type: 'text' as const, text: `# ${doc.title}\n\n${markdown}` }] };
     } catch (e) {
       return errorResult(`Failed to get current doc. ${(e as Error).message}`);
     }
@@ -299,10 +315,9 @@ server.tool(
   {},
   async () => {
     try {
-      const res = await api('GET', '/docs');
-      if (!res.ok) return apiError(res);
-
-      const docs = (res.data as { documents: Array<Record<string, unknown>> }).documents ?? [];
+      const wsId = await getDefaultWorkspaceId(db);
+      if (!wsId) return errorResult('No default workspace found');
+      const docs = await listDocuments(wsId, db);
 
       if (docs.length === 0) {
         return textResult('No docs found.');
@@ -310,9 +325,9 @@ server.tool(
 
       const SNIPPET_MAX = 200;
       const sections = docs.map((doc) => {
-        const title = (doc.title as string) || 'Untitled';
-        const id = doc.id as string;
-        const updatedAt = doc.updatedAt as string | undefined;
+        const title = doc.title || 'Untitled';
+        const id = doc.id;
+        const updatedAt = doc.updatedAt;
         const pinned = doc.pinnedAt ? ' | Pinned' : '';
 
         let snippet = '';
@@ -343,13 +358,13 @@ server.tool(
   { doc: z.string().describe('Doc title or UUID') },
   async ({ doc }) => {
     try {
-      const resolved = await resolveDocOrError(doc);
+      const resolved = await resolveDocOrError(doc, db);
       if (resolved.error) return resolved.error;
-      const res = await api('GET', `/docs/${resolved.id}?format=markdown`);
-      if (!res.ok) return apiError(res);
-      const data = res.data as { document: { title: string }; markdown: string };
-      const title = data.document?.title ?? 'Untitled';
-      return { content: [{ type: 'text' as const, text: `# ${title}\n\n${data.markdown}` }] };
+      const document = await getDocumentById(resolved.id, db);
+      if (!document) return errorResult('Document not found');
+      const markdown = blocksToMarkdown(document.content as unknown[]);
+      const title = document.title ?? 'Untitled';
+      return { content: [{ type: 'text' as const, text: `# ${title}\n\n${markdown}` }] };
     } catch (e) {
       return errorResult(`Failed to read doc. ${(e as Error).message}`);
     }
