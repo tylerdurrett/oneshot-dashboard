@@ -264,8 +264,10 @@ export async function generateDocumentTitle(
   const blockIds = extractBlockIds(content);
   const wordCount = countWords(text);
 
-  // Guard: content below threshold (fewer than 50 words AND fewer than 3 top-level blocks)
-  if (wordCount < 50 && blockIds.length < 3) return doc;
+  // Guard: content below threshold — lower bar for first title (20 words)
+  // vs re-title (50 words). Block count threshold is always 3.
+  const wordThreshold = doc.titleGeneratedFromBlockIds ? 50 : 20;
+  if (wordCount < wordThreshold && blockIds.length < 3) return doc;
 
   // Truncate to avoid sending huge documents to the AI model
   const promptText = text.length > TITLE_PROMPT_MAX_CHARS
@@ -279,7 +281,7 @@ export async function generateDocumentTitle(
       model: createGoogleGenerativeAI({ apiKey: config.googleGeminiApiKey })('gemini-2.5-flash'),
       prompt: `Generate a short, descriptive title for this document (max 60 characters).
 Rules: no quotes, no generic titles like "Untitled" or "My Document",
-no explanation — just the title on a single line.
+no explanation — just the title on a single line. Not too formal, this is a peronsal journal.
 
 Document content:
 ${promptText}`,

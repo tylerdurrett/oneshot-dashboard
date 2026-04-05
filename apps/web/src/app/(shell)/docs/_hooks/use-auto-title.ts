@@ -3,7 +3,8 @@ import type { Block } from '@blocknote/core';
 import type { DocumentResponse } from '../_lib/docs-api';
 import { useGenerateTitle } from './use-doc-query';
 
-const DEBOUNCE_MS = 12_000;
+const FIRST_TITLE_DEBOUNCE_MS = 5_000;
+const RETITLE_DEBOUNCE_MS = 12_000;
 
 // ---------------------------------------------------------------------------
 // Text extraction (typed frontend version — operates on Block[], not unknown[])
@@ -86,6 +87,9 @@ export function useAutoTitle({ docId, doc, enabled }: UseAutoTitleOptions) {
 
       if (!enabledRef.current || !docRef.current) return;
 
+      const isFirstTitle = !docRef.current.titleGeneratedFromBlockIds;
+      const debounceMs = isFirstTitle ? FIRST_TITLE_DEBOUNCE_MS : RETITLE_DEBOUNCE_MS;
+
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
 
@@ -100,8 +104,10 @@ export function useAutoTitle({ docId, doc, enabled }: UseAutoTitleOptions) {
         const wordCount = countWords(text);
         const blockCount = latestBlocks.length;
 
-        // Guard: content below threshold (fewer than 50 words AND fewer than 3 blocks)
-        if (wordCount < 50 && blockCount < 3) return;
+        // Guard: content below threshold — lower bar for first title (20 words)
+        // vs re-title (50 words). Block count threshold is always 3.
+        const wordThreshold = latestDoc.titleGeneratedFromBlockIds ? 50 : 20;
+        if (wordCount < wordThreshold && blockCount < 3) return;
 
         // Re-title check: if we already generated a title, only regenerate on
         // significant changes (>50% blocks changed or 2x+ block count).
@@ -118,7 +124,7 @@ export function useAutoTitle({ docId, doc, enabled }: UseAutoTitleOptions) {
         }
 
         mutateRef.current();
-      }, DEBOUNCE_MS);
+      }, debounceMs);
     },
     // Stable — all changing values read from refs
     [],

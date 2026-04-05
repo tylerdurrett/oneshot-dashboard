@@ -105,8 +105,8 @@ describe('useAutoTitle', () => {
     vi.useRealTimers();
   });
 
-  it('fires mutate after 12s debounce when conditions are met', () => {
-    const doc = makeDoc();
+  it('first title fires after 5s debounce', () => {
+    const doc = makeDoc(); // titleGeneratedFromBlockIds: null → first title
     const blocks = makeSufficientBlocks();
 
     const { result } = renderHook(() =>
@@ -115,11 +115,11 @@ describe('useAutoTitle', () => {
 
     act(() => result.current.notifyContentChange(blocks));
 
-    // Not yet — only 11s
-    act(() => vi.advanceTimersByTime(11_000));
+    // Not yet — only 4s
+    act(() => vi.advanceTimersByTime(4_000));
     expect(mutateMock).not.toHaveBeenCalled();
 
-    // Now at 12s
+    // Now at 5s
     act(() => vi.advanceTimersByTime(1_000));
     expect(mutateMock).toHaveBeenCalledOnce();
   });
@@ -134,17 +134,17 @@ describe('useAutoTitle', () => {
 
     // First call
     act(() => result.current.notifyContentChange(blocks));
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => vi.advanceTimersByTime(4_000));
 
     // Second call resets the timer
     act(() => result.current.notifyContentChange(blocks));
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => vi.advanceTimersByTime(4_000));
 
-    // Still hasn't fired — only 10s since last call
+    // Still hasn't fired — only 4s since last call
     expect(mutateMock).not.toHaveBeenCalled();
 
-    // 2 more seconds → 12s since last call
-    act(() => vi.advanceTimersByTime(2_000));
+    // 1 more second → 5s since last call
+    act(() => vi.advanceTimersByTime(1_000));
     expect(mutateMock).toHaveBeenCalledOnce();
   });
 
@@ -157,7 +157,7 @@ describe('useAutoTitle', () => {
     );
 
     act(() => result.current.notifyContentChange(blocks));
-    act(() => vi.advanceTimersByTime(12_000));
+    act(() => vi.advanceTimersByTime(5_000));
 
     expect(mutateMock).not.toHaveBeenCalled();
   });
@@ -172,7 +172,7 @@ describe('useAutoTitle', () => {
     );
 
     act(() => result.current.notifyContentChange(blocks));
-    act(() => vi.advanceTimersByTime(12_000));
+    act(() => vi.advanceTimersByTime(5_000));
 
     expect(mutateMock).not.toHaveBeenCalled();
   });
@@ -186,7 +186,7 @@ describe('useAutoTitle', () => {
     );
 
     act(() => result.current.notifyContentChange(blocks));
-    act(() => vi.advanceTimersByTime(12_000));
+    act(() => vi.advanceTimersByTime(5_000));
 
     expect(mutateMock).not.toHaveBeenCalled();
   });
@@ -202,7 +202,7 @@ describe('useAutoTitle', () => {
     act(() => result.current.notifyContentChange(blocks));
     unmount();
 
-    act(() => vi.advanceTimersByTime(12_000));
+    act(() => vi.advanceTimersByTime(5_000));
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
