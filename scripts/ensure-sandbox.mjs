@@ -331,10 +331,8 @@ function injectMcpConfig() {
   const mcpConfig = {
     mcpServers: {
       'oneshot': {
-        type: 'stdio',
-        command: 'node',
-        args: [MCP_BUNDLE_DEST],
-        env: { ONESHOT_API_BASE: `http://host.docker.internal:${serverPort}` },
+        type: 'http',
+        url: `http://host.docker.internal:${serverPort}/mcp`,
       },
     },
   };

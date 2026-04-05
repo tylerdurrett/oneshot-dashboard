@@ -96,13 +96,15 @@ workspace/
 
 ### 2.1 Update `ensure-sandbox.mjs` — change `.mcp.json` to HTTP transport
 
-- [ ] In `injectMcpConfig()`, change the config from `type: "stdio"` to `type: "http"` with `url` pointing to `http://host.docker.internal:<serverPort>/mcp`
-- [ ] Remove the `args` and `command` fields (not needed for HTTP transport)
-- [ ] Remove the `env` field (ONESHOT_API_BASE is no longer needed — tools run on the server)
+- [x] In `injectMcpConfig()`, change the config from `type: "stdio"` to `type: "http"` with `url` pointing to `http://host.docker.internal:<serverPort>/mcp`
+- [x] Remove the `args` and `command` fields (not needed for HTTP transport)
+- [x] Remove the `env` field (ONESHOT_API_BASE is no longer needed — tools run on the server)
 
 **Acceptance Criteria:**
 - `workspace/.mcp.json` contains `"type": "http"` with the correct URL
 - No reference to `node` command, bundle path, or `ONESHOT_API_BASE` in the config
+
+**Notes:** No divergences from plan. Single object replacement in `injectMcpConfig()` — `type`/`url` replaces `type`/`command`/`args`/`env`.
 
 ### 2.2 Remove the `injectMcpBundle()` function and build script
 
