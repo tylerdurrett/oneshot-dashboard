@@ -9,6 +9,8 @@ export interface DocumentResponse {
   pinnedAt: string | null;
   pipelineEnabled: boolean;
   processedAt: string | null;
+  isTitleManual: boolean;
+  titleGeneratedFromBlockIds: string[] | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,9 +75,18 @@ export async function createDocument(title?: string): Promise<DocumentResponse> 
   return data.document;
 }
 
+export async function generateTitle(id: string): Promise<DocumentResponse> {
+  const res = await fetch(`${getServerHttpUrl()}/docs/${id}/generate-title`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(`Failed to generate title: ${res.status}`);
+  const data: { document: DocumentResponse } = await res.json();
+  return data.document;
+}
+
 export async function saveDocument(
   id: string,
-  fields: { content?: unknown[]; title?: string },
+  fields: { content?: unknown[]; title?: string; isTitleManual?: boolean },
 ): Promise<DocumentResponse> {
   const res = await fetch(`${getServerHttpUrl()}/docs/${id}`, {
     method: 'PATCH',

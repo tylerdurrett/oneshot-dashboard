@@ -174,11 +174,11 @@ apps/web/src/app/(shell)/docs/
 
 ### 3.1 API client and query hooks
 
-- [ ] Update `DocumentResponse` in `apps/web/src/app/(shell)/docs/_lib/docs-api.ts`: add `isTitleManual: boolean` and `titleGeneratedFromBlockIds: string[] | null`.
-- [ ] Add `generateTitle(id: string): Promise<DocumentResponse>` — `POST` to `/docs/${id}/generate-title` with empty body (`{}`). Follow the existing fetch + error-throw + unwrap pattern.
-- [ ] Update `saveDocument` fields type: `{ content?: unknown[]; title?: string; isTitleManual?: boolean }`.
-- [ ] Add `useGenerateTitle(id: string)` mutation hook in `apps/web/src/app/(shell)/docs/_hooks/use-doc-query.ts`. `mutationFn` calls `generateTitle(id)`. `onSuccess` updates detail cache (`setQueryData`) and invalidates list — same pattern as `usePinDocument`.
-- [ ] Update `useSaveDocument` mutation's `mutationFn` type to accept `isTitleManual?: boolean` in the fields object.
+- [x] Update `DocumentResponse` in `apps/web/src/app/(shell)/docs/_lib/docs-api.ts`: add `isTitleManual: boolean` and `titleGeneratedFromBlockIds: string[] | null`.
+- [x] Add `generateTitle(id: string): Promise<DocumentResponse>` — `POST` to `/docs/${id}/generate-title` with empty body (`{}`). Follow the existing fetch + error-throw + unwrap pattern. *(Dropped the empty body and Content-Type header to match `pinDocument` pattern — no payload needed.)*
+- [x] Update `saveDocument` fields type: `{ content?: unknown[]; title?: string; isTitleManual?: boolean }`.
+- [x] Add `useGenerateTitle(id: string)` mutation hook in `apps/web/src/app/(shell)/docs/_hooks/use-doc-query.ts`. `mutationFn` calls `generateTitle(id)`. `onSuccess` updates detail cache (`setQueryData`) and invalidates list — same pattern as `usePinDocument`.
+- [x] Update `useSaveDocument` mutation's `mutationFn` type to accept `isTitleManual?: boolean` in the fields object.
 
 **Acceptance Criteria:**
 - `DocumentResponse` includes `isTitleManual` and `titleGeneratedFromBlockIds`.

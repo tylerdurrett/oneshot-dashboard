@@ -46,6 +46,8 @@ function makeDoc(overrides: Partial<DocumentResponse> = {}): DocumentResponse {
     pinnedAt: null,
     pipelineEnabled: true,
     processedAt: null,
+    isTitleManual: false,
+    titleGeneratedFromBlockIds: null,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-02T00:00:00Z',
     ...overrides,

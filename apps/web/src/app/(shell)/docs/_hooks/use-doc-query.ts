@@ -10,6 +10,7 @@ import {
   deleteDocument,
   pinDocument,
   unpinDocument,
+  generateTitle,
 } from '../_lib/docs-api';
 import type { DocumentResponse } from '../_lib/docs-api';
 
@@ -83,11 +84,26 @@ export function useSaveDocument(id: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (fields: { content?: unknown[]; title?: string }) =>
-      saveDocument(id, fields),
+    mutationFn: (fields: {
+      content?: unknown[];
+      title?: string;
+      isTitleManual?: boolean;
+    }) => saveDocument(id, fields),
     onSuccess: (data) => {
       // Update detail cache directly — avoids a redundant GET and prevents
       // the editor from re-rendering with fetched data mid-typing.
+      queryClient.setQueryData(docKeys.detail(id), data);
+      queryClient.invalidateQueries({ queryKey: docKeys.list });
+    },
+  });
+}
+
+export function useGenerateTitle(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => generateTitle(id),
+    onSuccess: (data) => {
       queryClient.setQueryData(docKeys.detail(id), data);
       queryClient.invalidateQueries({ queryKey: docKeys.list });
     },
