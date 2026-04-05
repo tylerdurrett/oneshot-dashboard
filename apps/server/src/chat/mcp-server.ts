@@ -1,19 +1,26 @@
 /**
  * MCP Server — Exposes One Shot operations (timers, docs) as Claude tools.
  *
- * Registers tools on an McpServer instance and exports it for use by the
- * Fastify route plugin (routes/mcp.ts), which serves it over Streamable HTTP.
+ * Creates an McpServer via `createMcpServer(db)` and registers all tool
+ * handlers. The factory receives a database instance so tool handlers can
+ * call service functions directly (instead of HTTP round-trips through api()).
+ *
+ * The returned McpServer is consumed by the Fastify route plugin
+ * (routes/mcp.ts), which serves it over Streamable HTTP.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api, resolveOrError, resolveDocOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
+import type { Database } from '../services/thread.js';
 
 // ---------------------------------------------------------------------------
-// MCP Server
+// MCP Server Factory
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({ name: 'oneshot', version: '1.0.0' });
+/** Create an McpServer with all tool handlers registered. */
+export function createMcpServer(db: Database) {
+  const server = new McpServer({ name: 'oneshot', version: '1.0.0' });
 
 // -- get_timer_status -------------------------------------------------------
 
@@ -339,8 +346,5 @@ server.tool(
   },
 );
 
-// ---------------------------------------------------------------------------
-// Export
-// ---------------------------------------------------------------------------
-
-export { server as mcpServer };
+  return server;
+}

@@ -29,7 +29,7 @@ import type { Database } from './services/thread.js';
 import { seedDefaultBuckets } from './services/timer-bucket.js';
 import { TimerScheduler } from './services/timer-scheduler.js';
 import { ensureDefaultWorkspace, backfillManualTitles } from './services/workspace.js';
-import { mcpServer } from './chat/mcp-server.js';
+import { createMcpServer } from './chat/mcp-server.js';
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -101,6 +101,7 @@ export function buildServer(opts?: BuildServerOptions) {
   server.register(docsRoutes, { database: opts?.database ?? defaultDb });
 
   // -- MCP tools over Streamable HTTP (no feature flag — always active) --
+  const mcpServer = createMcpServer(opts?.database ?? defaultDb);
   server.register(mcpRoutes, { mcpServer });
 
   // -- Timer system: scheduler + routes --

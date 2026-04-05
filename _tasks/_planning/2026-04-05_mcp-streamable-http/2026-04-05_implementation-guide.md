@@ -145,13 +145,15 @@ workspace/
 
 ### 3.1 Wire database access into MCP tool handlers
 
-- [ ] Update the MCP route plugin to pass the database instance to the MCP server module (e.g., via a setup function like `initMcpServer(db)`)
-- [ ] Import the relevant service functions: `listBuckets`, `getBucket` from `timer-bucket.ts`; `getTodayState`, `startTimer`, `stopTimer`, `resetProgress`, `setElapsedTime`, `setDailyGoal`, `dismissBucket` from `timer-progress.ts`; `listDocuments`, `getDocumentById` from `document.ts`
-- [ ] Create a `createBucket`, `updateBucket`, `deleteBucket` mapping if the service signatures differ from what tools need
+- [x] Update the MCP route plugin to pass the database instance to the MCP server module (e.g., via a setup function like `initMcpServer(db)`)
+- [x] Import the relevant service functions: `listBuckets`, `getBucket` from `timer-bucket.ts`; `getTodayState`, `startTimer`, `stopTimer`, `resetProgress`, `setElapsedTime`, `setDailyGoal`, `dismissBucket` from `timer-progress.ts`; `listDocuments`, `getDocumentById` from `document.ts`
+- [x] Create a `createBucket`, `updateBucket`, `deleteBucket` mapping if the service signatures differ from what tools need
 
 **Acceptance Criteria:**
 - MCP server module can access the database instance
 - Service function imports compile without errors
+
+**Notes:** Used a factory function `createMcpServer(db: Database)` instead of an `initMcpServer(db)` setter — cleaner pattern that avoids module-level mutable state and matches the codebase's `buildServer()` convention. `index.ts` calls `createMcpServer(opts?.database ?? defaultDb)` and passes the result to `mcpRoutes`. Service function imports are deferred to sections 3.2/3.3 when they're actually used (avoids unused import overhead, especially from `document.ts` which pulls in heavy deps like linkedom/BlockNote). No mapping functions needed — `CreateBucketInput`/`UpdateBucketInput` already match MCP tool schemas. TypeScript compiles cleanly, all 34 MCP tests pass.
 
 ### 3.2 Migrate timer tool handlers to direct service calls
 
