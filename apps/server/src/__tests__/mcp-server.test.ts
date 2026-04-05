@@ -8,7 +8,7 @@ import http from 'node:http';
 import { EventEmitter, Readable } from 'node:stream';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveBucket, api, API_BASE } from '../chat/mcp-helpers.js';
+import { resolveBucket, resolveDoc, api, API_BASE } from '../chat/mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Mock node:http so the helpers use our fake instead of real HTTP
@@ -103,6 +103,70 @@ describe('resolveBucket', () => {
     const result = await resolveBucket('School');
     expect(result).toHaveProperty('error');
     expect((result as { error: string }).error).toContain('Failed to fetch buckets');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveDoc tests
+// ---------------------------------------------------------------------------
+
+const SAMPLE_DOCS = [
+  { id: 'doc-aaa', title: 'Meeting Notes' },
+  { id: 'doc-bbb', title: 'Project Plan' },
+  { id: 'doc-ccc', title: 'Daily Journal' },
+  { id: 'doc-ddd', title: 'Project Retrospective' },
+];
+
+describe('resolveDoc', () => {
+  it('returns UUID directly without fetching', async () => {
+    const id = '12345678-1234-1234-1234-123456789abc';
+    const result = await resolveDoc(id);
+    expect(result).toEqual({ id });
+    expect(mockRequest).not.toHaveBeenCalled();
+  });
+
+  it('matches exact title (case-insensitive)', async () => {
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    const result = await resolveDoc('meeting notes');
+    expect(result).toEqual({ id: 'doc-aaa' });
+  });
+
+  it('matches exact title with different casing', async () => {
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    const result = await resolveDoc('DAILY JOURNAL');
+    expect(result).toEqual({ id: 'doc-ccc' });
+  });
+
+  it('matches substring when no exact match', async () => {
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    const result = await resolveDoc('Journal');
+    expect(result).toEqual({ id: 'doc-ccc' });
+  });
+
+  it('returns error when multiple partial matches', async () => {
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    const result = await resolveDoc('Project');
+    expect(result).toHaveProperty('error');
+    const err = (result as { error: string }).error;
+    expect(err).toContain('Multiple docs match');
+    expect(err).toContain('Project Plan');
+    expect(err).toContain('Project Retrospective');
+  });
+
+  it('returns error when no match found', async () => {
+    mockHttpResponse(200, { documents: SAMPLE_DOCS });
+    const result = await resolveDoc('Recipes');
+    expect(result).toHaveProperty('error');
+    const err = (result as { error: string }).error;
+    expect(err).toContain('No doc matches');
+    expect(err).toContain('Meeting Notes');
+  });
+
+  it('returns error when doc list fetch fails', async () => {
+    mockHttpResponse(500, { error: 'Internal error' });
+    const result = await resolveDoc('Meeting Notes');
+    expect(result).toHaveProperty('error');
+    expect((result as { error: string }).error).toContain('Failed to fetch docs');
   });
 });
 

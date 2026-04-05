@@ -169,12 +169,13 @@ apps/web/src/
 
 ### 3.2 Add doc resolution helper
 
-- [ ] Add `resolveDoc(nameOrId: string)` to `apps/server/src/chat/mcp-helpers.ts`, following the same pattern as `resolveBucket()`
-- [ ] Resolution order: UUID exact match → exact case-insensitive title match → substring title match
-- [ ] If multiple docs match a substring, return an error listing the ambiguous matches
-- [ ] If no docs match, return an error listing available doc titles
-- [ ] Add `resolveDocOrError()` wrapper (same pattern as `resolveOrError()` for buckets)
-- [ ] Write tests for the resolution logic
+- [x] Add `resolveDoc(nameOrId: string)` to `apps/server/src/chat/mcp-helpers.ts`, following the same pattern as `resolveBucket()`
+- [x] Resolution order: UUID exact match → exact case-insensitive title match → substring title match
+- [x] If multiple docs match a substring, return an error listing the ambiguous matches
+- [x] If no docs match, return an error listing available doc titles
+- [x] Add `resolveDocOrError()` wrapper (same pattern as `resolveOrError()` for buckets)
+- [x] Write tests for the resolution logic
+  - **Note:** 7 tests added in `mcp-server.test.ts` (same describe-block file as bucket tests): UUID passthrough, exact match, case-insensitive match, substring match, multiple matches error, no match error, API failure. All 18 tests pass (11 existing + 7 new).
 
 **Acceptance Criteria:**
 - UUID input → direct lookup, no list fetch

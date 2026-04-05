@@ -111,6 +111,50 @@ export async function resolveOrError(nameOrId: string): Promise<
 }
 
 // ---------------------------------------------------------------------------
+// Doc name resolution
+// ---------------------------------------------------------------------------
+
+interface Doc {
+  id: string;
+  title: string;
+}
+
+export async function resolveDoc(nameOrId: string): Promise<{ id: string } | { error: string }> {
+  if (UUID_RE.test(nameOrId)) return { id: nameOrId };
+
+  const res = await api('GET', '/docs');
+  if (!res.ok) return { error: `Failed to fetch docs: ${JSON.stringify(res.data)}` };
+
+  const docs = (res.data as { documents: Doc[] }).documents ?? [];
+  const needle = nameOrId.toLowerCase();
+
+  // Exact case-insensitive match first
+  const exact = docs.filter((d) => d.title.toLowerCase() === needle);
+  if (exact.length === 1) return { id: exact[0]!.id };
+
+  // Substring match
+  const partial = docs.filter((d) => d.title.toLowerCase().includes(needle));
+  if (partial.length === 1) return { id: partial[0]!.id };
+
+  const titles = docs.map((d) => d.title).join(', ');
+  if (partial.length > 1) {
+    return { error: `Multiple docs match "${nameOrId}": ${partial.map((d) => d.title).join(', ')}. Be more specific. Available: ${titles}` };
+  }
+  return { error: `No doc matches "${nameOrId}". Available docs: ${titles}` };
+}
+
+/** Resolve a doc name/ID or return an MCP error result. */
+export async function resolveDocOrError(nameOrId: string): Promise<
+  { id: string; error?: undefined } | { id?: undefined; error: { content: Array<{ type: 'text'; text: string }>; isError: true } }
+> {
+  const result = await resolveDoc(nameOrId);
+  if ('error' in result) {
+    return { error: { content: [{ type: 'text' as const, text: result.error }], isError: true } };
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Result formatters
 // ---------------------------------------------------------------------------
 
