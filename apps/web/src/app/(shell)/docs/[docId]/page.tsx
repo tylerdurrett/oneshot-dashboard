@@ -79,7 +79,7 @@ export default function DocViewPage({ docId: docIdProp }: { docId?: string }) {
         </div>
       )}
       <DocsLayout>
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden pt-6">
           <DocTitle key={`title-${docId}`} docId={docId} title={doc.title} onSave={handleSaveTitle} />
           {/* key forces editor remount when switching docs so BlockNote
               reinitializes with the new document's content */}
