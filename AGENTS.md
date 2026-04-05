@@ -35,7 +35,7 @@ Small changes are one-offs. Larger features use `_tasks/` with status folders: `
 
 ## Sandbox
 
-The chat agent runs in a Docker sandbox. Only the `workspace/` subdirectory is mounted — the agent cannot access project source code. The soul file, MCP server bundle, and MCP config are injected at startup by `scripts/ensure-sandbox.mjs`. After editing MCP tool source (`apps/server/src/chat/`), run `pnpm build:mcp` to rebuild the bundle, or `pnpm watch:mcp` to rebuild continuously. The server restart alone does not update the sandbox. See `docs/sandbox.md`.
+The chat agent runs in a Docker sandbox. Only the `workspace/` subdirectory is mounted — the agent cannot access project source code. The soul file, MCP server bundle, and MCP config are injected at startup by `scripts/ensure-sandbox.mjs`. After editing MCP tool source (`apps/server/src/chat/`), run `pnpm build:mcp` to rebuild the bundle, then restart the server. The server restart alone does not update the sandbox. See `docs/sandbox.md`.
 
 ## Restarting Dev Servers
 
