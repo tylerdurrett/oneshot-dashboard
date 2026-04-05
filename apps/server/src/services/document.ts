@@ -1,5 +1,8 @@
+import { generateText } from 'ai';
+import { google } from '@ai-sdk/google';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db as defaultDb, documents } from '@repo/db';
+import { config } from '../config.js';
 import type { Database } from './thread.js';
 import { getDefaultWorkspaceId, titleFromDate } from './workspace.js';
 
@@ -164,4 +167,136 @@ export async function unpinDocument(
     .where(eq(documents.id, id))
     .returning();
   return updated;
+}
+
+// -- Auto-title utilities --
+
+/** Recursively extract plain text from BlockNote JSONB content blocks. */
+export function extractTextFromBlocks(blocks: unknown[]): string {
+  const lines: string[] = [];
+
+  for (const block of blocks) {
+    if (typeof block !== 'object' || block === null) continue;
+    const b = block as Record<string, unknown>;
+
+    // Concatenate inline text spans within a single block
+    if (Array.isArray(b.content)) {
+      const spans: string[] = [];
+      for (const inline of b.content) {
+        if (
+          typeof inline === 'object' &&
+          inline !== null &&
+          (inline as Record<string, unknown>).type === 'text' &&
+          typeof (inline as Record<string, unknown>).text === 'string'
+        ) {
+          spans.push((inline as Record<string, unknown>).text as string);
+        }
+      }
+      if (spans.length) lines.push(spans.join(''));
+    }
+
+    // Recurse into children
+    if (Array.isArray(b.children)) {
+      const childText = extractTextFromBlocks(b.children as unknown[]);
+      if (childText) lines.push(childText);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/** Count words in a string. Returns 0 for empty/whitespace-only input. */
+export function countWords(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+  return trimmed.split(/\s+/).length;
+}
+
+/** Extract IDs from top-level blocks. */
+export function extractBlockIds(blocks: unknown[]): string[] {
+  return blocks
+    .filter(
+      (b): b is Record<string, unknown> =>
+        typeof b === 'object' && b !== null && typeof (b as Record<string, unknown>).id === 'string',
+    )
+    .map((b) => b.id as string);
+}
+
+let apiKeyWarningLogged = false;
+
+/** Reset the API key warning flag. Exported for test isolation. */
+export function resetApiKeyWarning(): void {
+  apiKeyWarningLogged = false;
+}
+
+/** Max characters of document text sent to the AI model for title generation. */
+const TITLE_PROMPT_MAX_CHARS = 2000;
+
+/**
+ * Generate a title for a document using Gemini Flash via the Vercel AI SDK.
+ * Guards: skips if isTitleManual is true, API key is empty, or content is below threshold.
+ * On success: updates title, sets isTitleManual = false, stores titleGeneratedFromBlockIds.
+ */
+export async function generateDocumentTitle(
+  id: string,
+  database: Database = defaultDb,
+): Promise<DocumentRow | undefined> {
+  const doc = await getDocumentById(id, database);
+  if (!doc) return undefined;
+
+  // Guard: manual title — never overwrite user edits
+  if (doc.isTitleManual) return doc;
+
+  // Guard: no API key configured
+  if (!config.googleGeminiApiKey) {
+    if (!apiKeyWarningLogged) {
+      console.warn('[auto-title] GOOGLE_GEMINI_API_KEY is not set — skipping title generation');
+      apiKeyWarningLogged = true;
+    }
+    return doc;
+  }
+
+  if (!Array.isArray(doc.content)) return doc;
+
+  const content = doc.content as unknown[];
+  const text = extractTextFromBlocks(content);
+  const blockIds = extractBlockIds(content);
+  const wordCount = countWords(text);
+
+  // Guard: content below threshold (fewer than 50 words AND fewer than 3 top-level blocks)
+  if (wordCount < 50 && blockIds.length < 3) return doc;
+
+  // Truncate to avoid sending huge documents to the AI model
+  const promptText = text.length > TITLE_PROMPT_MAX_CHARS
+    ? text.slice(0, TITLE_PROMPT_MAX_CHARS) + '...'
+    : text;
+
+  try {
+    const { text: generatedTitle } = await generateText({
+      model: google('gemini-2.5-flash'),
+      prompt: `Generate a short, descriptive title for this document (max 60 characters).
+Rules: no quotes, no generic titles like "Untitled" or "My Document",
+no explanation — just the title on a single line.
+
+Document content:
+${promptText}`,
+    });
+
+    const now = new Date().toISOString();
+    const [updated] = await database
+      .update(documents)
+      .set({
+        title: generatedTitle.trim(),
+        isTitleManual: false,
+        titleGeneratedFromBlockIds: blockIds,
+        updatedAt: now,
+      })
+      .where(eq(documents.id, id))
+      .returning();
+
+    return updated;
+  } catch (error) {
+    console.warn('[auto-title] Title generation failed:', error);
+    return doc;
+  }
 }

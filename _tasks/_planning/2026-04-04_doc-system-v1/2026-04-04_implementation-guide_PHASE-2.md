@@ -102,20 +102,22 @@ apps/web/src/app/(shell)/docs/
 
 ### 2.2 Title generation service
 
-- [ ] Add `extractTextFromBlocks(blocks: unknown[]): string` in `apps/server/src/services/document.ts` — recursively extracts plain text from BlockNote JSONB content. Each block has `content` (array of inline content with `type: 'text'` and `text` field) and `children` (nested blocks). Joins blocks with newlines.
-- [ ] Add `countWords(text: string): number` — trims, splits on whitespace, filters empty strings, returns length. Export for testing.
-- [ ] Add `extractBlockIds(blocks: unknown[]): string[]` — maps top-level blocks to their `id` field. Export for testing.
-- [ ] Add `generateDocumentTitle(id, database)` service function:
+- [x] Add `extractTextFromBlocks(blocks: unknown[]): string` in `apps/server/src/services/document.ts` — recursively extracts plain text from BlockNote JSONB content. Each block has `content` (array of inline content with `type: 'text'` and `text` field) and `children` (nested blocks). Joins blocks with newlines. *(Inline spans within a single block are concatenated, not newline-separated — fixes correct text extraction for styled runs.)*
+- [x] Add `countWords(text: string): number` — trims, splits on whitespace, returns length. Export for testing.
+- [x] Add `extractBlockIds(blocks: unknown[]): string[]` — maps top-level blocks to their `id` field. Export for testing.
+- [x] Add `generateDocumentTitle(id, database)` service function:
   1. Fetch the document by ID. Return `undefined` if not found.
   2. Guard: return the doc unchanged if `isTitleManual` is `true`.
   3. Guard: return the doc unchanged if `config.googleGeminiApiKey` is empty (log a warning on first occurrence).
-  4. Extract text from `content` using `extractTextFromBlocks`.
-  5. Extract block IDs using `extractBlockIds`.
-  6. Guard: return the doc unchanged if content is below threshold (fewer than 50 words AND fewer than 3 top-level blocks).
-  7. Call `generateText()` from `ai` with `google('gemini-2.5-flash')` model and a prompt instructing concise, descriptive title generation (see prompt below).
-  8. Update the document: set `title` to the generated text (trimmed), `isTitleManual = false`, `titleGeneratedFromBlockIds = blockIds`, bump `updatedAt`.
-  9. Return the updated document.
-- [ ] Title generation prompt — keep it minimal and direct:
+  4. Guard: return the doc unchanged if `doc.content` is not an array.
+  5. Extract text from `content` using `extractTextFromBlocks`.
+  6. Extract block IDs using `extractBlockIds`.
+  7. Guard: return the doc unchanged if content is below threshold (fewer than 50 words AND fewer than 3 top-level blocks).
+  8. Truncate text to 2000 chars before sending to AI (prevents unbounded token usage).
+  9. Call `generateText()` from `ai` with `google('gemini-2.5-flash')` model and a prompt instructing concise, descriptive title generation (see prompt below). Wrapped in try/catch — AI errors return doc unchanged.
+  10. Update the document: set `title` to the generated text (trimmed), `isTitleManual = false`, `titleGeneratedFromBlockIds = blockIds`, bump `updatedAt`.
+  11. Return the updated document.
+- [x] Title generation prompt — keep it minimal and direct:
   ```
   Generate a short, descriptive title for this document (max 60 characters).
   Rules: no quotes, no generic titles like "Untitled" or "My Document",
@@ -124,16 +126,19 @@ apps/web/src/app/(shell)/docs/
   Document content:
   {text}
   ```
-- [ ] Write tests in `apps/server/src/__tests__/auto-title.test.ts`:
+- [x] Added `resetApiKeyWarning()` export for test isolation of the module-level warning flag.
+- [x] Write tests in `apps/server/src/__tests__/auto-title.test.ts` (23 tests):
   - `extractTextFromBlocks` extracts text from paragraph and heading blocks.
   - `extractTextFromBlocks` handles nested children.
   - `extractTextFromBlocks` returns empty string for empty/malformed content.
+  - `extractTextFromBlocks` concatenates inline spans within a block.
   - `countWords` returns correct counts (including edge cases: empty, whitespace-only).
   - `extractBlockIds` returns top-level block IDs.
   - `generateDocumentTitle` skips docs where `isTitleManual = true`.
   - `generateDocumentTitle` skips docs below content threshold.
   - `generateDocumentTitle` skips when API key is empty.
   - `generateDocumentTitle` updates title and stores block IDs on success (mock `generateText` from `ai`).
+  - `generateDocumentTitle` returns doc unchanged when `generateText` throws (error handling).
 
 **Acceptance Criteria:**
 - `extractTextFromBlocks` correctly extracts text from BlockNote JSONB.
