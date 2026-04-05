@@ -17,6 +17,7 @@ import { websocket } from './plugins/websocket.js';
 import { chatRoutes, type ChatRoutesOptions } from './routes/chat.js';
 import { threadRoutes, type ThreadRoutesOptions } from './routes/threads.js';
 import { docsRoutes } from './routes/docs.js';
+import { mcpRoutes } from './routes/mcp.js';
 import { timerRoutes, broadcast, SSE_EVENTS } from './routes/timers.js';
 import { supportsHostCredentialInjection, refreshAndInjectCredentials } from './services/credentials.js';
 import {
@@ -28,6 +29,7 @@ import type { Database } from './services/thread.js';
 import { seedDefaultBuckets } from './services/timer-bucket.js';
 import { TimerScheduler } from './services/timer-scheduler.js';
 import { ensureDefaultWorkspace, backfillManualTitles } from './services/workspace.js';
+import { mcpServer } from './chat/mcp-server.js';
 
 export interface BuildServerOptions {
   logger?: boolean;
@@ -97,6 +99,9 @@ export function buildServer(opts?: BuildServerOptions) {
 
   // -- Docs routes (no feature flag — always active) --
   server.register(docsRoutes, { database: opts?.database ?? defaultDb });
+
+  // -- MCP tools over Streamable HTTP (no feature flag — always active) --
+  server.register(mcpRoutes, { mcpServer });
 
   // -- Timer system: scheduler + routes --
   let scheduler: TimerScheduler | null = null;

@@ -75,14 +75,16 @@ workspace/
 
 ### 1.3 Register the MCP route in the Fastify server
 
-- [ ] Import and register the MCP route plugin in `apps/server/src/index.ts`
-- [ ] Register it unconditionally (not behind a feature flag) — MCP tools are always available
-- [ ] Write a test that verifies the `/mcp` endpoint responds to an MCP `initialize` request with the correct server info and tool list
+- [x] Import and register the MCP route plugin in `apps/server/src/index.ts`
+- [x] Register it unconditionally (not behind a feature flag) — MCP tools are always available
+- [x] Write a test that verifies the `/mcp` endpoint responds to an MCP `initialize` request with the correct server info and tool list
 
 **Acceptance Criteria:**
 - `GET /health` still works
 - POST `/mcp` with an MCP `initialize` JSON-RPC request returns `serverInfo.name === 'oneshot'` and `capabilities.tools`
 - All existing server tests still pass
+
+**Notes:** No divergences from plan. The test uses a real listening server (port 0) because the MCP transport uses `reply.hijack()`, bypassing Fastify's `inject()`. Also includes a health endpoint regression test. TypeScript compiles cleanly, all 45 relevant tests pass (MCP routes, MCP server helpers, health).
 
 ---
 
