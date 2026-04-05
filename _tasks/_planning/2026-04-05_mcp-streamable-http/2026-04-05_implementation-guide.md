@@ -211,15 +211,15 @@ workspace/
 - [x] Keep `extractPlainText` tests unchanged
 - [x] Update `get_current_doc`, `list_docs`, `read_doc` logic tests to use direct service mocks
 - [x] Remove the "MCP server bundle" smoke test (bundle no longer exists)
-- [ ] Add a test that verifies the `/mcp` endpoint handles a `tools/list` request and returns all 14 tools
-- [ ] Run the full test suite: `pnpm --filter @repo/server test`
+- [x] Add a test that verifies the `/mcp` endpoint handles a `tools/list` request and returns all 14 tools
+- [x] Run the full test suite: `pnpm --filter @repo/server test`
 
 **Acceptance Criteria:**
 - All tests pass
 - No references to `api()`, `node:http` mock, or bundle smoke test remain
 - New test verifies tool list via HTTP transport
 
-**Notes:** Most of section 3.5 was completed as part of 3.4 (necessary to keep TypeScript compiling). The `get_current_doc logic`, `list_docs logic`, and `read_doc logic` describe blocks were removed (they tested the old `api()` flow, not the actual tool handlers). The remaining items are the `tools/list` integration test and the full test suite run.
+**Notes:** Most of section 3.5 was completed as part of 3.4 (necessary to keep TypeScript compiling). The `get_current_doc logic`, `list_docs logic`, and `read_doc logic` describe blocks were removed (they tested the old `api()` flow, not the actual tool handlers). The `tools/list` integration test follows the MCP protocol handshake: initialize → notifications/initialized → tools/list, using session IDs for the stateful transport. Verifies all 14 tools by name. Full suite run: 24 MCP tests pass (3 route + 21 server). The 5 pre-existing failing test files (timer-scheduler, thread, timer-bucket, timer-progress, timer-routes) are unrelated to this migration — they have timeout and database issues that predate this work. TypeScript compiles cleanly.
 
 ### 3.6 Smoke test
 

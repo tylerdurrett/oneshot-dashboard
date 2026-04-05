@@ -126,6 +126,65 @@ describe('MCP Streamable HTTP endpoint', () => {
     expect(result.capabilities).toHaveProperty('tools');
   });
 
+  it('returns all registered tools via tools/list', async () => {
+    server = buildServer({ logger: false });
+    const address = await server.listen({ port: 0, host: '127.0.0.1' });
+    port = Number(new URL(address).port);
+
+    // Step 1: Initialize the MCP session
+    const initResponse = await postMcp(port, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        capabilities: {},
+        protocolVersion: '2025-03-26',
+        clientInfo: { name: 'test', version: '1.0.0' },
+      },
+    });
+    expect(initResponse.status).toBe(200);
+    const sessionId = initResponse.sessionId;
+    expect(sessionId).toBeDefined();
+
+    // Step 2: Send initialized notification (required by MCP protocol)
+    await postMcp(
+      port,
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      { 'mcp-session-id': sessionId! },
+    );
+
+    // Step 3: Request the tool list
+    const listResponse = await postMcp(
+      port,
+      { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+      { 'mcp-session-id': sessionId! },
+    );
+    expect(listResponse.status).toBe(200);
+
+    const result = extractJsonRpcResult(listResponse);
+    const tools = result.tools as Array<{ name: string }>;
+
+    const expectedTools = [
+      'get_timer_status',
+      'list_buckets',
+      'start_timer',
+      'stop_timer',
+      'reset_timer',
+      'create_bucket',
+      'update_bucket',
+      'delete_bucket',
+      'set_timer_time',
+      'set_daily_goal',
+      'dismiss_bucket',
+      'get_current_doc',
+      'list_docs',
+      'read_doc',
+    ];
+
+    const toolNames = tools.map((t) => t.name).sort();
+    expect(toolNames).toEqual(expectedTools.sort());
+  });
+
   it('GET /health still works after MCP registration', async () => {
     server = buildServer({ logger: false });
     const response = await server.inject({
