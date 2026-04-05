@@ -12,6 +12,7 @@ import {
   pinDocument,
   unpinDocument,
   generateDocumentTitle,
+  blocksToMarkdown,
 } from '../services/document.js';
 import { getDefaultWorkspaceId } from '../services/workspace.js';
 
@@ -74,6 +75,19 @@ export async function docsRoutes(
     return { document: doc };
   });
 
+  /** GET /docs/:id/markdown — return a doc's content as markdown. */
+  server.get<{ Params: { id: string } }>(
+    '/docs/:id/markdown',
+    async (request, reply) => {
+      const doc = await getDocumentById(request.params.id, db);
+      if (!doc) {
+        return reply.status(404).send({ error: 'Document not found' });
+      }
+      const markdown = blocksToMarkdown(doc.content as unknown[]);
+      return { markdown };
+    },
+  );
+
   // Register /docs/:id/generate-title BEFORE /docs/:id (static segment before parameterized).
   /** POST /docs/:id/generate-title — auto-generate a title via AI. */
   server.post<{ Params: { id: string } }>(
@@ -91,13 +105,17 @@ export async function docsRoutes(
     },
   );
 
-  /** GET /docs/:id — single document by ID. */
-  server.get<{ Params: { id: string } }>(
+  /** GET /docs/:id — single document by ID. Supports ?format=markdown to include markdown content. */
+  server.get<{ Params: { id: string }; Querystring: { format?: string } }>(
     '/docs/:id',
     async (request, reply) => {
       const doc = await getDocumentById(request.params.id, db);
       if (!doc) {
         return reply.status(404).send({ error: 'Document not found' });
+      }
+      if (request.query.format === 'markdown') {
+        const markdown = blocksToMarkdown(doc.content as unknown[]);
+        return { document: doc, markdown };
       }
       return { document: doc };
     },

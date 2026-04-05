@@ -86,10 +86,11 @@ apps/web/src/
 
 ### 1.3 Add markdown field to doc API responses
 
-- [ ] Add a `GET /docs/:id/markdown` endpoint that returns `{ markdown: string }` for a single doc
-- [ ] This endpoint is used by the MCP tools (lighter than returning full JSONB + converting)
-- [ ] Also add an optional `?format=markdown` query param to `GET /docs/:id` that includes a `markdown` field in the response alongside the existing JSONB `content`
-- [ ] Write a test verifying the markdown endpoint returns correct content
+- [x] Add a `GET /docs/:id/markdown` endpoint that returns `{ markdown: string }` for a single doc
+- [x] This endpoint is used by the MCP tools (lighter than returning full JSONB + converting)
+- [x] Also add an optional `?format=markdown` query param to `GET /docs/:id` that includes a `markdown` field in the response alongside the existing JSONB `content`
+- [x] Write a test verifying the markdown endpoint returns correct content
+  - **Note:** Added 5 tests total: markdown with content, empty content, 404 for nonexistent doc, `?format=markdown` includes both fields, and absence of markdown without format param.
 
 **Acceptance Criteria:**
 - `GET /docs/:id/markdown` returns markdown conversion of the doc's content

@@ -295,6 +295,90 @@ describe('docs routes', () => {
     });
   });
 
+  // --- GET /docs/:id/markdown ---
+
+  describe('GET /docs/:id/markdown', () => {
+    it('returns markdown for a doc with content', async () => {
+      const server = createServer();
+      const createRes = await server.inject({ method: 'POST', url: '/docs', payload: { title: 'MD Test' } });
+      const docId = createRes.json().document.id;
+
+      const content = [
+        { type: 'heading', props: { level: 1 }, content: [{ type: 'text', text: 'Hello' }], children: [] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'World' }], children: [] },
+      ];
+      await server.inject({ method: 'PATCH', url: `/docs/${docId}`, payload: { content } });
+
+      const res = await server.inject({ method: 'GET', url: `/docs/${docId}/markdown` });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.markdown).toContain('Hello');
+      expect(body.markdown).toContain('World');
+      await server.close();
+    });
+
+    it('returns empty string for a doc with no content', async () => {
+      const server = createServer();
+      const createRes = await server.inject({ method: 'POST', url: '/docs', payload: { title: 'Empty' } });
+      const docId = createRes.json().document.id;
+
+      const res = await server.inject({ method: 'GET', url: `/docs/${docId}/markdown` });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json().markdown).toBe('');
+      await server.close();
+    });
+
+    it('returns 404 for a nonexistent doc', async () => {
+      const server = createServer();
+      const res = await server.inject({
+        method: 'GET',
+        url: '/docs/00000000-0000-0000-0000-000000000000/markdown',
+      });
+
+      expect(res.statusCode).toBe(404);
+      expect(res.json()).toEqual({ error: 'Document not found' });
+      await server.close();
+    });
+  });
+
+  // --- GET /docs/:id?format=markdown ---
+
+  describe('GET /docs/:id?format=markdown', () => {
+    it('includes both document and markdown fields when format=markdown', async () => {
+      const server = createServer();
+      const createRes = await server.inject({ method: 'POST', url: '/docs', payload: { title: 'Format Test' } });
+      const docId = createRes.json().document.id;
+
+      const content = [{ type: 'paragraph', content: [{ type: 'text', text: 'test content' }], children: [] }];
+      await server.inject({ method: 'PATCH', url: `/docs/${docId}`, payload: { content } });
+
+      const res = await server.inject({ method: 'GET', url: `/docs/${docId}?format=markdown` });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.document).toBeDefined();
+      expect(body.document.title).toBe('Format Test');
+      expect(body.markdown).toContain('test content');
+      await server.close();
+    });
+
+    it('does not include markdown field without format param', async () => {
+      const server = createServer();
+      const createRes = await server.inject({ method: 'POST', url: '/docs', payload: { title: 'No Format' } });
+      const docId = createRes.json().document.id;
+
+      const res = await server.inject({ method: 'GET', url: `/docs/${docId}` });
+
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.document).toBeDefined();
+      expect(body.markdown).toBeUndefined();
+      await server.close();
+    });
+  });
+
   // --- Backward compatibility ---
 
   describe('backward compat: /docs/default', () => {
