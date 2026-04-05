@@ -26,21 +26,22 @@ if (!fs.existsSync(configPath)) {
   }
 }
 
-// Warn when a service manager is already running the app. Starting a second
-// instance will fail with EADDRINUSE, and agents that pkill processes will
-// just see them respawn immediately.
-const serviceManager = getActiveServiceManager();
-if (serviceManager) {
-  console.error('');
-  console.error(`  ⚠ oneshot-dashboard is already running via ${serviceManager}.`);
-  console.error('');
-  console.error('  Starting another instance will fail (EADDRINUSE).');
-  console.error('  The service uses tsx watch — code changes are picked up automatically.');
-  console.error('');
-  console.error('  What to do instead:');
-  console.error('    • Nothing — your code changes are already live via hot reload.');
-  console.error('    • pnpm service:restart — full restart (kills old process, starts fresh).');
-  console.error('    • pnpm service:uninstall — stop the service, then run pnpm go manually.');
-  console.error('');
-  process.exit(1);
+// Warn when a service manager is already running the app. Skip the check when
+// we ARE the service (ONESHOT_SERVICE=1 is set by the launchd/systemd config).
+if (!process.env.ONESHOT_SERVICE) {
+  const serviceManager = getActiveServiceManager();
+  if (serviceManager) {
+    console.error('');
+    console.error(`  ⚠ oneshot-dashboard is already running via ${serviceManager}.`);
+    console.error('');
+    console.error('  Starting another instance will fail (EADDRINUSE).');
+    console.error('  The service uses tsx watch — code changes are picked up automatically.');
+    console.error('');
+    console.error('  What to do instead:');
+    console.error('    • Nothing — your code changes are already live via hot reload.');
+    console.error('    • pnpm service:restart — full restart (kills old process, starts fresh).');
+    console.error('    • pnpm service:uninstall — stop the service, then run pnpm go manually.');
+    console.error('');
+    process.exit(1);
+  }
 }

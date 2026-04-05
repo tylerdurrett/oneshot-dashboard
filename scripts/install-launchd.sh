@@ -79,6 +79,8 @@ cat >"${LAUNCHD_PLIST_PATH}" <<PLIST
     <string>${HOME}</string>
     <key>NODE_ENV</key>
     <string>development</string>
+    <key>ONESHOT_SERVICE</key>
+    <string>1</string>
   </dict>
 </dict>
 </plist>

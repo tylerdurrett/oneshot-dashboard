@@ -69,6 +69,7 @@ ExecStart=${PNPM_BIN} go
 Restart=always
 RestartSec=3
 Environment=NODE_ENV=development
+Environment=ONESHOT_SERVICE=1
 Environment=PATH=${RUNTIME_PATH}
 Environment=HOME=${HOME}
 StandardOutput=append:${OUT_LOG}
