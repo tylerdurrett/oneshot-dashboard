@@ -93,11 +93,37 @@ launchctl bootout "${LAUNCHD_SERVICE}" >/dev/null 2>&1 || true
 launchctl bootstrap "${LAUNCHD_DOMAIN}" "${LAUNCHD_PLIST_PATH}"
 launchctl enable "${LAUNCHD_SERVICE}" >/dev/null 2>&1 || true
 
+# Verify the service actually comes up. The server needs a few seconds to
+# start (migrations, sandbox check, etc.), so we poll the health endpoint.
+SERVER_PORT=$((PORT + 2))
+HEALTH_URL="http://localhost:${SERVER_PORT}/health"
 echo ""
-echo "oneshot-dashboard LaunchAgent installed and started."
-echo "  Label:   ${LAUNCHD_LABEL}"
-echo "  Plist:   ${LAUNCHD_PLIST_PATH}"
-echo "  URL:     http://localhost:${PORT}"
-echo "  Logs:    ${OUT_LOG}"
-echo "  Status:  pnpm launchd:status"
+echo -n "  Waiting for server to start "
+HEALTHY=false
+for i in $(seq 1 20); do
+  sleep 1
+  echo -n "."
+  if curl -sf "${HEALTH_URL}" >/dev/null 2>&1; then
+    HEALTHY=true
+    break
+  fi
+done
 echo ""
+
+if [ "$HEALTHY" = true ]; then
+  echo ""
+  echo "oneshot-dashboard LaunchAgent installed and started."
+  echo "  Label:   ${LAUNCHD_LABEL}"
+  echo "  Plist:   ${LAUNCHD_PLIST_PATH}"
+  echo "  URL:     http://localhost:${PORT}"
+  echo "  Logs:    ${OUT_LOG}"
+  echo "  Status:  pnpm launchd:status"
+  echo ""
+else
+  echo ""
+  echo "⚠ oneshot-dashboard LaunchAgent installed but server did not become healthy."
+  echo "  The service may have crashed during startup."
+  echo "  Check logs: tail -50 ${ERR_LOG}"
+  echo ""
+  exit 1
+fi

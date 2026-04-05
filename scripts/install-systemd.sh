@@ -85,14 +85,40 @@ chmod 0644 "${SYSTEMD_UNIT_PATH}"
 systemctl --user daemon-reload
 systemctl --user enable --now "${SYSTEMD_SERVICE_NAME}"
 
+# Verify the service actually comes up. The server needs a few seconds to
+# start (migrations, sandbox check, etc.), so we poll the health endpoint.
+SERVER_PORT=$((PORT + 2))
+HEALTH_URL="http://localhost:${SERVER_PORT}/health"
 echo ""
-echo "oneshot-dashboard systemd user service installed and started."
-echo "  Service: ${SYSTEMD_SERVICE_NAME}"
-echo "  Unit:    ${SYSTEMD_UNIT_PATH}"
-echo "  URL:     http://localhost:${PORT}"
-echo "  Logs:    ${OUT_LOG}"
-echo "  Status:  pnpm service:status"
+echo -n "  Waiting for server to start "
+HEALTHY=false
+for i in $(seq 1 20); do
+  sleep 1
+  echo -n "."
+  if curl -sf "${HEALTH_URL}" >/dev/null 2>&1; then
+    HEALTHY=true
+    break
+  fi
+done
 echo ""
-echo "Note: On WSL2, this service is persistent while the WSL environment"
-echo "is running. It does not survive a full WSL shutdown."
-echo ""
+
+if [ "$HEALTHY" = true ]; then
+  echo ""
+  echo "oneshot-dashboard systemd user service installed and started."
+  echo "  Service: ${SYSTEMD_SERVICE_NAME}"
+  echo "  Unit:    ${SYSTEMD_UNIT_PATH}"
+  echo "  URL:     http://localhost:${PORT}"
+  echo "  Logs:    ${OUT_LOG}"
+  echo "  Status:  pnpm service:status"
+  echo ""
+  echo "Note: On WSL2, this service is persistent while the WSL environment"
+  echo "is running. It does not survive a full WSL shutdown."
+  echo ""
+else
+  echo ""
+  echo "⚠ oneshot-dashboard systemd service installed but server did not become healthy."
+  echo "  The service may have crashed during startup."
+  echo "  Check logs: tail -50 ${ERR_LOG}"
+  echo ""
+  exit 1
+fi
