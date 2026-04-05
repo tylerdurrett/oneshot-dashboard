@@ -60,6 +60,23 @@ export function DocEditor({ docId, initialContent, onSave, onContentChange }: Do
     };
   }, []);
 
+  // Intercept Cmd/Ctrl+S to flush pending save instead of opening
+  // the browser's "Save As" dialog.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+          onSaveRef.current(editor.document);
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [editor]);
+
   // Block refresh/tab close when the debounce hasn't fired yet —
   // we can't flush here because the save is async
   useEffect(() => {
