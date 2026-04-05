@@ -387,3 +387,18 @@ One temporal table: periods (type, date range, narrative, intention)
 One join table: period_items (links a period to goals/projects/tasks it's focusing on, with optional time block info for daily periods)
 Existing timer buckets get an optional domain and/or work mode link
 The structural side is your permanent backlog. The temporal side is your planning rhythm. Timer buckets are your execution surface. All three coexist, referencing the same underlying work items.
+---
+## Temporal Views
+1. Year view: We're going to pull the very specific layout from the IAWT repo (/Users/tdogmini/repos/itallworkstogether). Here's a description of it: _ideas/05_iawt-year-view.md. This one is the most hyper-specific that we really want to nail the way IAWT does it.
+2. Month View: see _ideas/05_iawt-month-view.md
+3. Week View
+4. Day View
+---
+
+
+...
+On UI
+Start simple
+We need to be able to CRUD domains.
+So let's start with the DB updates we need, add the "Goals" area to the nav, and the first page can be a simple Domains page. It will be empty at first but allow user to add a domain and see/edit/delete domains.
+We'll keep the simple using standard UI at first.
