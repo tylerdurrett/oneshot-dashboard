@@ -1,12 +1,9 @@
 /**
- * Tests for the MCP server helpers (bucket resolution, API calls)
- * and a smoke test of the bundled MCP server binary.
+ * Tests for the MCP server helpers (bucket resolution, API calls).
  */
 
-import { spawnSync } from 'node:child_process';
 import http from 'node:http';
 import { EventEmitter, Readable } from 'node:stream';
-import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveBucket, resolveDoc, api, extractPlainText, API_BASE } from '../chat/mcp-helpers.js';
 
@@ -451,31 +448,3 @@ describe('read_doc logic', () => {
   });
 });
 
-describe('MCP server bundle', () => {
-  it('responds to MCP initialize request', () => {
-    const initRequest = JSON.stringify({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        capabilities: {},
-        protocolVersion: '2025-03-26',
-        clientInfo: { name: 'test', version: '1.0.0' },
-      },
-    });
-
-    // Use spawnSync with stdin input instead of shell echo for safety
-    const projectRoot = path.resolve(import.meta.dirname, '..', '..', '..', '..');
-    const result = spawnSync(
-      'node',
-      [path.join(projectRoot, 'apps/server/dist/oneshot-mcp-server.mjs')],
-      { input: initRequest + '\n', timeout: 10_000, cwd: projectRoot },
-    );
-
-    expect(result.status).toBe(0);
-    const output = result.stdout.toString().trim();
-    const response = JSON.parse(output);
-    expect(response.result.serverInfo.name).toBe('oneshot');
-    expect(response.result.capabilities.tools).toBeDefined();
-  });
-});

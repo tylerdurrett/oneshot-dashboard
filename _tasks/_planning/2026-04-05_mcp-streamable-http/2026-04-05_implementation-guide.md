@@ -108,18 +108,20 @@ workspace/
 
 ### 2.2 Remove the `injectMcpBundle()` function and build script
 
-- [ ] Remove the `injectMcpBundle()` function from `ensure-sandbox.mjs`
-- [ ] Remove the `injectMcpBundle()` call from `injectSandboxAssets()`
-- [ ] Delete `scripts/build-mcp-server.mjs`
-- [ ] Remove the `"build:mcp"` script from root `package.json`
-- [ ] Remove the `node scripts/build-mcp-server.mjs` step from the `"prego"` script in root `package.json`
-- [ ] Remove `MCP_BUNDLE_DEST` constant from `ensure-sandbox.mjs`
-- [ ] Delete `apps/server/dist/oneshot-mcp-server.mjs` if it exists (the build artifact)
+- [x] Remove the `injectMcpBundle()` function from `ensure-sandbox.mjs`
+- [x] Remove the `injectMcpBundle()` call from `injectSandboxAssets()`
+- [x] Delete `scripts/build-mcp-server.mjs`
+- [x] Remove the `"build:mcp"` script from root `package.json`
+- [x] Remove the `node scripts/build-mcp-server.mjs` step from the `"prego"` script in root `package.json`
+- [x] Remove `MCP_BUNDLE_DEST` constant from `ensure-sandbox.mjs`
+- [x] Delete `apps/server/dist/oneshot-mcp-server.mjs` if it exists (the build artifact)
 
 **Acceptance Criteria:**
 - `pnpm prego` runs without errors (no missing script)
 - `scripts/build-mcp-server.mjs` does not exist
 - `injectSandboxAssets()` still injects the soul file but skips the MCP bundle
+
+**Notes:** No divergences from plan. Also removed the "MCP server bundle" smoke test from `mcp-server.test.ts` (and its now-unused `spawnSync`/`path` imports) since it tested the deleted bundle artifact. All 34 MCP tests pass. TypeScript compiles cleanly.
 
 ### 2.3 Update AGENTS.md and sandbox docs
 

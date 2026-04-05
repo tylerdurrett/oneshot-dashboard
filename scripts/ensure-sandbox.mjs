@@ -38,8 +38,6 @@ const SANDBOX_NAME = process.env.SANDBOX_NAME ?? 'oneshot-sandbox';
 // Only the workspace/ subdirectory is mounted — NOT the project root.
 // This prevents the agent from accessing or modifying project source code.
 const SANDBOX_WORKSPACE = process.env.SANDBOX_WORKSPACE ?? path.join(ROOT, 'workspace');
-/** Where the MCP bundle lands inside the sandbox (used by both injection and config). */
-const MCP_BUNDLE_DEST = '/home/agent/oneshot-mcp-server.mjs';
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -294,26 +292,7 @@ function injectSandboxAssets() {
     console.log('  ⚠ Could not inject soul file');
   }
 
-  injectMcpBundle();
   injectMcpConfig();
-}
-
-/** Inject the pre-built MCP bundle — self-contained, no node_modules needed in sandbox. */
-function injectMcpBundle() {
-  const bundlePath = path.join(ROOT, 'apps', 'server', 'dist', 'oneshot-mcp-server.mjs');
-  let bundleContent;
-  try {
-    bundleContent = fs.readFileSync(bundlePath);
-  } catch {
-    console.log(`  ⚠ MCP server bundle not found at ${bundlePath} — run pnpm build:mcp first`);
-    return;
-  }
-
-  if (injectFileIntoSandbox(bundleContent, MCP_BUNDLE_DEST, { chmod: '644' })) {
-    console.log('  ✓ MCP server bundle injected');
-  } else {
-    console.log('  ⚠ Could not inject MCP bundle — tools may be unavailable');
-  }
 }
 
 /**
