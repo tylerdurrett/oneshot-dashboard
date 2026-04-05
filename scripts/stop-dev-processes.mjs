@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { getActiveServiceManager } from './lib/service-status.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const defaultPort = 4900;
@@ -96,52 +97,20 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Must match LAUNCHD_LABEL in scripts/launchd-common.sh
-const launchdLabel = 'com.tdogmini.oneshot-dashboard';
-
-function isLaunchdManaged() {
-  if (process.platform !== 'darwin') return false;
-  try {
-    execFileSync('launchctl', ['print', `gui/${process.getuid()}/${launchdLabel}`], {
-      stdio: 'ignore',
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Must match SYSTEMD_SERVICE_NAME in scripts/systemd-common.sh
-const systemdServiceName = 'oneshot-dashboard';
-
-function isSystemdManaged() {
-  if (process.platform !== 'linux') return false;
-  try {
-    const output = execFileSync(
-      'systemctl',
-      ['--user', 'is-active', `${systemdServiceName}.service`],
-      { encoding: 'utf8', stdio: 'pipe' },
-    ).trim();
-    return output === 'active';
-  } catch {
-    return false;
-  }
-}
-
 async function main() {
   // Warn if a service manager is managing the service — killing processes will
   // just cause it to restart them immediately.
-  if (isLaunchdManaged()) {
+  const serviceManager = getActiveServiceManager();
+  if (serviceManager) {
     console.log(
-      'Warning: oneshot-dashboard is managed by launchd.\n' +
-      'Killing processes will cause launchd to restart them immediately.\n' +
-      'Use `pnpm service:uninstall` to stop the persistent service.\n',
-    );
-  } else if (isSystemdManaged()) {
-    console.log(
-      'Warning: oneshot-dashboard is managed by systemd.\n' +
-      'Killing processes will cause systemd to restart them immediately.\n' +
-      'Use `pnpm service:uninstall` to stop the persistent service.\n',
+      `Warning: oneshot-dashboard is managed by ${serviceManager}.\n` +
+      'Killing processes will cause them to restart immediately.\n' +
+      'The service uses tsx watch — code changes are picked up automatically.\n' +
+      '\n' +
+      'What to do instead:\n' +
+      '  • Nothing — your code changes are already live via hot reload.\n' +
+      '  • pnpm service:restart — full restart (kills + restarts cleanly).\n' +
+      '  • pnpm service:uninstall — stop the service permanently.\n',
     );
   }
 
