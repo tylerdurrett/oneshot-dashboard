@@ -1,4 +1,12 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Load env vars from project root: .env.local first (secrets/overrides), then .env (safe defaults).
+// dotenv won't overwrite values already set, so .env.local takes precedence.
+const __dotenvDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+dotenv.config({ path: resolve(__dotenvDir, '.env.local') });
+dotenv.config({ path: resolve(__dotenvDir, '.env') });
 
 import cors from '@fastify/cors';
 import { db as defaultDb } from '@repo/db';

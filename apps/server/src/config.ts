@@ -77,6 +77,11 @@ export const config = {
   /** Attempts outside this window are pruned, so the breaker resets naturally. */
   healWindowMs: envInt('HEAL_WINDOW_MS', 900_000),
   credentialSweepEnabled: envBool('CREDENTIAL_SWEEP_ENABLED', true),
+
+  // -- AI --
+
+  /** Google Gemini API key for auto-title generation. Empty string = disabled. */
+  googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? '',
 };
 
 /** Check whether an origin is allowed for CORS (any host on the web app port). */

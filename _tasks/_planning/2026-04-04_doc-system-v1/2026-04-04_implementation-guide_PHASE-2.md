@@ -78,9 +78,9 @@ apps/web/src/app/(shell)/docs/
 
 ### 2.1 Install Vercel AI SDK and configure API key
 
-- [ ] Install `ai` and `@ai-sdk/google` in the server package: `pnpm --filter @repo/server add ai @ai-sdk/google`.
-- [ ] Add `googleGeminiApiKey` to `apps/server/src/config.ts`: `googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? ''`. Place it in a new `// -- AI --` section after the credential sweep config.
-- [ ] Fix dotenv loading in `apps/server/src/index.ts`: the current `import 'dotenv/config'` only reads from `apps/server/` (Turbo sets cwd to the package directory), but secrets live in the root `.env.local`. Replace the bare import with explicit `dotenv.config()` calls that load from the project root:
+- [x] Install `ai` and `@ai-sdk/google` in the server package: `pnpm --filter @repo/server add ai @ai-sdk/google`.
+- [x] Add `googleGeminiApiKey` to `apps/server/src/config.ts`: `googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? ''`. Place it in a new `// -- AI --` section after the credential sweep config.
+- [x] Fix dotenv loading in `apps/server/src/index.ts`: the current `import 'dotenv/config'` only reads from `apps/server/` (Turbo sets cwd to the package directory), but secrets live in the root `.env.local`. Replace the bare import with explicit `dotenv.config()` calls that load from the project root:
   ```typescript
   import dotenv from 'dotenv';
   import { resolve, dirname } from 'node:path';
@@ -91,8 +91,8 @@ apps/web/src/app/(shell)/docs/
   dotenv.config({ path: resolve(__dotenvDir, '.env') });
   ```
   `.env.local` loads first (secrets/overrides), then `.env` (safe defaults). `dotenv` won't overwrite values already set, so `.env.local` takes precedence.
-- [ ] `GOOGLE_GEMINI_API_KEY` is already set in the root `.env.local`. Verify the server reads it after the dotenv fix: `config.googleGeminiApiKey` should be non-empty at startup.
-- [ ] Verify: server starts without errors when the key is absent (for other developers who haven't set it).
+- [x] `GOOGLE_GEMINI_API_KEY` is already set in the root `.env.local`. Verify the server reads it after the dotenv fix: `config.googleGeminiApiKey` should be non-empty at startup. *(Confirmed via dotenv debug output: `.env.local` loads 2 vars from project root.)*
+- [x] Verify: server starts without errors when the key is absent (for other developers who haven't set it). *(All 58 docs/health tests pass with empty default.)*
 
 **Acceptance Criteria:**
 - `ai` and `@ai-sdk/google` are in server's `package.json` dependencies.

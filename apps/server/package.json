@@ -11,21 +11,23 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.58",
     "@fastify/cors": "^11.0.0",
     "@fastify/websocket": "^11.0.0",
     "@repo/db": "workspace:*",
     "@repo/features": "workspace:*",
+    "ai": "^6.0.97",
     "dotenv": "^17.0.0",
     "fastify": "^5.7.0"
   },
   "devDependencies": {
-    "postgres": "^3.4.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^25.3.0",
     "@types/ws": "^8.18.1",
     "drizzle-orm": "^0.41.0",
+    "postgres": "^3.4.5",
     "tsx": "^4.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0",
