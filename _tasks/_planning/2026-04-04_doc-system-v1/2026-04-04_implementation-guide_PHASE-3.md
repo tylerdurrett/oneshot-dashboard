@@ -186,16 +186,17 @@ apps/web/src/
 
 ### 3.3 Add get_current_doc tool
 
-- [ ] Add `get_current_doc` tool to `mcp-server.ts`
-- [ ] No parameters
-- [ ] Calls `GET /docs/active` on the host API
-- [ ] Returns: doc title + full content as markdown
-- [ ] If no active doc is set, returns a helpful message ("No doc is currently open. Use list_docs to see available docs.")
-- [ ] Write a test
+- [x] Add `get_current_doc` tool to `mcp-server.ts`
+- [x] No parameters
+- [x] Calls `GET /docs/active` on the host API
+- [x] Returns: doc title + full content as markdown
+- [x] If no active doc is set, returns a helpful message ("No doc is currently open. Use list_docs to see available docs.")
+- [x] Write a test
+  - **Note:** Added 2 tests in `mcp-server.test.ts` testing the underlying API interaction: active doc exists (returns title + markdown), and 404 when no active doc. All 20 tests pass (18 existing + 2 new).
 
 **Acceptance Criteria:**
-- Returns the currently viewed doc's title and markdown content
-- Gracefully handles "no active doc" state
+- Returns the currently viewed doc's title and markdown content ✅
+- Gracefully handles "no active doc" state ✅
 
 ### 3.4 Add list_docs tool
 

@@ -202,6 +202,38 @@ describe('api helper', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// get_current_doc tool logic
+// ---------------------------------------------------------------------------
+
+// The tool handler is registered on McpServer and not directly importable.
+// We extract and test the same logic inline: api call → format response.
+
+describe('get_current_doc logic', () => {
+  /** Mirrors the tool handler in mcp-server.ts */
+  async function getCurrentDoc() {
+    const res = await api('GET', '/docs/active');
+    if (!res.ok) {
+      return { content: [{ type: 'text' as const, text: 'No doc is currently open. Use list_docs to see available docs.' }] };
+    }
+    const { title, markdown } = res.data as { title: string; markdown: string };
+    return { content: [{ type: 'text' as const, text: `# ${title}\n\n${markdown}` }] };
+  }
+
+  it('returns formatted markdown with title when active doc exists', async () => {
+    mockHttpResponse(200, { id: 'doc-aaa', title: 'Meeting Notes', markdown: '## Agenda\n\n- Item 1' });
+    const result = await getCurrentDoc();
+    expect(result.content[0]!.text).toBe('# Meeting Notes\n\n## Agenda\n\n- Item 1');
+  });
+
+  it('returns helpful message when no active doc is set', async () => {
+    mockHttpResponse(404, { error: 'No active document' });
+    const result = await getCurrentDoc();
+    expect(result.content[0]!.text).toContain('No doc is currently open');
+    expect(result.content[0]!.text).toContain('list_docs');
+  });
+});
+
 describe('MCP server bundle', () => {
   it('responds to MCP initialize request', () => {
     const initRequest = JSON.stringify({

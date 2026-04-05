@@ -251,6 +251,32 @@ server.tool(
   },
 );
 
+// ===========================================================================
+// Doc Tools
+// ===========================================================================
+
+// -- get_current_doc --------------------------------------------------------
+
+server.tool(
+  'get_current_doc',
+  "Get the doc the user is currently viewing — returns title and full markdown content.",
+  {},
+  async () => {
+    try {
+      const res = await api('GET', '/docs/active');
+      if (!res.ok) {
+        return textResult(
+          'No doc is currently open. Use list_docs to see available docs.',
+        );
+      }
+      const { title, markdown } = res.data as { title: string; markdown: string };
+      return { content: [{ type: 'text' as const, text: `# ${title}\n\n${markdown}` }] };
+    } catch (e) {
+      return errorResult(`Failed to get current doc. ${(e as Error).message}`);
+    }
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
