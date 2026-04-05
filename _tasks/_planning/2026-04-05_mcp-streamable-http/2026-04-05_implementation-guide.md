@@ -125,13 +125,15 @@ workspace/
 
 ### 2.3 Update AGENTS.md and sandbox docs
 
-- [ ] Remove references to `pnpm build:mcp` from `AGENTS.md`
-- [ ] Update the sandbox section to reflect that MCP tools are served via HTTP, not a bundled process
-- [ ] Update `docs/sandbox.md` if it references the old build/inject workflow
+- [x] Remove references to `pnpm build:mcp` from `AGENTS.md`
+- [x] Update the sandbox section to reflect that MCP tools are served via HTTP, not a bundled process
+- [x] Update `docs/sandbox.md` if it references the old build/inject workflow
 
 **Acceptance Criteria:**
 - No documentation references `build:mcp` or the old bundle injection flow
 - Sandbox docs describe the HTTP transport
+
+**Notes:** No divergences from plan. Updated AGENTS.md sandbox section (removed bundle/build references, simplified to "just restart the server"). Updated docs/sandbox.md: reduced startup injection items from 4 to 3 (removed MCP bundle), rewrote MCP tools section to describe Streamable HTTP transport, removed node:http proxy workaround explanation, updated troubleshooting. Verified via grep that no stale references remain in live docs (only historical _tasks/_planning/ files).
 
 ---
 

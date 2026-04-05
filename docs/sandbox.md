@@ -10,27 +10,23 @@ When the sandbox is created (`docker sandbox run claude workspace/`), Docker mou
 
 ## What gets injected at startup
 
-Four things are set up each time the sandbox starts (via `scripts/ensure-sandbox.mjs`):
+Three things are set up each time the sandbox starts (via `scripts/ensure-sandbox.mjs`):
 
 1. **Soul file** → `/home/agent/.claude/CLAUDE.md` — The agent's identity and instructions (sourced from `apps/server/src/chat/soul.md`). Claude Code auto-loads this at session start.
 
-2. **MCP server bundle** → `/home/agent/oneshot-mcp-server.mjs` — The pre-built MCP tools server (timers, docs). Injected via stdin since the project source is not mounted.
+2. **MCP server config** → `workspace/.mcp.json` — Written to the host's `workspace/` directory (visible via VirtioFS mount). Points to the Fastify server's `/mcp` endpoint via Streamable HTTP transport. Claude Code reads MCP servers from `.mcp.json` in its cwd, not from `settings.json`.
 
-3. **MCP server config** → `workspace/.mcp.json` — Written to the host's `workspace/` directory (visible via VirtioFS mount). Claude Code reads MCP servers from `.mcp.json` in its cwd, not from `settings.json`.
-
-4. **Host networking** — Allows the sandbox to reach host services (127.0.0.0/8). Required because the MCP server calls the host API via `host.docker.internal`, which resolves to a loopback address blocked by the sandbox's default network policy.
+3. **Host networking** — Allows the sandbox to reach host services (127.0.0.0/8). Required because the MCP server runs on the host at `http://host.docker.internal:<port>/mcp`, which resolves to a loopback address blocked by the sandbox's default network policy.
 
 ## MCP tools
 
-The MCP server gives the chat agent tools to manage timers (start, stop, create buckets, check status, etc.) and read docs (get current doc, list docs, read a doc by name). It communicates with the host's API server over `http://host.docker.internal:<port>`. The port is read from `project.config.json` at injection time.
+The MCP server gives the chat agent tools to manage timers (start, stop, create buckets, check status, etc.) and read docs (get current doc, list docs, read a doc by name). It runs in-process on the Fastify server and is served over Streamable HTTP at `/mcp`. The sandbox connects to it via `http://host.docker.internal:<port>/mcp`. The port is read from `project.config.json` at injection time.
 
-The MCP server uses Node's built-in `http` module (not `fetch`) because the sandbox routes HTTP through a MITM proxy. Node 20's `fetch` doesn't honor the `HTTP_PROXY` environment variable, so direct `fetch` calls fail. The `http.request` approach sends requests through the proxy correctly.
-
-The MCP server source is in `apps/server/src/chat/mcp-server.ts` and gets bundled to `apps/server/dist/oneshot-mcp-server.mjs` by `scripts/build-mcp-server.mjs`.
+The MCP server source is in `apps/server/src/chat/mcp-server.ts` and the route plugin is in `apps/server/src/routes/mcp.ts`.
 
 ## Troubleshooting
 
 - **"Agent is offline"** — Run `pnpm sandbox` to set up or re-authenticate the sandbox
-- **Timer tools not working** — Restart with `pnpm service:uninstall && pnpm stop && pnpm service:install` to re-inject the MCP config and bundle
+- **Timer tools not working** — Restart with `pnpm service:uninstall && pnpm stop && pnpm service:install` to restart the server and re-inject the MCP config
 - **Stale soul file** — Same restart sequence; all assets are re-injected each time
 - **After upgrading** — If the sandbox was created before isolation changes, destroy and recreate it: `docker sandbox rm oneshot-sandbox && pnpm prego`
