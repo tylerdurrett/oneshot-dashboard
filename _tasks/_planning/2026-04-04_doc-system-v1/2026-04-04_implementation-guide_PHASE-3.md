@@ -53,9 +53,9 @@ apps/web/src/
 
 ### 1.1 Add linkedom + BlockNote to server dependencies
 
-- [ ] Install `linkedom` as a dependency of `apps/server`
-- [ ] Install `@blocknote/core` as a dependency of `apps/server` (same version as `apps/web`: `^0.47.3`)
-- [ ] Verify both packages resolve correctly in the server's module graph
+- [x] Install `linkedom` as a dependency of `apps/server`
+- [x] Install `@blocknote/core` as a dependency of `apps/server` (same version as `apps/web`: `^0.47.3`)
+- [x] Verify both packages resolve correctly in the server's module graph
 
 **Acceptance Criteria:**
 - `apps/server/package.json` lists `linkedom` and `@blocknote/core` as dependencies

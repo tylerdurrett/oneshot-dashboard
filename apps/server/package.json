@@ -12,13 +12,15 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.58",
+    "@blocknote/core": "^0.47.3",
     "@fastify/cors": "^11.0.0",
     "@fastify/websocket": "^11.0.0",
     "@repo/db": "workspace:*",
     "@repo/features": "workspace:*",
     "ai": "^6.0.97",
     "dotenv": "^17.0.0",
-    "fastify": "^5.7.0"
+    "fastify": "^5.7.0",
+    "linkedom": "^0.18.12"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
