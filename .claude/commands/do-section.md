@@ -10,7 +10,7 @@ The user wants you to implement one part of an implementation plan doc. They are
 
 Our goal is to implement the plan using standard best practices and clean, maintainable, well-documented code following the established codebase patterns. Please implement this next unfinished section of the phase. ONLY ONE SECTION.
 
-As much as possible, perform your own testing and acceptance criteria validation, unless manual user testing is required.
+Perform your own testing and acceptance criteria validation. Smoke test steps (curl, browser, chat) are NOT "manual user testing" — they are your responsibility. Execute them, paste the output, and check the box only after confirming the expected result.
 
 ALWAYS run the code quality review after you finish implementation.
 

@@ -69,6 +69,12 @@ actually works when everything is wired together. This catches
 integration bugs (wrong env var names, module evaluation order,
 missing config) that mocks hide by design.
 
+Rules for smoke test checkboxes:
+- A checkbox is only checked after you actually execute the step and
+  observe the result. "Covered by automated tests" is not valid.
+- If you cannot run a step (no Docker, no browser, etc.), leave it
+  unchecked and add a note explaining why.
+
 ## End Sections
 
 ### Dependency Graph

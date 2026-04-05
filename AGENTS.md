@@ -35,7 +35,7 @@ Small changes are one-offs. Larger features use `_tasks/` with status folders: `
 
 ## Sandbox
 
-The chat agent runs in a Docker sandbox. Only the `workspace/` subdirectory is mounted — the agent cannot access project source code. The soul file, MCP server bundle, and MCP config are injected at startup by `scripts/ensure-sandbox.mjs`. See `docs/sandbox.md`.
+The chat agent runs in a Docker sandbox. Only the `workspace/` subdirectory is mounted — the agent cannot access project source code. The soul file, MCP server bundle, and MCP config are injected at startup by `scripts/ensure-sandbox.mjs`. After editing MCP tool source (`apps/server/src/chat/`), run `pnpm build:mcp` to rebuild the bundle, or `pnpm watch:mcp` to rebuild continuously. The server restart alone does not update the sandbox. See `docs/sandbox.md`.
 
 ## Restarting Dev Servers
 
@@ -54,7 +54,7 @@ After schema changes (`packages/db/src/schema.ts`), `tsx watch` auto-restarts th
 
 - Never edit files ending in .human.md. Those were created by a person and should stay that way.
 - Always create tests for your code
-- **Mocked tests are not enough.** After building a feature, restart the server and smoke-test the real endpoint (curl, browser). Mocks hide integration bugs — prove it works end-to-end.
+- **Mocked tests are not enough.** After building a feature, restart the server and smoke-test the real endpoint (curl, browser). Mocks hide integration bugs — prove it works end-to-end. "Covered by automated tests" is never a valid substitute — actually run it.
 - When you fix a bug, add a comment documenting why you're updating the code so we prevent regressions.
 - To type-check without a full build, use `pnpm --filter @repo/web tsc --noEmit`.
 - When doing UI work, visually test your code using the chrome devtools skill
