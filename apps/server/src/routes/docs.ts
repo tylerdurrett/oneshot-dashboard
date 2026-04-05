@@ -20,6 +20,20 @@ export interface DocsRoutesOptions {
   database?: Database;
 }
 
+// In-memory active doc tracking (single-user app — no DB persistence needed).
+// Resets on server restart, which is fine — the frontend re-reports on navigation.
+let activeDocId: string | null = null;
+
+/** Reset active doc state. Exported for test isolation. */
+export function resetActiveDoc(): void {
+  activeDocId = null;
+}
+
+/** Force-set active doc ID without validation. Exported for test isolation only. */
+export function setActiveDocForTest(id: string | null): void {
+  activeDocId = id;
+}
+
 export async function docsRoutes(
   server: FastifyInstance,
   opts: DocsRoutesOptions,
@@ -73,6 +87,40 @@ export async function docsRoutes(
     const wsId = await requireWorkspaceId();
     const doc = await getMostRecentDocument(wsId, db);
     return { document: doc };
+  });
+
+  // --- Active doc tracking (static routes — must be before /docs/:id) ---
+
+  /** PUT /docs/active — set the currently viewed doc. */
+  server.put<{ Body: { docId: string } }>(
+    '/docs/active',
+    async (request, reply) => {
+      const { docId } = request.body ?? {};
+      if (!docId) {
+        return reply.status(400).send({ error: 'docId is required' });
+      }
+      const doc = await getDocumentById(docId, db);
+      if (!doc) {
+        return reply.status(404).send({ error: 'Document not found' });
+      }
+      activeDocId = docId;
+      return { ok: true };
+    },
+  );
+
+  /** GET /docs/active — return the currently viewed doc with markdown content. */
+  server.get('/docs/active', async (_request, reply) => {
+    if (!activeDocId) {
+      return reply.status(404).send({ error: 'No active document' });
+    }
+    const doc = await getDocumentById(activeDocId, db);
+    if (!doc) {
+      // Doc was deleted since it was set as active — clear stale reference
+      activeDocId = null;
+      return reply.status(404).send({ error: 'No active document' });
+    }
+    const markdown = blocksToMarkdown(doc.content as unknown[]);
+    return { id: doc.id, title: doc.title, markdown };
   });
 
   /** GET /docs/:id/markdown — return a doc's content as markdown. */
@@ -166,6 +214,9 @@ export async function docsRoutes(
       const deleted = await deleteDocument(request.params.id, db);
       if (!deleted) {
         return reply.status(404).send({ error: 'Document not found' });
+      }
+      if (activeDocId === request.params.id) {
+        activeDocId = null;
       }
       return { success: true };
     },

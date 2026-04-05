@@ -105,20 +105,23 @@ apps/web/src/
 
 ### 2.1 Server-side active doc state
 
-- [ ] Add an in-memory `activeDocId: string | null` variable in `apps/server/src/routes/docs.ts` (module-level, single-user app — no database needed)
-- [ ] Add `PUT /docs/active` endpoint: accepts `{ docId: string }`, stores the ID, returns `{ ok: true }`
-- [ ] Add `GET /docs/active` endpoint: returns the active doc's full data (ID, title, markdown content) or `404` if no active doc is set
-- [ ] When a doc is deleted, clear `activeDocId` if it matches the deleted doc
-- [ ] Write tests in `apps/server/src/__tests__/doc-active.test.ts`:
+- [x] Add an in-memory `activeDocId: string | null` variable in `apps/server/src/routes/docs.ts` (module-level, single-user app — no database needed)
+- [x] Add `PUT /docs/active` endpoint: accepts `{ docId: string }`, stores the ID, returns `{ ok: true }`
+- [x] Add `GET /docs/active` endpoint: returns the active doc's full data (ID, title, markdown content) or `404` if no active doc is set
+- [x] When a doc is deleted, clear `activeDocId` if it matches the deleted doc
+- [x] Write tests in `apps/server/src/__tests__/doc-active.test.ts`:
   - PUT sets active doc, GET retrieves it
   - GET returns 404 when no active doc set
   - GET returns 404 when active doc has been deleted
   - PUT with non-existent doc ID returns 404
+  - Switching active doc updates correctly
+  - Stale reference (activeDocId points to nonexistent doc) is cleaned up by GET handler
+  - **Note:** Added `resetActiveDoc()` and `setActiveDocForTest()` exports for test isolation (same pattern as `resetApiKeyWarning()` in document.ts). Also added 400 validation for missing `docId` in PUT body.
 
 **Acceptance Criteria:**
-- `PUT /docs/active` + `GET /docs/active` round-trips correctly
-- Active doc state resets when the referenced doc is deleted
-- Single-user, in-memory — no database tables needed
+- `PUT /docs/active` + `GET /docs/active` round-trips correctly ✅
+- Active doc state resets when the referenced doc is deleted ✅
+- Single-user, in-memory — no database tables needed ✅
 
 ### 2.2 Frontend active doc reporting
 
