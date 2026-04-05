@@ -189,7 +189,7 @@ apps/web/src/app/(shell)/docs/
 
 ### 3.2 Auto-title hook
 
-- [ ] Create `apps/web/src/app/(shell)/docs/_hooks/use-auto-title.ts` with a `useAutoTitle(options)` hook:
+- [x] Create `apps/web/src/app/(shell)/docs/_hooks/use-auto-title.ts` with a `useAutoTitle(options)` hook:
   - **Options:** `{ docId: string; doc: DocumentResponse | undefined; enabled: boolean }`
   - **Returns:** `{ notifyContentChange: (blocks: Block[]) => void }`
   - **Internal state:** Uses `useGenerateTitle(docId)` mutation. Timer ref for debounce. Ref for latest blocks (to read in timer callback without stale closure).
@@ -204,8 +204,9 @@ apps/web/src/app/(shell)/docs/
        - If `doc.titleGeneratedFromBlockIds` is not null (re-title case): compare current block IDs to stored. Calculate overlap ratio = (count of current IDs present in stored) / stored length. Calculate size ratio = current length / stored length. If overlap >= 0.5 AND size ratio < 2, skip (not enough change).
        - All checks pass → call `generateMutation.mutate()`.
   - **Cleanup:** `useEffect` cleanup clears timer on unmount and docId change.
-- [ ] Add `extractTextFromBlocks(blocks: Block[]): string` utility function in the hook file — extracts text from typed BlockNote `Block` objects. Each block has `content` (array of `InlineContent` with `type === 'text'` having a `text` field) and `children` (nested `Block[]`). Joins with spaces.
-- [ ] Write tests in `apps/web/src/app/(shell)/docs/_hooks/__tests__/use-auto-title.test.ts`:
+  - *(Code review: stabilized `notifyContentChange` identity by reading `doc`, `enabled`, and `generateMutation.mutate` via refs — empty `useCallback` deps prevents identity churn on every keystroke.)*
+- [x] Add `extractTextFromBlocks(blocks: Block[]): string` utility function in the hook file — extracts text from typed BlockNote `Block` objects. Each block has `content` (array of `InlineContent` with `type === 'text'` having a `text` field) and `children` (nested `Block[]`). Joins with spaces.
+- [x] Write tests in `apps/web/src/app/(shell)/docs/_hooks/__tests__/use-auto-title.test.ts` (13 tests including 4 extractTextFromBlocks tests):
   - Timer resets on each `notifyContentChange` call (use `vi.useFakeTimers`).
   - Does not fire when `isTitleManual` is true.
   - Does not fire when content is below threshold.
