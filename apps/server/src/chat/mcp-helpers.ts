@@ -155,6 +155,47 @@ export async function resolveDocOrError(nameOrId: string): Promise<
 }
 
 // ---------------------------------------------------------------------------
+// Plain text extraction (lightweight — no DOM needed, safe for MCP bundle)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract plain text from BlockNote JSONB content blocks.
+ * Walks the block tree, concatenating text spans from `content[].text`.
+ * Used by list_docs to generate content snippets without pulling in
+ * linkedom/BlockNote (which live on the server side only).
+ */
+export function extractPlainText(blocks: unknown[]): string {
+  const lines: string[] = [];
+
+  for (const block of blocks) {
+    if (typeof block !== 'object' || block === null) continue;
+    const b = block as Record<string, unknown>;
+
+    if (Array.isArray(b.content)) {
+      const spans: string[] = [];
+      for (const inline of b.content) {
+        if (
+          typeof inline === 'object' &&
+          inline !== null &&
+          (inline as Record<string, unknown>).type === 'text' &&
+          typeof (inline as Record<string, unknown>).text === 'string'
+        ) {
+          spans.push((inline as Record<string, unknown>).text as string);
+        }
+      }
+      if (spans.length) lines.push(spans.join(''));
+    }
+
+    if (Array.isArray(b.children)) {
+      const childText = extractPlainText(b.children as unknown[]);
+      if (childText) lines.push(childText);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
 // Result formatters
 // ---------------------------------------------------------------------------
 

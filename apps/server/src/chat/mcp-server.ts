@@ -10,7 +10,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { api, resolveOrError, textResult, errorResult, apiError } from './mcp-helpers.js';
+import { api, resolveOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
 // MCP Server
@@ -273,6 +273,50 @@ server.tool(
       return { content: [{ type: 'text' as const, text: `# ${title}\n\n${markdown}` }] };
     } catch (e) {
       return errorResult(`Failed to get current doc. ${(e as Error).message}`);
+    }
+  },
+);
+
+// -- list_docs --------------------------------------------------------------
+
+server.tool(
+  'list_docs',
+  'List all docs with title, ID, last updated time, pinned status, and a short content preview.',
+  {},
+  async () => {
+    try {
+      const res = await api('GET', '/docs');
+      if (!res.ok) return apiError(res);
+
+      const docs = (res.data as { documents: Array<Record<string, unknown>> }).documents ?? [];
+
+      if (docs.length === 0) {
+        return textResult('No docs found.');
+      }
+
+      const SNIPPET_MAX = 200;
+      const sections = docs.map((doc) => {
+        const title = (doc.title as string) || 'Untitled';
+        const id = doc.id as string;
+        const updatedAt = doc.updatedAt as string | undefined;
+        const pinned = doc.pinnedAt ? ' | Pinned' : '';
+
+        let snippet = '';
+        if (Array.isArray(doc.content) && doc.content.length > 0) {
+          const text = extractPlainText(doc.content as unknown[]);
+          snippet = text.length > SNIPPET_MAX
+            ? text.slice(0, SNIPPET_MAX) + '...'
+            : text;
+        }
+
+        const updated = updatedAt ? updatedAt.replace('T', ' ').replace(/\.\d+Z$/, 'Z') : 'unknown';
+        const preview = snippet ? `\nPreview: ${snippet}` : '';
+        return `## ${title}\nID: ${id} | Updated: ${updated}${pinned}${preview}`;
+      });
+
+      return { content: [{ type: 'text' as const, text: sections.join('\n\n') }] };
+    } catch (e) {
+      return errorResult(`Failed to list docs. ${(e as Error).message}`);
     }
   },
 );

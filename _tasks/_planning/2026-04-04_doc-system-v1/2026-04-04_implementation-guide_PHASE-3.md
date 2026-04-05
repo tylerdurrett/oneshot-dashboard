@@ -200,17 +200,19 @@ apps/web/src/
 
 ### 3.4 Add list_docs tool
 
-- [ ] Add `list_docs` tool to `mcp-server.ts`
-- [ ] No parameters
-- [ ] Calls `GET /docs` on the host API
-- [ ] Returns: list of docs with ID, title, updatedAt, pinned status, and a content snippet (first ~200 chars of plain text)
-- [ ] Format the output for readability (one doc per section, not raw JSON)
-- [ ] Write a test
+- [x] Add `list_docs` tool to `mcp-server.ts`
+- [x] No parameters
+- [x] Calls `GET /docs` on the host API
+- [x] Returns: list of docs with ID, title, updatedAt, pinned status, and a content snippet (first ~200 chars of plain text)
+- [x] Format the output for readability (one doc per section, not raw JSON)
+- [x] Write a test
+  - **Note:** Added `extractPlainText()` helper to `mcp-helpers.ts` for lightweight plain text extraction from BlockNote JSONB (no DOM needed). This mirrors `extractTextFromBlocks` in `document.ts` but stays within the MCP bundle boundary — the MCP server can't import from `document.ts` without pulling in heavy deps (DB, linkedom, AI SDK). Added 6 tests for `extractPlainText` and 4 tests for `list_docs` logic (formatted output, empty list, truncation, no-content docs). All 30 tests pass.
+  - **Note:** Used locale-independent date formatting (`updatedAt.replace('T', ' ')...`) instead of `toLocaleString()` per code review — ensures consistent output regardless of server locale.
 
 **Acceptance Criteria:**
-- Returns all docs with identifying info
-- Content snippets are truncated, not full documents
-- Output is formatted for LLM readability
+- Returns all docs with identifying info ✅
+- Content snippets are truncated, not full documents ✅
+- Output is formatted for LLM readability ✅
 
 ### 3.5 Add read_doc tool
 

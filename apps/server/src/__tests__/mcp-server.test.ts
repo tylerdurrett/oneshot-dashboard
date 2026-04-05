@@ -8,7 +8,7 @@ import http from 'node:http';
 import { EventEmitter, Readable } from 'node:stream';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveBucket, resolveDoc, api, API_BASE } from '../chat/mcp-helpers.js';
+import { resolveBucket, resolveDoc, api, extractPlainText, API_BASE } from '../chat/mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Mock node:http so the helpers use our fake instead of real HTTP
@@ -231,6 +231,174 @@ describe('get_current_doc logic', () => {
     const result = await getCurrentDoc();
     expect(result.content[0]!.text).toContain('No doc is currently open');
     expect(result.content[0]!.text).toContain('list_docs');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractPlainText tests
+// ---------------------------------------------------------------------------
+
+describe('extractPlainText', () => {
+  it('returns empty string for empty blocks', () => {
+    expect(extractPlainText([])).toBe('');
+  });
+
+  it('extracts text from a paragraph block', () => {
+    const blocks = [
+      { type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] },
+    ];
+    expect(extractPlainText(blocks)).toBe('Hello world');
+  });
+
+  it('concatenates multiple inline spans within a block', () => {
+    const blocks = [
+      { type: 'paragraph', content: [
+        { type: 'text', text: 'Hello ' },
+        { type: 'text', text: 'world' },
+      ]},
+    ];
+    expect(extractPlainText(blocks)).toBe('Hello world');
+  });
+
+  it('joins multiple blocks with newlines', () => {
+    const blocks = [
+      { type: 'paragraph', content: [{ type: 'text', text: 'Line 1' }] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'Line 2' }] },
+    ];
+    expect(extractPlainText(blocks)).toBe('Line 1\nLine 2');
+  });
+
+  it('recurses into children', () => {
+    const blocks = [
+      { type: 'bulletListItem', content: [{ type: 'text', text: 'Parent' }], children: [
+        { type: 'bulletListItem', content: [{ type: 'text', text: 'Child' }] },
+      ]},
+    ];
+    expect(extractPlainText(blocks)).toBe('Parent\nChild');
+  });
+
+  it('skips blocks with no text content', () => {
+    const blocks = [
+      { type: 'image', props: { url: 'test.png' } },
+      { type: 'paragraph', content: [{ type: 'text', text: 'After image' }] },
+    ];
+    expect(extractPlainText(blocks)).toBe('After image');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// list_docs tool logic
+// ---------------------------------------------------------------------------
+
+describe('list_docs logic', () => {
+  /** Mirrors the tool handler in mcp-server.ts */
+  async function listDocs() {
+    const res = await api('GET', '/docs');
+    if (!res.ok) return { content: [{ type: 'text' as const, text: `API error (${res.status}): ${JSON.stringify(res.data)}` }], isError: true as const };
+
+    const docs = (res.data as { documents: Array<Record<string, unknown>> }).documents ?? [];
+    if (docs.length === 0) {
+      return { content: [{ type: 'text' as const, text: JSON.stringify('No docs found.', null, 2) }] };
+    }
+
+    const SNIPPET_MAX = 200;
+    const sections = docs.map((doc) => {
+      const title = (doc.title as string) || 'Untitled';
+      const id = doc.id as string;
+      const updatedAt = doc.updatedAt as string | undefined;
+      const pinned = doc.pinnedAt ? ' | Pinned' : '';
+
+      let snippet = '';
+      if (Array.isArray(doc.content) && doc.content.length > 0) {
+        const text = extractPlainText(doc.content as unknown[]);
+        snippet = text.length > SNIPPET_MAX
+          ? text.slice(0, SNIPPET_MAX) + '...'
+          : text;
+      }
+
+      const updated = updatedAt ? updatedAt.replace('T', ' ').replace(/\.\d+Z$/, 'Z') : 'unknown';
+      const preview = snippet ? `\nPreview: ${snippet}` : '';
+      return `## ${title}\nID: ${id} | Updated: ${updated}${pinned}${preview}`;
+    });
+
+    return { content: [{ type: 'text' as const, text: sections.join('\n\n') }] };
+  }
+
+  it('returns formatted doc list with snippets', async () => {
+    mockHttpResponse(200, {
+      documents: [
+        {
+          id: 'doc-aaa',
+          title: 'Meeting Notes',
+          updatedAt: '2026-04-04T12:00:00Z',
+          pinnedAt: '2026-04-04T10:00:00Z',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Discussed roadmap for Q3.' }] }],
+        },
+        {
+          id: 'doc-bbb',
+          title: 'Daily Journal',
+          updatedAt: '2026-04-03T08:00:00Z',
+          pinnedAt: null,
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Today was productive.' }] }],
+        },
+      ],
+    });
+
+    const result = await listDocs();
+    const text = result.content[0]!.text;
+
+    expect(text).toContain('## Meeting Notes');
+    expect(text).toContain('doc-aaa');
+    expect(text).toContain('Pinned');
+    expect(text).toContain('Preview: Discussed roadmap for Q3.');
+    expect(text).toContain('## Daily Journal');
+    expect(text).toContain('doc-bbb');
+    expect(text).toContain('Preview: Today was productive.');
+    // Daily Journal should NOT have Pinned
+    const journalSection = text.split('## Daily Journal')[1]!;
+    expect(journalSection).not.toContain('Pinned');
+  });
+
+  it('returns "No docs found." for empty list', async () => {
+    mockHttpResponse(200, { documents: [] });
+    const result = await listDocs();
+    expect(result.content[0]!.text).toContain('No docs found.');
+  });
+
+  it('truncates long content snippets to ~200 chars', async () => {
+    const longText = 'A'.repeat(300);
+    mockHttpResponse(200, {
+      documents: [{
+        id: 'doc-long',
+        title: 'Long Doc',
+        updatedAt: '2026-04-04T12:00:00Z',
+        pinnedAt: null,
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: longText }] }],
+      }],
+    });
+
+    const result = await listDocs();
+    const text = result.content[0]!.text;
+    // Snippet should be 200 chars + "..."
+    expect(text).toContain('A'.repeat(200) + '...');
+    expect(text).not.toContain('A'.repeat(201));
+  });
+
+  it('handles docs with no content gracefully', async () => {
+    mockHttpResponse(200, {
+      documents: [{
+        id: 'doc-empty',
+        title: 'Empty Doc',
+        updatedAt: '2026-04-04T12:00:00Z',
+        pinnedAt: null,
+        content: [],
+      }],
+    });
+
+    const result = await listDocs();
+    const text = result.content[0]!.text;
+    expect(text).toContain('## Empty Doc');
+    expect(text).not.toContain('Preview:');
   });
 });
 
