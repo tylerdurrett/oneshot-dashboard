@@ -101,8 +101,8 @@ export function buildServer(opts?: BuildServerOptions) {
   server.register(docsRoutes, { database: opts?.database ?? defaultDb });
 
   // -- MCP tools over Streamable HTTP (no feature flag — always active) --
-  const mcpServer = createMcpServer(opts?.database ?? defaultDb);
-  server.register(mcpRoutes, { mcpServer });
+  const mcpDb = opts?.database ?? defaultDb;
+  server.register(mcpRoutes, { createMcpServer: () => createMcpServer(mcpDb) });
 
   // -- Timer system: scheduler + routes --
   let scheduler: TimerScheduler | null = null;

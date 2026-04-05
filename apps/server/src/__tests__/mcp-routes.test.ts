@@ -88,6 +88,17 @@ function extractJsonRpcResult(response: {
     .result;
 }
 
+const MCP_INIT_REQUEST = {
+  jsonrpc: '2.0',
+  id: 1,
+  method: 'initialize',
+  params: {
+    capabilities: {},
+    protocolVersion: '2025-03-26',
+    clientInfo: { name: 'test', version: '1.0.0' },
+  },
+};
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -105,16 +116,7 @@ describe('MCP Streamable HTTP endpoint', () => {
     const address = await server.listen({ port: 0, host: '127.0.0.1' });
     port = Number(new URL(address).port);
 
-    const response = await postMcp(port, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        capabilities: {},
-        protocolVersion: '2025-03-26',
-        clientInfo: { name: 'test', version: '1.0.0' },
-      },
-    });
+    const response = await postMcp(port, MCP_INIT_REQUEST);
 
     expect(response.status).toBe(200);
     expect(response.sessionId).toBeDefined();
@@ -132,16 +134,7 @@ describe('MCP Streamable HTTP endpoint', () => {
     port = Number(new URL(address).port);
 
     // Step 1: Initialize the MCP session
-    const initResponse = await postMcp(port, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        capabilities: {},
-        protocolVersion: '2025-03-26',
-        clientInfo: { name: 'test', version: '1.0.0' },
-      },
-    });
+    const initResponse = await postMcp(port, MCP_INIT_REQUEST);
     expect(initResponse.status).toBe(200);
     const sessionId = initResponse.sessionId;
     expect(sessionId).toBeDefined();
@@ -183,6 +176,57 @@ describe('MCP Streamable HTTP endpoint', () => {
 
     const toolNames = tools.map((t) => t.name).sort();
     expect(toolNames).toEqual(expectedTools.sort());
+  });
+
+  it('supports multiple sequential client sessions', async () => {
+    server = buildServer({ logger: false });
+    const address = await server.listen({ port: 0, host: '127.0.0.1' });
+    port = Number(new URL(address).port);
+
+    // Client 1 initializes
+    const client1 = await postMcp(port, MCP_INIT_REQUEST);
+    expect(client1.status).toBe(200);
+    expect(client1.sessionId).toBeDefined();
+
+    // Client 2 initializes — must get a different session
+    const client2 = await postMcp(port, MCP_INIT_REQUEST);
+    expect(client2.status).toBe(200);
+    expect(client2.sessionId).toBeDefined();
+    expect(client2.sessionId).not.toBe(client1.sessionId);
+
+    // Both sessions can list tools independently
+    for (const sessionId of [client1.sessionId!, client2.sessionId!]) {
+      await postMcp(
+        port,
+        { jsonrpc: '2.0', method: 'notifications/initialized' },
+        { 'mcp-session-id': sessionId },
+      );
+
+      const listResponse = await postMcp(
+        port,
+        { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} },
+        { 'mcp-session-id': sessionId },
+      );
+      expect(listResponse.status).toBe(200);
+
+      const result = extractJsonRpcResult(listResponse);
+      const tools = result.tools as Array<{ name: string }>;
+      expect(tools.length).toBe(14);
+    }
+  });
+
+  it('returns 400 for unknown session ID', async () => {
+    server = buildServer({ logger: false });
+    const address = await server.listen({ port: 0, host: '127.0.0.1' });
+    port = Number(new URL(address).port);
+
+    const response = await postMcp(
+      port,
+      { jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} },
+      { 'mcp-session-id': 'nonexistent-session-id' },
+    );
+
+    expect(response.status).toBe(400);
   });
 
   it('GET /health still works after MCP registration', async () => {
