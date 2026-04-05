@@ -152,18 +152,20 @@ apps/web/src/
 
 ### 3.1 Rename MCP server files
 
-- [ ] Rename `apps/server/src/chat/timer-mcp-server.ts` → `apps/server/src/chat/mcp-server.ts`
-- [ ] Rename `apps/server/src/chat/timer-mcp-helpers.ts` → `apps/server/src/chat/mcp-helpers.ts`
-- [ ] Update all import paths in the renamed files
-- [ ] Update `scripts/build-mcp-server.mjs`: change entry point to `apps/server/src/chat/mcp-server.ts`, output to `apps/server/dist/oneshot-mcp-server.mjs`
-- [ ] Update any `package.json` scripts that reference the old filenames (e.g., `build:mcp`)
-- [ ] Verify `pnpm build:mcp` produces `apps/server/dist/oneshot-mcp-server.mjs`
-- [ ] Update existing MCP server tests if they import from the old paths
+- [x] Rename `apps/server/src/chat/timer-mcp-server.ts` → `apps/server/src/chat/mcp-server.ts`
+- [x] Rename `apps/server/src/chat/timer-mcp-helpers.ts` → `apps/server/src/chat/mcp-helpers.ts`
+- [x] Update all import paths in the renamed files
+- [x] Update `scripts/build-mcp-server.mjs`: change entry point to `apps/server/src/chat/mcp-server.ts`, output to `apps/server/dist/oneshot-mcp-server.mjs`
+- [x] Update any `package.json` scripts that reference the old filenames (e.g., `build:mcp`)
+  - **Note:** No package.json scripts referenced the old filenames directly — only `build:mcp` which calls `node scripts/build-mcp-server.mjs` (unchanged).
+- [x] Verify `pnpm build:mcp` produces `apps/server/dist/oneshot-mcp-server.mjs`
+- [x] Update existing MCP server tests if they import from the old paths
+  - **Note:** Also renamed test file `timer-mcp-server.test.ts` → `mcp-server.test.ts`. Updated `scripts/ensure-sandbox.mjs` (bundle dest, read path, server name `oneshot-timers` → `oneshot`, log messages). Updated `docs/sandbox.md` and `docs/project-structure.md`. Also updated the MCP server name in `mcp-server.ts` from `oneshot-timers` to `oneshot` since it now serves multiple tool domains.
 
 **Acceptance Criteria:**
-- All timer tools still work after the rename
-- Build produces `oneshot-mcp-server.mjs` instead of `timer-mcp-server.mjs`
-- No broken imports
+- All timer tools still work after the rename ✅ (11 tests pass)
+- Build produces `oneshot-mcp-server.mjs` instead of `timer-mcp-server.mjs` ✅
+- No broken imports ✅ (type-check passes)
 
 ### 3.2 Add doc resolution helper
 

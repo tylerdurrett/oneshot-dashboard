@@ -39,7 +39,7 @@ const SANDBOX_NAME = process.env.SANDBOX_NAME ?? 'oneshot-sandbox';
 // This prevents the agent from accessing or modifying project source code.
 const SANDBOX_WORKSPACE = process.env.SANDBOX_WORKSPACE ?? path.join(ROOT, 'workspace');
 /** Where the MCP bundle lands inside the sandbox (used by both injection and config). */
-const MCP_BUNDLE_DEST = '/home/agent/timer-mcp-server.mjs';
+const MCP_BUNDLE_DEST = '/home/agent/oneshot-mcp-server.mjs';
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -300,19 +300,19 @@ function injectSandboxAssets() {
 
 /** Inject the pre-built MCP bundle — self-contained, no node_modules needed in sandbox. */
 function injectMcpBundle() {
-  const bundlePath = path.join(ROOT, 'apps', 'server', 'dist', 'timer-mcp-server.mjs');
+  const bundlePath = path.join(ROOT, 'apps', 'server', 'dist', 'oneshot-mcp-server.mjs');
   let bundleContent;
   try {
     bundleContent = fs.readFileSync(bundlePath);
   } catch {
-    console.log(`  ⚠ MCP bundle not found at ${bundlePath} — run pnpm build:mcp first`);
+    console.log(`  ⚠ MCP server bundle not found at ${bundlePath} — run pnpm build:mcp first`);
     return;
   }
 
   if (injectFileIntoSandbox(bundleContent, MCP_BUNDLE_DEST, { chmod: '644' })) {
-    console.log('  ✓ MCP timer server bundle injected');
+    console.log('  ✓ MCP server bundle injected');
   } else {
-    console.log('  ⚠ Could not inject MCP bundle — timer tools may be unavailable');
+    console.log('  ⚠ Could not inject MCP bundle — tools may be unavailable');
   }
 }
 
@@ -330,7 +330,7 @@ function injectMcpConfig() {
   const serverPort = readServerPort();
   const mcpConfig = {
     mcpServers: {
-      'oneshot-timers': {
+      'oneshot': {
         type: 'stdio',
         command: 'node',
         args: [MCP_BUNDLE_DEST],
@@ -341,9 +341,9 @@ function injectMcpConfig() {
 
   try {
     fs.writeFileSync(path.join(SANDBOX_WORKSPACE, '.mcp.json'), JSON.stringify(mcpConfig, null, 2));
-    console.log('  ✓ MCP timer server config written (.mcp.json)');
+    console.log('  ✓ MCP server config written (.mcp.json)');
   } catch (err) {
-    console.log(`  ⚠ Could not write .mcp.json — chat timer tools may be unavailable: ${err.message}`);
+    console.log(`  ⚠ Could not write .mcp.json — chat tools may be unavailable: ${err.message}`);
   }
 }
 

@@ -1,5 +1,5 @@
 /**
- * Tests for the MCP timer server helpers (bucket resolution, API calls)
+ * Tests for the MCP server helpers (bucket resolution, API calls)
  * and a smoke test of the bundled MCP server binary.
  */
 
@@ -8,7 +8,7 @@ import http from 'node:http';
 import { EventEmitter, Readable } from 'node:stream';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { resolveBucket, api, API_BASE } from '../chat/timer-mcp-helpers.js';
+import { resolveBucket, api, API_BASE } from '../chat/mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
 // Mock node:http so the helpers use our fake instead of real HTTP
@@ -155,14 +155,14 @@ describe('MCP server bundle', () => {
     const projectRoot = path.resolve(import.meta.dirname, '..', '..', '..', '..');
     const result = spawnSync(
       'node',
-      [path.join(projectRoot, 'apps/server/dist/timer-mcp-server.mjs')],
+      [path.join(projectRoot, 'apps/server/dist/oneshot-mcp-server.mjs')],
       { input: initRequest + '\n', timeout: 10_000, cwd: projectRoot },
     );
 
     expect(result.status).toBe(0);
     const output = result.stdout.toString().trim();
     const response = JSON.parse(output);
-    expect(response.result.serverInfo.name).toBe('oneshot-timers');
+    expect(response.result.serverInfo.name).toBe('oneshot');
     expect(response.result.capabilities.tools).toBeDefined();
   });
 });

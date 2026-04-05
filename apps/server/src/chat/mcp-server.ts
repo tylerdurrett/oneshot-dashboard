@@ -1,8 +1,8 @@
 /**
- * MCP Timer Server — Exposes One Shot timer operations as Claude tools.
+ * MCP Server — Exposes One Shot operations (timers, docs) as Claude tools.
  *
  * Runs as a stdio MCP server inside the Docker sandbox. Calls the host's
- * timer REST API over HTTP via host.docker.internal.
+ * REST API over HTTP via host.docker.internal.
  *
  * Bundled into a single .mjs file by esbuild (scripts/build-mcp-server.mjs).
  */
@@ -10,13 +10,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { api, resolveOrError, textResult, errorResult, apiError } from './timer-mcp-helpers.js';
+import { api, resolveOrError, textResult, errorResult, apiError } from './mcp-helpers.js';
 
 // ---------------------------------------------------------------------------
 // MCP Server
 // ---------------------------------------------------------------------------
 
-const server = new McpServer({ name: 'oneshot-timers', version: '1.0.0' });
+const server = new McpServer({ name: 'oneshot', version: '1.0.0' });
 
 // -- get_timer_status -------------------------------------------------------
 

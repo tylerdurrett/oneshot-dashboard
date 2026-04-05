@@ -1,5 +1,5 @@
 /**
- * Shared helpers for the MCP timer server. Extracted so tests can import
+ * Shared helpers for the MCP server. Extracted so tests can import
  * these without triggering the stdio transport connection in the entry point.
  */
 
