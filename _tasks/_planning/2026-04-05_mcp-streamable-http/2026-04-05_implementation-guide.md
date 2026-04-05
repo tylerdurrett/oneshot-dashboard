@@ -157,18 +157,20 @@ workspace/
 
 ### 3.2 Migrate timer tool handlers to direct service calls
 
-- [ ] Replace `api('GET', '/timers/today')` in `get_timer_status` with a direct call to `getTodayState(db)`
-- [ ] Replace `api('GET', '/timers/buckets')` in `list_buckets` with `listBuckets(db)`
-- [ ] Replace bucket resolution (`resolveOrError` → `api()`) with direct DB queries in `start_timer`, `stop_timer`, `reset_timer`, `set_timer_time`, `set_daily_goal`, `dismiss_bucket`
-- [ ] Replace `api('POST', '/timers/buckets', body)` in `create_bucket` with direct service call
-- [ ] Replace `api('PATCH', ...)` in `update_bucket` with direct service call
-- [ ] Replace `api('DELETE', ...)` in `delete_bucket` with direct service call
-- [ ] Update `resolveBucket()` in `mcp-helpers.ts` to accept a database parameter and query directly instead of calling `api('GET', '/timers/buckets')`
+- [x] Replace `api('GET', '/timers/today')` in `get_timer_status` with a direct call to `getTodayState(db)`
+- [x] Replace `api('GET', '/timers/buckets')` in `list_buckets` with `listBuckets(db)`
+- [x] Replace bucket resolution (`resolveOrError` → `api()`) with direct DB queries in `start_timer`, `stop_timer`, `reset_timer`, `set_timer_time`, `set_daily_goal`, `dismiss_bucket`
+- [x] Replace `api('POST', '/timers/buckets', body)` in `create_bucket` with direct service call
+- [x] Replace `api('PATCH', ...)` in `update_bucket` with direct service call
+- [x] Replace `api('DELETE', ...)` in `delete_bucket` with direct service call
+- [x] Update `resolveBucket()` in `mcp-helpers.ts` to accept a database parameter and query directly instead of calling `api('GET', '/timers/buckets')`
 
 **Acceptance Criteria:**
 - All 11 timer tools work via direct service calls
 - No `api()` calls remain in timer tool handlers
 - Timer tools return the same response format as before
+
+**Notes:** No divergences from plan. `resolveBucket()` and `resolveOrError()` accept an optional `db?: Database` parameter — when provided, queries `listBuckets(db)` directly; the HTTP fallback is preserved for the transition window until Phase 3.4 removes `api()` entirely. Response formats match what the HTTP routes returned: `stop_timer` normalizes `elapsedSeconds ?? 0` and `goalReachedAt ?? null`, `reset_timer` returns `{ success: true }`, `dismiss_bucket` returns `{ success: true, dismissedAt }`. Used the typed `CreateBucketInput` instead of `Record<string, unknown>` for `create_bucket`. `update_bucket` and `delete_bucket` now handle not-found cases directly (service returns `undefined`/`false`) instead of relying on HTTP 404. All 34 MCP tests pass. TypeScript compiles cleanly.
 
 ### 3.3 Migrate doc tool handlers to direct service calls
 

@@ -4,6 +4,8 @@
  */
 
 import http from 'node:http';
+import { listBuckets } from '../services/timer-bucket.js';
+import type { Database } from '../services/thread.js';
 
 // ---------------------------------------------------------------------------
 // Config
@@ -75,13 +77,22 @@ interface Bucket {
   name: string;
 }
 
-export async function resolveBucket(nameOrId: string): Promise<{ id: string } | { error: string }> {
+export async function resolveBucket(nameOrId: string, db?: Database): Promise<{ id: string } | { error: string }> {
   if (UUID_RE.test(nameOrId)) return { id: nameOrId };
 
-  const res = await api('GET', '/timers/buckets');
-  if (!res.ok) return { error: `Failed to fetch buckets: ${JSON.stringify(res.data)}` };
-
-  const buckets = (res.data as { buckets: Bucket[] }).buckets ?? [];
+  // HTTP fallback kept until Phase 3.4 removes api() entirely.
+  let buckets: Bucket[];
+  if (db) {
+    try {
+      buckets = await listBuckets(db);
+    } catch (e) {
+      return { error: `Failed to fetch buckets: ${(e as Error).message}` };
+    }
+  } else {
+    const res = await api('GET', '/timers/buckets');
+    if (!res.ok) return { error: `Failed to fetch buckets: ${JSON.stringify(res.data)}` };
+    buckets = (res.data as { buckets: Bucket[] }).buckets ?? [];
+  }
   const needle = nameOrId.toLowerCase();
 
   // Exact case-insensitive match first
@@ -100,10 +111,10 @@ export async function resolveBucket(nameOrId: string): Promise<{ id: string } | 
 }
 
 /** Resolve or return an MCP error result. */
-export async function resolveOrError(nameOrId: string): Promise<
+export async function resolveOrError(nameOrId: string, db?: Database): Promise<
   { id: string; error?: undefined } | { id?: undefined; error: { content: Array<{ type: 'text'; text: string }>; isError: true } }
 > {
-  const result = await resolveBucket(nameOrId);
+  const result = await resolveBucket(nameOrId, db);
   if ('error' in result) {
     return { error: { content: [{ type: 'text' as const, text: result.error }], isError: true } };
   }

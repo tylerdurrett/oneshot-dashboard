@@ -13,6 +13,22 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { api, resolveOrError, resolveDocOrError, textResult, errorResult, apiError, extractPlainText } from './mcp-helpers.js';
 import type { Database } from '../services/thread.js';
+import {
+  listBuckets,
+  createBucket,
+  updateBucket,
+  deleteBucket,
+  type CreateBucketInput,
+} from '../services/timer-bucket.js';
+import {
+  getTodayState,
+  startTimer,
+  stopTimer,
+  resetProgress,
+  setElapsedTime,
+  setDailyGoal,
+  dismissBucket,
+} from '../services/timer-progress.js';
 
 // ---------------------------------------------------------------------------
 // MCP Server Factory
@@ -30,11 +46,10 @@ server.tool(
   {},
   async () => {
     try {
-      const res = await api('GET', '/timers/today');
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const state = await getTodayState(db);
+      return textResult(state);
     } catch (e) {
-      return errorResult(`Timer server not reachable. Is the host app running? ${(e as Error).message}`);
+      return errorResult(`Failed to get timer status. ${(e as Error).message}`);
     }
   },
 );
@@ -47,11 +62,10 @@ server.tool(
   {},
   async () => {
     try {
-      const res = await api('GET', '/timers/buckets');
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const buckets = await listBuckets(db);
+      return textResult({ buckets });
     } catch (e) {
-      return errorResult(`Timer server not reachable. ${(e as Error).message}`);
+      return errorResult(`Failed to list buckets. ${(e as Error).message}`);
     }
   },
 );
@@ -64,11 +78,10 @@ server.tool(
   { bucket: z.string().describe('Bucket name or ID') },
   async ({ bucket }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('POST', `/timers/buckets/${resolved.id}/start`);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const result = await startTimer(resolved.id, db);
+      return textResult(result);
     } catch (e) {
       return errorResult(`Failed to start timer. ${(e as Error).message}`);
     }
@@ -83,11 +96,13 @@ server.tool(
   { bucket: z.string().describe('Bucket name or ID') },
   async ({ bucket }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('POST', `/timers/buckets/${resolved.id}/stop`);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const result = await stopTimer(resolved.id, db);
+      return textResult({
+        elapsedSeconds: result.elapsedSeconds ?? 0,
+        goalReachedAt: result.goalReachedAt ?? null,
+      });
     } catch (e) {
       return errorResult(`Failed to stop timer. ${(e as Error).message}`);
     }
@@ -102,11 +117,10 @@ server.tool(
   { bucket: z.string().describe('Bucket name or ID') },
   async ({ bucket }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('POST', `/timers/buckets/${resolved.id}/reset`);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      await resetProgress(resolved.id, db);
+      return textResult({ success: true });
     } catch (e) {
       return errorResult(`Failed to reset timer. ${(e as Error).message}`);
     }
@@ -129,16 +143,15 @@ server.tool(
   },
   async ({ name, totalMinutes, colorIndex, daysOfWeek, weeklySchedule }) => {
     try {
-      const body: Record<string, unknown> = {
+      const input: CreateBucketInput = {
         name,
         totalMinutes,
         colorIndex: colorIndex ?? 0,
         daysOfWeek: daysOfWeek ?? [1, 2, 3, 4, 5],
       };
-      if (weeklySchedule) body.weeklySchedule = weeklySchedule;
-      const res = await api('POST', '/timers/buckets', body);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      if (weeklySchedule) input.weeklySchedule = weeklySchedule;
+      const bucket = await createBucket(input, db);
+      return textResult({ bucket });
     } catch (e) {
       return errorResult(`Failed to create bucket. ${(e as Error).message}`);
     }
@@ -162,11 +175,11 @@ server.tool(
   },
   async ({ bucket, ...updates }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('PATCH', `/timers/buckets/${resolved.id}`, updates);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const updated = await updateBucket(resolved.id, updates, db);
+      if (!updated) return errorResult('Bucket not found');
+      return textResult({ bucket: updated });
     } catch (e) {
       return errorResult(`Failed to update bucket. ${(e as Error).message}`);
     }
@@ -181,11 +194,11 @@ server.tool(
   { bucket: z.string().describe('Bucket name or ID') },
   async ({ bucket }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('DELETE', `/timers/buckets/${resolved.id}`);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const deleted = await deleteBucket(resolved.id, db);
+      if (!deleted) return errorResult('Bucket not found');
+      return textResult({ success: true });
     } catch (e) {
       return errorResult(`Failed to delete bucket. ${(e as Error).message}`);
     }
@@ -203,11 +216,10 @@ server.tool(
   },
   async ({ bucket, elapsedSeconds }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('POST', `/timers/buckets/${resolved.id}/set-time`, { elapsedSeconds });
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const result = await setElapsedTime(resolved.id, elapsedSeconds, db);
+      return textResult(result);
     } catch (e) {
       return errorResult(`Failed to set timer time. ${(e as Error).message}`);
     }
@@ -225,11 +237,10 @@ server.tool(
   },
   async ({ bucket, targetMinutes }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('POST', `/timers/buckets/${resolved.id}/set-daily-goal`, { targetMinutes });
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const result = await setDailyGoal(resolved.id, targetMinutes, db);
+      return textResult(result);
     } catch (e) {
       return errorResult(`Failed to set daily goal. ${(e as Error).message}`);
     }
@@ -244,11 +255,10 @@ server.tool(
   { bucket: z.string().describe('Bucket name or ID') },
   async ({ bucket }) => {
     try {
-      const resolved = await resolveOrError(bucket);
+      const resolved = await resolveOrError(bucket, db);
       if (resolved.error) return resolved.error;
-      const res = await api('POST', `/timers/buckets/${resolved.id}/dismiss`);
-      if (!res.ok) return apiError(res);
-      return textResult(res.data);
+      const result = await dismissBucket(resolved.id, db);
+      return textResult({ success: true, dismissedAt: result.dismissedAt });
     } catch (e) {
       return errorResult(`Failed to dismiss bucket. ${(e as Error).message}`);
     }
